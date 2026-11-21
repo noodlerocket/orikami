@@ -10,6 +10,13 @@ signal health_changed(current: int, maximum: int)
 signal ink_changed(current: int, maximum: int)
 signal slash_landed
 signal hurt
+signal parried
+## He has fallen into a pit: the screen should fade out, then call
+## respawn_at_checkpoint() (main.gd does this).
+signal fell_in_pit
+## He has died (shredded): the screen should fade out, then call revive()
+## (main.gd does this).
+signal died
 
 @export_group("Run")
 @export var run_speed := 7.5
@@ -44,12 +51,13 @@ signal hurt
 @export var slash_active_time := 0.12
 @export var slash_cooldown := 0.3
 ## How far in front of the body the hit area is centred.
-@export var slash_reach := 0.85
+@export var slash_reach := 1.05
 ## Hit area size: (length along the swing, width across it).
-## The cut hits out to slash_reach + half the length = 1.6 m, which is where
+## The cut hits out to slash_reach + half the length = 1.9 m, which is where
 ## the white swoosh ends (RoninPuppet.sweep_reach). Keep the two in step:
 ## a cut should hit what the swoosh touches and nothing beyond it.
-@export var slash_size := Vector2(1.5, 1.4)
+## (1.6 m was a little short.)
+@export var slash_size := Vector2(1.7, 1.4)
 ## Upward bounce when a downward slash connects.
 @export var pogo_velocity := 12.0
 ## Push-back when a sideways slash connects.
@@ -57,6 +65,76 @@ signal hurt
 @export var recoil_time := 0.08
 ## Tiny freeze on hit that makes blows feel heavy.
 @export var hit_stop_time := 0.05
+
+@export_group("Wall")
+## Sliding down a wall: the fastest he falls while clinging to it.
+@export var wall_slide_speed := 2.6
+## A wall jump: how hard he is thrown away from the wall, and upward.
+@export var wall_jump_push := 7.5
+@export var wall_jump_velocity := 13.0
+## For this long after a wall jump the push is not overridden by the stick,
+## so the jump carries him out before you can steer back.
+@export var wall_jump_lock := 0.14
+## A jump pressed this long after leaving the wall still counts as a wall jump.
+@export var wall_coyote := 0.1
+## Holding away from the wall this long lets go of it.
+@export var wall_let_go_time := 0.15
+
+@export_group("Parry")
+## After pressing parry, a blow that lands within this many seconds is
+## deflected. Smaller = harder. (Sekiro's is roughly 0.2.)
+@export var parry_window := 0.2
+## Seconds before he can parry again, so mashing the button does not work.
+@export var parry_cooldown := 0.45
+## Freeze on a deflect, a little longer than a hit's, so it feels weighty.
+@export var parry_hit_stop := 0.09
+## How far a deflect pushes him back, in metres per second.
+@export var parry_push := 3.5
+## A parry is also good for this long after a deflect, so a quick second
+## blow straight after the first can be caught too.
+@export var parry_chain_time := 0.25
+## A finishing cut on a staggered enemy freezes the game this long.
+@export var finish_hit_stop := 0.14
+## Extra ink for a finishing cut, on top of ink_per_hit.
+@export var finish_ink := 2
+
+@export_group("Iaijutsu draw")
+## Seconds in the stance before the draw is ready. Let go sooner and he just
+## stands up again.
+@export var draw_charge_time := 0.45
+## How far the draw carries him, in metres, and how long it takes.
+@export var draw_distance := 4.6
+@export var draw_time := 0.13
+@export var draw_damage := 2
+## The cut lands this long after he arrives (the enemies he passed through
+## fall a moment later, like the classic draw).
+@export var draw_cut_delay := 0.07
+## How tall the band he cuts through is (metres), centred on his body.
+@export var draw_height := 1.5
+## Safe from harm for this long after the draw starts.
+@export var draw_safe_time := 0.35
+## Holding the draw key (K) within this long of a parry skips the charge:
+## straight into a ready stance (the parry-then-draw combo).
+@export var draw_combo_window := 0.6
+
+@export_group("Duck")
+## Holding down (S) on the ground: he crouches low and his body shrinks to
+## this height (metres), under the Hannya's glide.
+@export var duck_height := 0.85
+
+@export_group("Block")
+## Holding parry keeps his guard up after the parry window: a blow from the
+## front is blocked (no harm, a push back). This many blocks close together
+## break his guard and stun him.
+@export var block_breaks_after := 2
+## How long a broken guard leaves him stunned and open.
+@export var guard_break_stun := 0.9
+## Seconds without being hit before one block is forgotten.
+@export var block_recover_time := 2.0
+## How hard a blocked blow pushes him back.
+@export var block_push := 4.0
+## While guarding he can only shuffle, at this fraction of his run speed.
+@export var guard_walk := 0.3
 
 @export_group("Health and Ink")
 @export var max_health := 5
@@ -67,11 +145,18 @@ signal hurt
 @export var max_ink := 9
 @export var ink_per_hit := 1
 @export var heal_cost := 3
+## Every drop of ink he takes in marks his paper for good. At this many
+## drops (in total, over the whole game) he is covered in ink.
+@export var marks_full_at := 150
 ## How long K must be held to heal one point.
 @export var heal_hold_time := 0.9
-## Falling below this height counts as falling out of the world.
-@export var fall_limit_y := -10.0
-@export var respawn_delay := 0.9
+## Falling below this height (into a pit) fades the screen out and puts him
+## back at the start of the level.
+@export var fall_limit_y := -1.6
+## Health lost for falling in.
+@export var pit_damage := 1
+## Seconds between shredding and the screen starting to fade.
+@export var respawn_delay := 1.3
 
 const ENEMY_LAYER_MASK := 4
 const BODY_CENTER := Vector3(0.0, 0.75, 0.0)
@@ -82,6 +167,9 @@ const SLASH_DOWN := Vector2(0.0, -1.0)
 
 var health := 0
 var ink := 0
+## All the ink he has ever taken in. It never goes down (spending ink to heal
+## does not wash it off): it is what marks his body.
+var ink_absorbed := 0
 ## 1 = facing right, -1 = facing left.
 var facing := 1.0
 
@@ -101,6 +189,29 @@ var _hurt_lock := 0.0
 var _invulnerable := 0.0
 var _heal_progress := 0.0
 var _healing := false
+var _parry_time := 0.0
+var _parry_cooldown_left := 0.0
+var _parrying := 0.0        # time left in the parry stance (no cutting while in it)
+var _guarding := false      # holding his guard up (parry held past the window)
+var _ducking := false       # crouched low (holding down on the ground)
+var _body_shape: CapsuleShape3D
+var _stand_height := 1.5
+var _blocks := 0            # blocks taken close together (the guard breaks at block_breaks_after)
+var _block_clock := 0.0
+var _iai := false           # crouched in the iai stance
+var _iai_charge := 0.0      # seconds spent in the stance
+var _drawing := 0.0         # time left in the draw's dash
+var _draw_from := 0.0       # x where the draw started
+var _draw_hits: Array[Object] = []
+var _combo := 0.0           # time left to start the parry-then-draw combo
+var _draw_safe := 0.0       # time left that the draw keeps him from harm (no ink shown)
+var _wall_normal := 0.0     # +1 = a wall on his left (it pushes right), -1 = on his right, 0 = none
+var _wall_coyote := 0.0     # time left in which a jump still counts as a wall jump
+var _wall_side := 0.0       # the side of the last wall he touched
+var _wall_lock := 0.0       # time left in a wall jump's push
+var _wall_away := 0.0       # how long he has held away from the wall
+var _sliding := false       # clinging to a wall and sliding down it
+var _in_pit := false        # falling into a pit; waiting for the screen to fade
 var _dead := false
 var _grounded_time := 0.0
 var _safe_position := Vector3.ZERO
@@ -110,6 +221,12 @@ var _spawn_position := Vector3.ZERO
 
 
 func _ready() -> void:
+	add_to_group(&"player")
+	var holder: CollisionShape3D = $CollisionShape3D
+	_body_shape = holder.shape as CapsuleShape3D
+	_body_shape = _body_shape.duplicate()  # its own copy, to shrink when ducking
+	holder.shape = _body_shape
+	_stand_height = _body_shape.height
 	health = max_health
 	_spawn_position = global_position
 	_safe_position = global_position
@@ -119,6 +236,12 @@ func _physics_process(delta: float) -> void:
 	_count_down(delta)
 	var grounded := is_on_floor()
 
+	if _in_pit:
+		velocity.x = 0.0
+		_apply_gravity(delta, grounded)
+		move_and_slide()
+		_update_puppet()
+		return
 	if _dead:
 		velocity.x = move_toward(velocity.x, 0.0, ground_deceleration * delta)
 		_apply_gravity(delta, grounded)
@@ -149,11 +272,49 @@ func _physics_process(delta: float) -> void:
 	var busy := _hurt_lock > 0.0 or _healing
 	if Input.is_action_just_pressed("dash") and _can_dash and _dash_cooldown_left <= 0.0 and not busy:
 		_start_dash(move)
-	if Input.is_action_just_pressed("slash") and _slash_cooldown_left <= 0.0 and _dash_time <= 0.0 and not busy:
+	if Input.is_action_just_pressed("parry") and _parry_cooldown_left <= 0.0 and _dash_time <= 0.0 and not busy:
+		_start_parry()
+	# Holding down on the ground: duck. A cut, parry, draw or jump ends it.
+	var duck := (grounded and Input.is_action_pressed("aim_down") and not busy and _dash_time <= 0.0
+			and _slash_time <= 0.0 and not _iai and _drawing <= 0.0 and _parrying <= 0.0
+			and not Input.is_action_pressed("parry"))
+	_set_ducking(duck)
+	if _ducking:
+		if move != 0.0:
+			facing = signf(move)
+		move = 0.0
+	# Holding parry keeps the guard up (after the parry stance).
+	_guarding = (Input.is_action_pressed("parry") and not busy and _dash_time <= 0.0
+			and not _iai and _drawing <= 0.0 and _slash_time <= 0.0)
+	if _guarding:
+		move *= guard_walk
+	if _blocks > 0:
+		_block_clock += delta
+		if _block_clock >= block_recover_time:
+			_block_clock = 0.0
+			_blocks -= 1
+	_update_iai(delta, grounded, busy)
+	if (Input.is_action_just_pressed("slash") and _slash_cooldown_left <= 0.0 and _dash_time <= 0.0
+			and not busy and not _iai and _drawing <= 0.0 and _parrying <= 0.0):
 		_start_slash(grounded)
 
 	# --- Work out the velocity ---
-	if _dash_time > 0.0:
+	if _drawing > 0.0:
+		# The draw: a straight, very fast line along the ground.
+		velocity = Vector3(facing * draw_distance / draw_time, 0.0, 0.0)
+		_sweep_draw_path()
+		_drawing -= delta
+		if _drawing <= 0.0 or is_on_wall():
+			_drawing = 0.0
+			velocity.x = facing * run_speed * 0.3
+			_land_draw()
+	elif _iai:
+		# Crouched, perfectly still. He may turn to face the other way.
+		velocity.x = move_toward(velocity.x, 0.0, ground_deceleration * delta)
+		if move != 0.0:
+			facing = move
+		_apply_gravity(delta, grounded)
+	elif _dash_time > 0.0:
 		# Dashing: a straight horizontal burst that ignores gravity.
 		velocity = Vector3(_dash_dir * dash_speed, 0.0, 0.0)
 		if _dash_time - delta <= 0.0:
@@ -162,15 +323,18 @@ func _physics_process(delta: float) -> void:
 		# Knocked back: no control for a moment.
 		_apply_gravity(delta, grounded)
 	else:
-		if _recoil_left <= 0.0:
+		if _recoil_left <= 0.0 and _wall_lock <= 0.0:
 			var rate := air_acceleration
 			if grounded:
 				rate = ground_acceleration if move != 0.0 else ground_deceleration
 			velocity.x = move_toward(velocity.x, move * run_speed, rate * delta)
 			if move != 0.0 and _slash_time <= 0.0:
-				facing = move
+				facing = signf(move)
 		_apply_gravity(delta, grounded)
-		if _jump_buffer > 0.0 and _coyote > 0.0:
+		_update_wall(delta, grounded, move)
+		if _jump_buffer > 0.0 and _wall_coyote > 0.0 and not grounded and _coyote <= 0.0:
+			_wall_jump()
+		elif _jump_buffer > 0.0 and _coyote > 0.0:
 			velocity.y = jump_velocity
 			Sound.play(self, &"jump")
 			_jumping = true
@@ -185,6 +349,7 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 	position.z = 0.0  # Gameplay stays on a single plane.
+	_find_wall()
 
 	_update_slash()
 	if global_position.y < fall_limit_y:
@@ -192,10 +357,59 @@ func _physics_process(delta: float) -> void:
 	_update_puppet()
 
 
-## Called by enemies when they touch the Ronin.
-func take_damage(amount: int, from: Vector3) -> void:
-	if _invulnerable > 0.0 or _dead:
+func _set_ducking(on: bool) -> void:
+	if on == _ducking:
 		return
+	_ducking = on
+	var holder: CollisionShape3D = $CollisionShape3D
+	_body_shape.height = duck_height if on else _stand_height
+	_body_shape.radius = minf(0.32, _body_shape.height * 0.5)
+	holder.position.y = _body_shape.height * 0.5
+
+
+## Called by an enemy's ATTACK (not by touching it). Returns true if the
+## blow was parried, so the attacker can be knocked off balance.
+func receive_strike(amount: int, from: Vector3) -> bool:
+	if _dead:
+		return false
+	var toward := signf(from.x - global_position.x)
+	if _parry_time > 0.0 and (toward == facing or toward == 0.0):
+		_deflect(toward if toward != 0.0 else facing)
+		return true
+	if _guarding and (toward == facing or toward == 0.0) and _hurt_lock <= 0.0:
+		_block(toward if toward != 0.0 else facing)
+		return false  # blocked: no harm to him, but no posture lost by them either
+	take_damage(amount, from)
+	return false
+
+
+## A blow taken on his guard: no harm, a push back. Too many close together
+## break the guard and leave him stunned.
+func _block(toward: float) -> void:
+	_blocks += 1
+	_block_clock = 0.0
+	velocity.x = -toward * block_push
+	_recoil_left = recoil_time * 1.5
+	if _blocks >= block_breaks_after:
+		_blocks = 0
+		_guarding = false
+		_hurt_lock = guard_break_stun
+		velocity = Vector3(-toward * block_push * 1.4, 3.0, 0.0)
+		_puppet.play_guard_break()
+		Sound.play(self, &"stagger", 2.0)
+		hurt.emit()  # (shakes the camera)
+		_hit_stop(parry_hit_stop)
+	else:
+		_puppet.play_block()
+		Sound.play(self, &"parry", -7.0)
+		_hit_stop(hit_stop_time)
+
+
+## Called by enemies when they touch the Ronin. Returns true if it hurt him
+## (false while he cannot be hurt).
+func take_damage(amount: int, from: Vector3) -> bool:
+	if _invulnerable > 0.0 or _draw_safe > 0.0 or _dead:
+		return false
 	health = maxi(health - amount, 0)
 	health_changed.emit(health, max_health)
 	hurt.emit()
@@ -204,6 +418,7 @@ func take_damage(amount: int, from: Vector3) -> void:
 	_dash_time = 0.0
 	_slash_time = 0.0
 	_jumping = false
+	_iai = false
 	var away := signf(global_position.x - from.x)
 	if away == 0.0:
 		away = -facing
@@ -212,6 +427,7 @@ func take_damage(amount: int, from: Vector3) -> void:
 	_hit_stop(hit_stop_time * 2.0)
 	if health <= 0:
 		_die()
+	return true
 
 
 func _count_down(delta: float) -> void:
@@ -224,6 +440,13 @@ func _count_down(delta: float) -> void:
 	_recoil_left = maxf(_recoil_left - delta, 0.0)
 	_hurt_lock = maxf(_hurt_lock - delta, 0.0)
 	_invulnerable = maxf(_invulnerable - delta, 0.0)
+	_parry_time = maxf(_parry_time - delta, 0.0)
+	_parry_cooldown_left = maxf(_parry_cooldown_left - delta, 0.0)
+	_combo = maxf(_combo - delta, 0.0)
+	_draw_safe = maxf(_draw_safe - delta, 0.0)
+	_parrying = maxf(_parrying - delta, 0.0)
+	_wall_coyote = maxf(_wall_coyote - delta, 0.0)
+	_wall_lock = maxf(_wall_lock - delta, 0.0)
 
 
 func _apply_gravity(delta: float, grounded: bool) -> void:
@@ -258,6 +481,113 @@ func _start_slash(grounded: bool) -> void:
 	_puppet.play_slash(_slash_dir)
 
 
+# --- The iaijutsu draw ------------------------------------------------------
+
+## The draw has its own key (K), so holding it crouches straight into the
+## stance with no cut first. (Holding the cut key instead would have meant
+## waiting before every cut to see if it was held.)
+func _update_iai(delta: float, grounded: bool, busy: bool) -> void:
+	if _iai:
+		if busy or not grounded:
+			_iai = false
+			return
+		_iai_charge += delta
+		if not Input.is_action_pressed("draw"):
+			_iai = false
+			if _iai_charge >= draw_charge_time:
+				_start_draw()
+		return
+	if (Input.is_action_pressed("draw") and grounded and not busy and _slash_time <= 0.0
+			and _drawing <= 0.0 and _dash_time <= 0.0 and _parrying <= 0.0):
+		# Straight after a parry, the stance is ready at once (the combo).
+		_enter_iai(_combo > 0.0)
+
+
+func _enter_iai(ready: bool) -> void:
+	_iai = true
+	_iai_charge = draw_charge_time if ready else 0.0
+	_combo = 0.0
+
+
+## True once the draw is charged: letting go now will draw.
+func iai_ready() -> bool:
+	return _iai and _iai_charge >= draw_charge_time
+
+
+func _start_draw() -> void:
+	Sound.play(self, &"slash", 3.0)
+	_drawing = draw_time
+	_draw_from = global_position.x
+	_draw_hits.clear()
+	_draw_safe = draw_safe_time
+	_slash_cooldown_left = slash_cooldown
+	_puppet.play_draw(_draw_from)
+
+
+## Every frame of the draw: note every enemy inside the band between where he
+## started and where he is now. They are cut when he arrives.
+func _sweep_draw_path() -> void:
+	var left := minf(_draw_from, global_position.x) - 0.5
+	var right := maxf(_draw_from, global_position.x) + 0.5
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(right - left, draw_height, 2.0)
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = shape
+	query.collision_mask = ENEMY_LAYER_MASK
+	query.transform = Transform3D(Basis.IDENTITY, Vector3((left + right) * 0.5, global_position.y + BODY_CENTER.y, 0.0))
+	for result: Dictionary in get_world_3d().direct_space_state.intersect_shape(query, 16):
+		var target: Object = result["collider"]
+		if target not in _draw_hits and target.has_method("take_hit"):
+			_draw_hits.append(target)
+
+
+func _land_draw() -> void:
+	_sweep_draw_path()
+	_puppet.end_draw(global_position.x)
+	if _draw_hits.is_empty():
+		return
+	await get_tree().create_timer(draw_cut_delay, true, true).timeout
+	var any := false
+	for target: Object in _draw_hits:
+		if not is_instance_valid(target):
+			continue
+		var finishing: bool = target.has_method("is_staggered") and target.is_staggered()
+		for i in draw_damage:
+			if is_instance_valid(target):
+				target.take_hit(1, Vector2(facing, 0.0))
+		ink = mini(ink + ink_per_hit + (finish_ink if finishing else 0), max_ink)
+		ink_absorbed += ink_per_hit + (finish_ink if finishing else 0)
+		any = true
+	if any:
+		ink_changed.emit(ink, max_ink)
+		slash_landed.emit()
+		Sound.play(self, &"paper_cut", 2.0)
+		_hit_stop(finish_hit_stop)
+
+
+func _start_parry() -> void:
+	_parry_time = parry_window
+	_parry_cooldown_left = parry_cooldown
+	_slash_time = 0.0
+	_iai = false
+	_parrying = _puppet.parry_time
+	_puppet.play_parry()
+
+
+func _deflect(toward: float) -> void:
+	Sound.play(self, &"parry")
+	# A good parry is rewarded: he can parry again at once.
+	_parry_time = parry_chain_time
+	_parry_cooldown_left = 0.0
+	velocity.x = -toward * parry_push
+	_recoil_left = recoil_time * 1.5
+	_puppet.play_deflect()
+	_parrying = maxf(_parrying, _puppet.parry_time * 0.7)
+	_combo = draw_combo_window
+	parried.emit()
+	_hit_stop(parry_hit_stop)
+
+
 ## While the blade is active, ask the physics engine "what enemies are inside
 ## this box in front of me?" and hit each one once.
 func _update_slash() -> void:
@@ -278,12 +608,14 @@ func _update_slash() -> void:
 		if target in _slash_hits or not target.has_method("take_hit"):
 			continue
 		_slash_hits.append(target)
+		var finishing: bool = target.has_method("is_staggered") and target.is_staggered()
 		target.take_hit(slash_damage, _slash_dir)
-		_on_slash_connected()
+		_on_slash_connected(finishing)
 
 
-func _on_slash_connected() -> void:
-	ink = mini(ink + ink_per_hit, max_ink)
+func _on_slash_connected(finishing: bool = false) -> void:
+	ink = mini(ink + ink_per_hit + (finish_ink if finishing else 0), max_ink)
+	ink_absorbed += ink_per_hit + (finish_ink if finishing else 0)
 	ink_changed.emit(ink, max_ink)
 	slash_landed.emit()
 	Sound.play(self, &"paper_cut")
@@ -295,7 +627,7 @@ func _on_slash_connected() -> void:
 	elif _slash_dir.x != 0.0:
 		velocity.x = -_slash_dir.x * recoil_speed
 		_recoil_left = recoil_time
-	_hit_stop(hit_stop_time)
+	_hit_stop(finish_hit_stop if finishing else hit_stop_time)
 
 
 func _update_heal(delta: float, grounded: bool) -> void:
@@ -310,31 +642,120 @@ func _update_heal(delta: float, grounded: bool) -> void:
 		ink -= heal_cost
 		health += 1
 		Sound.play(self, &"heal")
+		_puppet.play_healed()
 		ink_changed.emit(ink, max_ink)
 		health_changed.emit(health, max_health)
 
 
 func _fell_out_of_world() -> void:
-	health = maxi(health - 1, 0)
-	health_changed.emit(health, max_health)
-	hurt.emit()
-	Sound.play(self, &"hurt")
-	velocity = Vector3.ZERO
-	global_position = _safe_position
-	_invulnerable = invulnerable_time
+	if _in_pit or _dead:
+		return
+	_in_pit = true
+	_iai = false
+	_drawing = 0.0
+	_dash_time = 0.0
+	fell_in_pit.emit()
+
+
+## Called (by main.gd) once the screen has faded out after a fall: he is
+## put back at the start of the level, a point of health lighter. No ink:
+## he was not struck, he fell.
+func respawn_at_checkpoint() -> void:
+	health = maxi(health - pit_damage, 0)
 	if health <= 0:
-		_die()
-
-
-func _die() -> void:
-	_dead = true
-	await get_tree().create_timer(respawn_delay).timeout
+		health = max_health  # falling to the end of your health is a death; a death respawns here too
+	health_changed.emit(health, max_health)
 	global_position = _spawn_position
 	_safe_position = _spawn_position
 	velocity = Vector3.ZERO
+	facing = 1.0
+	_sliding = false
+	_wall_lock = 0.0
+	_draw_safe = 0.6  # a moment's safety, without the struck look
+	_in_pit = false
+
+
+# --- Walls -------------------------------------------------------------------
+
+## After moving: is he touching a climbable wall (one the level marked with
+## the "climbable" meta)? Records which side it is on.
+func _find_wall() -> void:
+	_wall_normal = 0.0
+	if is_on_floor():
+		return
+	for i in get_slide_collision_count():
+		var hit := get_slide_collision(i)
+		var normal := hit.get_normal()
+		var wall := hit.get_collider() as Node
+		if absf(normal.x) > 0.7 and wall and wall.has_meta(&"climbable"):
+			_wall_normal = signf(normal.x)
+			_wall_side = _wall_normal
+			_wall_coyote = wall_coyote
+
+
+## Clinging and sliding. He clings to a wall he has jumped onto as soon as he
+## starts to fall, keeps hold of it without any button held, and slides down
+## slowly. Holding away from it for a moment lets go.
+func _update_wall(delta: float, grounded: bool, move: float) -> void:
+	var was_sliding := _sliding
+	_sliding = (_wall_normal != 0.0 and not grounded and velocity.y <= 0.0
+			and _wall_lock <= 0.0 and _hurt_lock <= 0.0)
+	if not _sliding:
+		_wall_away = 0.0
+		return
+	if move == _wall_normal:
+		_wall_away += delta
+		if _wall_away >= wall_let_go_time:
+			_sliding = false
+			return
+	else:
+		_wall_away = 0.0
+		velocity.x = -_wall_normal * 1.5  # a light press, to keep touching it
+	velocity.y = maxf(velocity.y, -wall_slide_speed)
+	facing = _wall_normal  # back to the wall, looking out, feet braced on it
+	_can_dash = true
+	if not was_sliding:
+		Sound.play(self, &"land", -6.0)
+
+
+func _wall_jump() -> void:
+	var away := _wall_side
+	velocity = Vector3(away * wall_jump_push, wall_jump_velocity, 0.0)
+	facing = away
+	_wall_lock = wall_jump_lock
+	_wall_coyote = 0.0
+	_jump_buffer = 0.0
+	_sliding = false
+	_jumping = true
+	_can_dash = true
+	Sound.play(self, &"jump")
+	_puppet.play_wall_jump()
+
+
+## Out of health: his paper body shreds into pieces, and a moment later the
+## screen fades and he is back at the start (main.gd calls revive()).
+func _die() -> void:
+	_dead = true
+	_iai = false
+	_drawing = 0.0
+	_puppet.shred()
+	Sound.play(self, &"paper_burst", 4.0)
+	Sound.play(self, &"paper_rip", -2.0)
+	await get_tree().create_timer(respawn_delay).timeout
+	died.emit()
+
+
+## Back at the start, whole again, at full health.
+func revive() -> void:
+	global_position = _spawn_position
+	_safe_position = _spawn_position
+	velocity = Vector3.ZERO
+	facing = 1.0
 	health = max_health
 	health_changed.emit(health, max_health)
-	_invulnerable = invulnerable_time
+	_puppet.restore()
+	_draw_safe = 0.8
+	_invulnerable = 0.0
 	_dead = false
 
 
@@ -352,8 +773,20 @@ func _update_puppet() -> void:
 	_puppet.vertical_speed = velocity.y
 	_puppet.horizontal_speed = velocity.x
 	_puppet.blinking = _invulnerable > 0.0 and not _dead
+	_puppet.iai_charge = clampf(_iai_charge / draw_charge_time, 0.0, 1.0)
+	_puppet.guarding = _guarding
+	_puppet.heal_charge = clampf(_heal_progress / heal_hold_time, 0.0, 1.0) if _healing else -1.0
+	_puppet.marks = clampf(float(ink_absorbed) / maxf(marks_full_at, 1.0), 0.0, 1.0)
 	if _dead or _hurt_lock > 0.0:
 		_puppet.state = &"hurt"
+	elif _drawing > 0.0:
+		_puppet.state = &"draw"
+	elif _sliding:
+		_puppet.state = &"wall"
+	elif _ducking:
+		_puppet.state = &"duck"
+	elif _iai:
+		_puppet.state = &"iai"
 	elif _dash_time > 0.0:
 		_puppet.state = &"dash"
 	elif _healing:

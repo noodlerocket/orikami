@@ -26,6 +26,17 @@ const SOUNDS := {
 	&"paper_burst": {"files": ["paper_burst.mp3"], "volume": -4.0, "vary": 0.06},
 	&"hurt": {"files": ["hurt.mp3"], "volume": -5.0, "vary": 0.05},
 	&"heal": {"files": ["heal.mp3"], "volume": -10.0, "vary": 0.0},
+	&"parry": {"files": ["parry.mp3"], "volume": -4.0, "vary": 0.05},
+	&"stagger": {"files": ["stagger.mp3"], "volume": -8.0, "vary": 0.04},
+	# The Hannya cutscene.
+	&"lantern_snuff": {"files": ["lantern_snuff.mp3"], "volume": -8.0, "vary": 0.05},
+	&"mask_creak": {"files": ["mask_creak.mp3"], "volume": -6.0, "vary": 0.03},
+	&"ink_bleed": {"files": ["ink_bleed.mp3"], "volume": -6.0, "vary": 0.0},
+	&"paper_rip": {"files": ["paper_rip.mp3"], "volume": -3.0, "vary": 0.07},
+	&"taiko_hit": {"files": ["taiko_hit.mp3"], "volume": -2.0, "vary": 0.0},
+	&"hannya_wail": {"files": ["hannya_wail.mp3"], "volume": -5.0, "vary": 0.05},
+	&"draw_ready": {"files": ["draw_ready.mp3"], "volume": -9.0, "vary": 0.0},
+	&"hannya_sob_short": {"files": ["hannya_sob.mp3"], "volume": -6.0, "vary": 0.06},
 }
 
 @export_group("Volume (decibels)")
@@ -34,6 +45,8 @@ const SOUNDS := {
 ## Added to every one-off sound (steps, cuts, hits).
 @export var effects_volume := 0.0
 @export var rain_volume := -16.0
+## The village music (shakuhachi and koto), under the rain. M mutes it too.
+@export var music_volume := -12.0
 ## The wind when it is only a breeze, and at the height of a gust.
 @export var wind_quiet := -30.0
 @export var wind_loud := -11.0
@@ -44,6 +57,8 @@ var _next_voice := 0
 var _rain_near: AudioStreamPlayer
 var _rain_far: AudioStreamPlayer
 var _wind: AudioStreamPlayer
+var _music: AudioStreamPlayer
+var _wind_hush := 0.0   # taken off the wind while the rain is hushed
 
 
 ## Plays a one-off sound from anywhere. `from` is any node in the scene.
@@ -71,6 +86,16 @@ func _ready() -> void:
 	_rain_near = _start_loop("rain_close.mp3", rain_volume, 1.0)
 	_rain_far = _start_loop("rain_far.mp3", rain_volume - 3.0, 0.93)
 	_wind = _start_loop("wind.mp3", wind_quiet, 1.0)
+	# The music loops seamlessly on its own (its end was blended into its
+	# start when it was made); OGG, unlike MP3, adds no gap at the seam.
+	var music := load(FOLDER + "music_village.ogg") as AudioStreamOggVorbis
+	if music:
+		music.loop = true
+		_music = AudioStreamPlayer.new()
+		_music.stream = music
+		_music.volume_db = music_volume
+		add_child(_music)
+		_music.play()
 
 
 func _process(_delta: float) -> void:
@@ -79,7 +104,7 @@ func _process(_delta: float) -> void:
 	if camera == null or _wind == null:
 		return
 	var gust := clampf((Wind.speed_at(camera.global_position.x) - Wind.breeze) / maxf(Wind.gusts, 0.1), 0.0, 1.0)
-	_wind.volume_db = lerpf(wind_quiet, wind_loud, sqrt(gust))
+	_wind.volume_db = lerpf(wind_quiet, wind_loud, sqrt(gust)) + _wind_hush
 	_wind.pitch_scale = lerpf(0.92, 1.1, gust)
 
 
@@ -87,6 +112,33 @@ func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if key and key.pressed and not key.echo and key.keycode == KEY_M:
 		AudioServer.set_bus_mute(0, not AudioServer.is_bus_mute(0))
+
+
+## Fades the village music out (true) or back in (false), from anywhere.
+static func duck_music(on: bool) -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	tree.call_group(&"sound", &"_fade_music", on)
+
+
+## Hushes the rain and wind (true) or brings them back (false).
+static func duck_rain(on: bool) -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	tree.call_group(&"sound", &"_fade_rain", on)
+
+
+func _fade_music(on: bool) -> void:
+	if _music:
+		create_tween().tween_property(_music, "volume_db", -60.0 if on else music_volume, 1.5)
+
+
+func _fade_rain(on: bool) -> void:
+	var drop := -14.0 if on else 0.0
+	var t := create_tween().set_parallel()
+	if _rain_near:
+		t.tween_property(_rain_near, "volume_db", rain_volume + drop, 1.2)
+	if _rain_far:
+		t.tween_property(_rain_far, "volume_db", rain_volume - 3.0 + drop, 1.2)
+	_wind_hush = drop
 
 
 ## Plays one of the files for `sound`. (Called through Sound.play.)

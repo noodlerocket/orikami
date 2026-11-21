@@ -409,3 +409,35 @@ func _cap(ring: PackedVector3Array, outward: Vector3) -> void:
 	var middle := PaperMesh._middle(ring)
 	for i in ring.size():
 		tri(middle, ring[i], ring[(i + 1) % ring.size()], outward)
+
+
+
+# --- Liquid ink, for particles ------------------------------------------------------
+
+static var _soft_dot: GradientTexture2D
+
+## A material for drops, splashes and wisps of ink: a soft round blot (not a
+## hard-edged rectangle), see-through at its edge, tinted by `colour` and by
+## the particle's own colour (so a colour ramp can fade it out).
+static func soft_ink(colour: Color, billboard: int = BaseMaterial3D.BILLBOARD_PARTICLES) -> StandardMaterial3D:
+	if _soft_dot == null:
+		var ramp := Gradient.new()
+		ramp.set_color(0, Color(1, 1, 1, 1))
+		ramp.set_color(1, Color(1, 1, 1, 0))
+		ramp.add_point(0.45, Color(1, 1, 1, 0.95))
+		_soft_dot = GradientTexture2D.new()
+		_soft_dot.gradient = ramp
+		_soft_dot.fill = GradientTexture2D.FILL_RADIAL
+		_soft_dot.fill_from = Vector2(0.5, 0.5)
+		_soft_dot.fill_to = Vector2(1.0, 0.5)
+		_soft_dot.width = 64
+		_soft_dot.height = 64
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_texture = _soft_dot
+	mat.albedo_color = colour
+	mat.vertex_color_use_as_albedo = true
+	mat.billboard_mode = billboard
+	mat.disable_fog = true
+	return mat

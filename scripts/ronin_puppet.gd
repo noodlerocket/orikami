@@ -65,7 +65,7 @@ extends Node3D
 @export var aimed_cut_fps := 30.0
 ## How far out the white sweep reaches (metres), and how tall its ribbon is
 ## at the widest point.
-@export var sweep_reach := 1.55
+@export var sweep_reach := 1.85
 @export var sweep_height := 0.5
 ## How much of cut_time the sweep takes to be drawn on (0 to 1), and the
 ## moment it starts being wiped away from the end where it began.
@@ -76,6 +76,43 @@ extends Node3D
 @export var run_ease_out := 0.22
 ## How much he is stretched along the way he is going during a dash.
 @export var dash_stretch := 1.12
+
+@export_group("Parry")
+## How long the parry stance lasts, from the draw to the blade going home.
+## Keep it at or above Ronin.parry_window.
+@export var parry_time := 0.32
+## The parry is posed this many times a second, like the aimed cuts, so the
+## short draw into the guard shows.
+@export var parry_fps := 30.0
+## How long the clash (the burst of paper rays off the blade) lasts.
+@export var clash_time := 0.2
+## How far the rays of the clash reach out from the blade.
+@export var clash_size := 0.48
+## A perfect parry's clash is gold; a plain block's is a smaller, dull grey.
+@export var parry_color := Color(1.0, 0.8, 0.36, 0.95)
+@export var block_color := Color(0.7, 0.7, 0.76, 0.8)
+## Where on him the blade catches the blow (forward, up), in metres.
+@export var clash_at := Vector2(0.6, 1.12)
+
+@export_group("Wall")
+## How long the spring-off pose shows before he is in the ordinary jump.
+@export var wall_jump_pose_time := 0.25
+## While sliding down a wall, how much the cloak is lifted by the air rushing
+## up past him (1 = as much as in a fall of the same speed).
+@export var wall_cloth_lift := 0.3
+
+@export_group("Iaijutsu draw")
+## How long the streak of the draw stays, from when he arrives to when the
+## last of it is wiped away. The sword goes away with it.
+@export var draw_trail_time := 0.32
+## How tall the streak is, in metres, and its height above his feet.
+@export var draw_trail_width := 0.22
+@export var draw_trail_height := 0.95
+
+@export_group("Ink marks")
+## How fast new marks are drawn onto him (fraction of full marks per second),
+## so a gain shows as strokes spreading, not appearing.
+@export var marks_draw_speed := 0.08
 
 @export_group("Struck")
 ## When he is hurt, ink splashes off him and blots his paper. This is how
@@ -153,6 +190,31 @@ var _sweep_side: MeshInstance3D   # the swoosh for a forward cut: round him, fro
 var _sweep_tall: MeshInstance3D   # the swoosh for cuts aimed up or down
 var _sweep_flip: Node3D           # flips the upright swoosh for facing and up/down
 var _step := 0.0         # seconds since the last stop-motion pose
+var iai_charge := 0.0             # 0 to 1: how ready the draw is (set by ronin.gd)
+var guarding := false             # holding his guard up (set by ronin.gd)
+var heal_charge := -1.0           # 0 to 1 while healing, -1 when not (set by ronin.gd)
+var _enso: MeshInstance3D         # the brush circle painted round him as he heals
+var _enso_head := 0.0             # how much of the circle is painted (eases toward heal_charge)
+var _enso_tail := 0.0
+var _enso_done := -1.0            # seconds since a heal completed (the flash), or -1
+var _motes: CPUParticles3D        # pale motes drawn in toward him while he heals
+var _was_ready := false           # the draw was ready last frame
+var _ready_flash := 0.0           # 1 the instant the draw is ready, fading
+var _glint: Node3D                # the gleam on the inch of blade
+var _glint_rays: Array[MeshInstance3D] = []
+var _glint_clock := -1.0
+var _flecks_look: StandardMaterial3D
+var marks := 0.0                  # 0 to 1: how marked he should be (set by ronin.gd)
+var _marks_shown := 0.0           # how marked he is drawn right now
+var _wall_jump_clock := -1.0      # seconds since he sprang off a wall, or -1
+var _draw_trail: MeshInstance3D   # the streak along the path of the draw
+var _draw_from := 0.0             # x where the draw started
+var _draw_clock := -1.0           # seconds since he arrived, or -1
+var _parry_clock := -1.0          # seconds into the current parry, or -1
+var _clash_clock := -1.0          # seconds into the current clash, or -1
+var _clash: Node3D                # the burst of rays when a parry lands
+var _clash_rays: Array[MeshInstance3D] = []
+var _flecks: CPUParticles3D       # white paper chips knocked off by the clash
 
 
 func _ready() -> void:
@@ -180,6 +242,20 @@ func _process(delta: float) -> void:
 			_frame_clock = 1.0
 		if _cut_clock > cut_time:
 			_cut_clock = -1.0
+	if _parry_clock >= 0.0:
+		_parry_clock += delta
+		if _parry_clock > parry_time:
+			_parry_clock = -1.0
+			_shown_state = &""  # ease back out of the guard
+			_frame_clock = 1.0  # and put the sword away this instant
+	if _model:
+		_update_ready_cue(delta)
+		_update_enso(delta)
+		# The marks creep toward what he has absorbed, every frame.
+		_marks_shown = move_toward(_marks_shown, marks, marks_draw_speed * delta)
+		_cloth.set_shader_parameter(&"marks", _marks_shown)
+		_update_clash(delta)
+		_update_draw_trail(delta)
 	# The blade is only out while he strikes, in the hand nearest the camera.
 	var drawn := _slash_clock >= 0.0
 	if not _model:
@@ -195,6 +271,8 @@ func _process(delta: float) -> void:
 	var rate := frames_per_second
 	if _model and _cut_clock >= 0.0 and not _sheathed and absf(_slash_dir.y) > 0.5:
 		rate = aimed_cut_fps
+	if _model and _parry_clock >= 0.0:
+		rate = parry_fps
 	if _frame_clock >= 1.0 / rate:
 		_step = minf(_frame_clock, 1.0 / frames_per_second)
 		_frame_clock = 0.0
@@ -211,6 +289,70 @@ func play_slash(direction: Vector2) -> void:
 	_cut_clock = 0.0
 	_sheathed = false
 	_pose()
+
+
+## Called by ronin.gd when he springs off a wall.
+func play_wall_jump() -> void:
+	_wall_jump_clock = 0.0
+	_frame_clock = 1.0
+
+
+## Called by ronin.gd when the draw starts, at x = `from`.
+func play_draw(from: float) -> void:
+	_draw_from = from
+	_draw_clock = -1.0
+	_cut_clock = -1.0
+	_parry_clock = -1.0
+	_frame_clock = 1.0  # strike pose at once
+
+
+## Called by ronin.gd when the draw has carried him to x = `to`.
+func end_draw(to: float) -> void:
+	_draw_clock = 0.0
+	_frame_clock = 1.0
+	_set_trail(_draw_from, to)
+
+
+## Called by ronin.gd when he raises his blade to parry.
+func play_parry() -> void:
+	_parry_clock = 0.0
+	_cut_clock = -1.0
+	_frame_clock = 0.0
+	_step = 0.0
+	_pose()
+
+
+## Called by ronin.gd when a parry catches a blow: the blade is held in the
+## guard a moment longer and the clash bursts off it.
+func play_deflect() -> void:
+	if _parry_clock < 0.0:
+		play_parry()
+	# Hold the guard (not the draw) for the rest of the parry.
+	_parry_clock = maxf(_parry_clock, parry_time * 0.3)
+	_burst_clash(parry_color, 1.0)
+
+
+## A blow taken on his guard: a smaller, dull clash.
+func play_block() -> void:
+	_burst_clash(block_color, 0.6)
+
+
+## His guard is broken: a dull clash, and the sword knocked away.
+func play_guard_break() -> void:
+	_burst_clash(block_color, 1.0)
+	_parry_clock = -1.0
+	_frame_clock = 1.0
+
+
+func _burst_clash(colour: Color, size: float) -> void:
+	_clash_clock = 0.0
+	_clash.scale = Vector3(facing, 1.0, 1.0) * size
+	for ray: MeshInstance3D in _clash_rays:
+		(ray.material_override as ShaderMaterial).set_shader_parameter(&"tint", colour)
+	if _flecks:
+		_flecks_look.albedo_color = Color(colour.r, colour.g, colour.b)
+		_flecks.amount = int(10 * size) + 2
+		_flecks.restart()
 
 
 # --- Building the paper figure -------------------------------------------
@@ -315,6 +457,11 @@ func _build_model() -> void:
 	_fold_slim_katana(_model_sword)
 	_model_sword.visible = false
 
+	_build_clash()
+	_build_draw_trail()
+	_build_glint()
+	_build_enso()
+
 	# Speed lines for the dash: thin white strokes left hanging in the air.
 	_streaks = CPUParticles3D.new()
 	_streaks.emitting = false
@@ -358,13 +505,8 @@ func _build_model() -> void:
 	_ink_drops.scale_amount_min = 0.5
 	_ink_drops.scale_amount_max = 1.6
 	var drop := QuadMesh.new()
-	drop.size = Vector2(0.07, 0.07)
-	var black := StandardMaterial3D.new()
-	black.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	black.albedo_color = PaperMesh.SUMI
-	black.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-	black.disable_fog = true
-	drop.material = black
+	drop.size = Vector2(0.1, 0.1)
+	drop.material = PaperMesh.soft_ink(PaperMesh.SUMI)
 	_ink_drops.mesh = drop
 	_ink_drops.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_ink_drops.position = Vector3(0.0, 0.9, 0.3)
@@ -406,8 +548,17 @@ func _paint_cloth(node: MeshInstance3D) -> void:
 			var swing := 0.0 if scabbard or handle > 0.0 else loose * clampf(1.2 - p.y, 0.0, 1.1) / CLOTH_REACH
 			paint[i] = Color(swing, fposmod(p.x * 1.7 + p.y * 2.3 + p.z * 1.1, 1.0), handle)
 		arrays[Mesh.ARRAY_COLOR] = paint
-		painted.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {},
-				source.surface_get_format(surface) & Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS)
+		# Each point's resting place on his body, for the permanent ink marks.
+		var rest := PackedFloat32Array()
+		rest.resize(points.size() * 4)
+		for i in points.size():
+			rest[i * 4] = points[i].x
+			rest[i * 4 + 1] = points[i].y
+			rest[i * 4 + 2] = points[i].z
+		arrays[Mesh.ARRAY_CUSTOM0] = rest
+		var format: int = (source.surface_get_format(surface) & Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS) \
+				| (Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT)
+		painted.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {}, format)
 	node.mesh = painted
 
 
@@ -416,9 +567,13 @@ func _paint_cloth(node: MeshInstance3D) -> void:
 ## when he runs or dashes, and flies up when he falls.
 func _blow_cloth(delta: float) -> void:
 	var air := Wind.at(global_position.x) - Vector3(horizontal_speed, vertical_speed, 0.0)
+	if state == &"wall":
+		air.y *= wall_cloth_lift  # a slow slide only stirs it, it is not a fall
 	var space := _animator.skeleton.global_transform.basis.orthonormalized()
 	var push := ((space.inverse() * air) / cloth_weight).limit_length(2.2)
 	push.z = minf(push.z, 0.2)  # it cannot blow through his back
+	if state == &"wall":
+		push.z = maxf(push.z, 0.15)  # nor back into the wall behind him
 	push.y = minf(push.y, 0.85) # in a fall it lifts level, but not over his head
 	_cloth_push = _cloth_push.lerp(push, 1.0 - exp(-cloth_follow * delta))
 	_cloth.set_shader_parameter(&"push", _cloth_push)
@@ -445,8 +600,31 @@ func _pose_model() -> void:
 		&"jump", &"fall":
 			pose = SamuraiAnimator.air(clampf(vertical_speed / jump_pose_speed, 0.0, 1.0),
 					clampf(-vertical_speed / fall_pose_speed, 0.0, 1.0))
+			# Just sprang off a wall: the push, easing into the ordinary jump.
+			if _wall_jump_clock >= 0.0:
+				_wall_jump_clock += _step
+				if _wall_jump_clock > wall_jump_pose_time:
+					_wall_jump_clock = -1.0
+				else:
+					pose = SamuraiAnimator.mix(SamuraiAnimator.wall_jump(), pose,
+							smoothstep(0.4, 1.0, _wall_jump_clock / wall_jump_pose_time))
+		&"wall":
+			pose = SamuraiAnimator.wall_slide(_clock)
+		&"duck":
+			pose = SamuraiAnimator.duck(_clock)
+		&"sneak":
+			# Creeping (cutscenes): short steps at `strides_per_second`.
+			var before_step := _run_phase
+			_run_phase = fposmod(_run_phase + _step * strides_per_second, 1.0)
+			if _run_phase < before_step or (before_step < 0.5 and _run_phase >= 0.5):
+				Sound.play(self, &"step", -9.0)
+			pose = SamuraiAnimator.sneak(_run_phase)
 		&"dash":
 			pose = SamuraiAnimator.dash()
+		&"iai":
+			pose = SamuraiAnimator.iai(iai_charge, _clock)
+		&"draw":
+			pose = SamuraiAnimator.iai_strike()
 		&"hurt":
 			pose = SamuraiAnimator.hurt()
 		&"heal":
@@ -480,6 +658,29 @@ func _pose_model() -> void:
 		else:
 			pose = SamuraiAnimator.with_upper_body(pose, cut)
 
+	# Just arrived from a draw: hold the end of the cut until the streak is
+	# wiped away, then put the sword away with the last of it.
+	if _draw_clock >= 0.0 and state != &"draw" and state != &"hurt":
+		if _draw_clock < draw_trail_time * 0.95:
+			pose = SamuraiAnimator.iai_strike()
+			cutting = true
+
+	# Holding his guard: the braced end of the parry, held.
+	if guarding and _parry_clock < 0.0 and state != &"hurt":
+		var held := SamuraiAnimator.parry(0.85)
+		pose = held if state == &"idle" and _run_blend <= 0.0 else SamuraiAnimator.with_upper_body(pose, held)
+		cutting = true
+
+	# The parry. Like a cut: whole body standing still, upper body otherwise.
+	var parrying := _parry_clock >= 0.0
+	if parrying:
+		var guard := SamuraiAnimator.parry(_parry_clock / parry_time)
+		if state == &"idle" and _run_blend <= 0.0:
+			pose = guard
+		else:
+			pose = SamuraiAnimator.with_upper_body(pose, guard)
+		cutting = true  # no in-between frame: the draw must be instant
+
 	# A new kind of stance gets one in-between frame, so it does not pop.
 	# (Standing and running count as one kind: the easing above handles them.)
 	var kind: StringName = &"ground" if state == &"idle" or state == &"run" else state
@@ -491,8 +692,9 @@ func _pose_model() -> void:
 	_animator.apply(_shown)
 
 	# A dash stretches him along the way he is going.
-	_model.scale = Vector3(dash_stretch, 1.0 / sqrt(dash_stretch), 1.0) if state == &"dash" else Vector3.ONE
-	_streaks.emitting = state == &"dash"
+	var stretched := state == &"dash" or state == &"draw"
+	_model.scale = Vector3(dash_stretch, 1.0 / sqrt(dash_stretch), 1.0) if stretched else Vector3.ONE
+	_streaks.emitting = stretched
 
 	# The katana. While it is out, the sculpted handle at his hip slides back
 	# out of sight, so there is only ever one sword.
@@ -604,6 +806,160 @@ func _update_sweep() -> void:
 	# match the way he faces and whether the cut goes up or down.
 	_sweep_side.rotation.y = _rig.rotation.y
 	_sweep_flip.scale = Vector3(1.0 if facing > 0.0 else -1.0, -1.0 if _slash_dir.y < -0.5 else 1.0, 1.0)
+
+
+## Builds the clash of a parry: thin, pointed strips of paper radiating from
+## where the blade meets the blow, like a brush flicked outward. Each ray uses
+## the swoosh material, so it is drawn out from the centre and then wiped
+## away from the centre too: it never pops in or out whole.
+func _build_clash() -> void:
+	_clash = _piece(self, Vector3(clash_at.x, clash_at.y, 0.35))
+	var noise := RandomNumberGenerator.new()
+	noise.seed = 77
+	# The rays fan out toward the blow (forward, and up and down from it),
+	# none back toward him: ink flicked off the blade, not a star.
+	var count := 7
+	for i in count:
+		var angle := deg_to_rad(lerpf(-95.0, 95.0, (float(i) + noise.randf_range(-0.25, 0.25)) / (count - 1)))
+		var length := clash_size * noise.randf_range(0.55, 1.0)
+		var width := length * noise.randf_range(0.07, 0.11)
+		var ray := SurfaceTool.new()
+		ray.begin(Mesh.PRIMITIVE_TRIANGLES)
+		# A long thin leaf: widest a third of the way out, sharp at the tip.
+		var steps := 8
+		for k in steps:
+			for corner: Array in [[0, 0.0], [1, 0.0], [1, 1.0], [0, 0.0], [1, 1.0], [0, 1.0]]:
+				var t := float(k + corner[0]) / steps
+				var half := width * sin(PI * pow(t, 0.6)) * (1.0 - t * 0.3)
+				ray.set_uv(Vector2(t, corner[1]))
+				ray.add_vertex(Vector3(0.08 + t * length, (corner[1] * 2.0 - 1.0) * half, 0.0))
+		var strip := _sweep_strip(ray.commit())
+		strip.rotation.z = angle
+		_clash.add_child(strip)
+		_clash_rays.append(strip)
+	_clash.visible = false
+
+	# A few white chips of paper knocked off the blade.
+	_flecks = CPUParticles3D.new()
+	_flecks.emitting = false
+	_flecks.one_shot = true
+	_flecks.explosiveness = 1.0
+	_flecks.amount = 10
+	_flecks.lifetime = 0.45
+	_flecks.local_coords = false
+	_flecks.direction = Vector3(1.0, 0.6, 0.0)
+	_flecks.spread = 70.0
+	_flecks.initial_velocity_min = 2.5
+	_flecks.initial_velocity_max = 5.0
+	_flecks.gravity = Vector3(0.0, -12.0, 0.0)
+	_flecks.angle_max = 360.0
+	_flecks.angular_velocity_min = -600.0
+	_flecks.angular_velocity_max = 600.0
+	_flecks.scale_amount_min = 0.5
+	_flecks.scale_amount_max = 1.2
+	var shrink := Curve.new()
+	shrink.add_point(Vector2(0.0, 1.0))
+	shrink.add_point(Vector2(0.7, 0.8))
+	shrink.add_point(Vector2(1.0, 0.0))
+	_flecks.scale_amount_curve = shrink
+	var chip := QuadMesh.new()
+	chip.size = Vector2(0.06, 0.04)
+	var white := StandardMaterial3D.new()
+	white.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	white.albedo_color = Color(1.0, 0.98, 0.94)
+	_flecks_look = white
+	white.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	white.cull_mode = BaseMaterial3D.CULL_DISABLED
+	white.disable_fog = true
+	chip.material = white
+	_flecks.mesh = chip
+	_flecks.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_flecks.position = _clash.position
+	add_child(_flecks)
+
+
+## The streak of the draw: one long strip of paper, level with his waist,
+## that follows him as he goes (drawn on in the direction he travels) and is
+## then wiped away from where he started. It stays where it was cut, in the
+## world, rather than moving with him.
+func _build_draw_trail() -> void:
+	var strip := SurfaceTool.new()
+	strip.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var steps := 24
+	for k in steps:
+		for corner: Array in [[0, 0.0], [1, 0.0], [1, 1.0], [0, 0.0], [1, 1.0], [0, 1.0]]:
+			var t := float(k + corner[0]) / steps
+			# Thin at the start, full in the middle, a sharp point at the end.
+			var half := 0.5 * pow(sin(PI * clampf(t * 0.92 + 0.04, 0.0, 1.0)), 0.5) * lerpf(0.35, 1.0, t)
+			strip.set_uv(Vector2(t, corner[1]))
+			strip.add_vertex(Vector3(t, (corner[1] * 2.0 - 1.0) * half, 0.0))
+	_draw_trail = _sweep_strip(strip.commit())
+	_draw_trail.top_level = true
+	add_child(_draw_trail)
+	_draw_trail.visible = false
+
+
+func _set_trail(from: float, to: float) -> void:
+	var length := absf(to - from)
+	if length < 0.3:
+		return
+	var direction := signf(to - from)
+	var ground := global_position.y
+	_draw_trail.global_transform = Transform3D(
+			Basis(Vector3(direction * length, 0.0, 0.0), Vector3(0.0, draw_trail_width, 0.0), Vector3(0.0, 0.0, 1.0)),
+			Vector3(from, ground + draw_trail_height, 0.35))
+	_draw_trail.visible = true
+
+
+## While he dashes, the streak is drawn on behind him; once he arrives it is
+## wiped away from the start, gone exactly when the sword goes away.
+func _update_draw_trail(delta: float) -> void:
+	var look := _draw_trail.material_override as ShaderMaterial
+	if state == &"draw":
+		# Stretch it from the start to where he is now.
+		_set_trail(_draw_from, global_position.x + facing * 0.6)
+		look.set_shader_parameter(&"head", 1.03)
+		look.set_shader_parameter(&"tail", -0.12)
+		return
+	if _draw_clock < 0.0:
+		_draw_trail.visible = false
+		return
+	_draw_clock += delta
+	var through := _draw_clock / draw_trail_time
+	if through >= 1.0:
+		_draw_clock = -1.0
+		_draw_trail.visible = false
+		_shown_state = &""
+		_frame_clock = 1.0  # sword away this instant, with the last of the streak
+		return
+	look.set_shader_parameter(&"head", 1.03)
+	look.set_shader_parameter(&"tail", pow(through, 1.4) * 1.12 - 0.12)
+
+
+## Moves the clash on, every frame (smooth, not stop-motion).
+func _update_clash(delta: float) -> void:
+	if _clash_clock < 0.0:
+		_clash.visible = false
+		return
+	_clash_clock += delta
+	var through := _clash_clock / clash_time
+	if through >= 1.0:
+		_clash_clock = -1.0
+		_clash.visible = false
+		return
+	_clash.visible = true
+	# It bursts toward the blow: on the side he faces.
+	_clash.position.x = clash_at.x * facing
+	_clash.scale.x = absf(_clash.scale.y) * facing
+	_flecks.position.x = clash_at.x * facing
+	_flecks.direction = Vector3(facing, 0.6, 0.0)
+	# Out fast, then eaten away from the middle outward.
+	var head := smoothstep(0.0, 0.35, through) * 1.03
+	var tail := pow(clampf((through - 0.3) / 0.7, 0.0, 1.0), 1.5) * 1.12 - 0.12
+	for ray: MeshInstance3D in _clash_rays:
+		var look := ray.material_override as ShaderMaterial
+		look.set_shader_parameter(&"head", head)
+		look.set_shader_parameter(&"tail", tail)
 
 
 ## Folds the katana he draws: a slim, gently curved blade with a pale cutting
@@ -1083,3 +1439,245 @@ func _show_arc() -> void:
 			_arc.rotation.z = 0.0
 			_arc.scale = Vector3(grow * facing, grow, 1.0)
 
+
+
+## Shows the marks at once (for screenshots and debug), without drawing them on.
+func set_marks_now(amount: float) -> void:
+	marks = amount
+	_marks_shown = amount
+
+
+## Death: his paper body tears apart. He vanishes into a burst of long white
+## strips and torn scraps (inked like he is, if he carries marks) and a
+## spatter of ink, flung up and out, fluttering down in the wind.
+func shred() -> void:
+	_rig.visible = false
+	_draw_trail.visible = false
+	_clash.visible = false
+	var white := PaperMesh.WASHI
+	var marked := white.lerp(Color(0.1, 0.1, 0.14), clampf(_marks_shown, 0.0, 1.0) * 0.6)
+	for kind in 2:
+		var bits := CPUParticles3D.new()
+		bits.emitting = false
+		bits.one_shot = true
+		bits.explosiveness = 0.92
+		bits.amount = 70 if kind == 0 else 40
+		bits.lifetime = 2.2
+		bits.local_coords = false
+		bits.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+		bits.emission_box_extents = Vector3(0.25, 0.7, 0.2)
+		bits.direction = Vector3.UP
+		bits.spread = 70.0
+		bits.initial_velocity_min = 2.5
+		bits.initial_velocity_max = 7.0
+		bits.gravity = Vector3(-1.2, -7.0, 0.0)  # drifting off downwind as they fall
+		bits.damping_min = 1.5
+		bits.damping_max = 3.5
+		bits.angle_max = 360.0
+		bits.angular_velocity_min = -540.0
+		bits.angular_velocity_max = 540.0
+		bits.scale_amount_min = 0.5
+		bits.scale_amount_max = 1.4
+		var ramp := Gradient.new()
+		ramp.set_color(0, white)
+		ramp.set_color(1, marked)
+		ramp.add_point(0.5, Color(0.82, 0.8, 0.76))
+		bits.color_initial_ramp = ramp
+		var piece := QuadMesh.new()
+		# Long thin strips (the cloak and robe torn into ribbons), and squarer
+		# torn scraps.
+		piece.size = Vector2(0.04, 0.26) if kind == 0 else Vector2(0.13, 0.1)
+		var paper := StandardMaterial3D.new()
+		paper.vertex_color_use_as_albedo = true
+		paper.cull_mode = BaseMaterial3D.CULL_DISABLED
+		paper.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		paper.roughness = 1.0
+		piece.material = paper
+		bits.mesh = piece
+		bits.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		get_tree().root.add_child(bits)
+		bits.global_position = global_position + Vector3(0.0, 0.85, 0.0)
+		bits.emitting = true
+		bits.finished.connect(bits.queue_free)
+	if _ink_drops:
+		_ink_drops.restart()
+
+
+## Whole again (after dying).
+func restore() -> void:
+	_rig.visible = true
+	_ink = 0.0
+
+
+# --- The draw's "ready" cue ----------------------------------------------------
+
+## A small four-pointed gleam: light catching the inch of blade he has pushed
+## out of the scabbard. Thin rays drawn out and wiped away, like the clash.
+func _build_glint() -> void:
+	_glint = Node3D.new()
+	_glint.top_level = true
+	add_child(_glint)
+	for i in 4:
+		var length := 0.34 if i % 2 == 0 else 0.2
+		var ray := SurfaceTool.new()
+		ray.begin(Mesh.PRIMITIVE_TRIANGLES)
+		var steps := 6
+		for k in steps:
+			for corner: Array in [[0, 0.0], [1, 0.0], [1, 1.0], [0, 0.0], [1, 1.0], [0, 1.0]]:
+				var t := float(k + corner[0]) / steps
+				var half := 0.018 * (1.0 - t)
+				ray.set_uv(Vector2(t, corner[1]))
+				ray.add_vertex(Vector3(0.02 + t * length, (corner[1] * 2.0 - 1.0) * half, 0.0))
+		var strip := _sweep_strip(ray.commit())
+		(strip.material_override as ShaderMaterial).set_shader_parameter(&"tint", Color(1.0, 0.97, 0.88, 1.0))
+		strip.rotation.z = TAU * i / 4.0 + 0.4
+		_glint.add_child(strip)
+		_glint_rays.append(strip)
+	_glint.visible = false
+
+
+## The moment the draw is ready: the gleam on the blade, a chime, and a flash
+## of his paper. While he holds it ready, his paper glows softly, breathing.
+func _update_ready_cue(delta: float) -> void:
+	var ready := state == &"iai" and iai_charge >= 1.0
+	if ready and not _was_ready:
+		_glint_clock = 0.0
+		_ready_flash = 1.0
+		Sound.play(self, &"draw_ready")
+	_was_ready = ready
+	_ready_flash = maxf(_ready_flash - delta * 2.5, 0.0)
+	var breathe := 0.0
+	if ready:
+		breathe = 0.18 + 0.12 * sin(_clock * 4.0)
+	_cloth.set_shader_parameter(&"glow", paper_glow + _ready_flash * 1.1 + breathe)
+	if _glint_clock < 0.0:
+		_glint.visible = false
+		return
+	_glint_clock += delta
+	var through := _glint_clock / 0.35
+	if through >= 1.0:
+		_glint_clock = -1.0
+		_glint.visible = false
+		return
+	_glint.visible = true
+	# At his sword hand, where the inch of blade shows, toward the camera.
+	var space := _animator.skeleton.global_transform
+	_glint.global_position = space * _animator.sword_at + Vector3(0.0, 0.04, 0.35)
+	_glint.rotation.z = through * 0.6
+	var head := smoothstep(0.0, 0.4, through) * 1.03
+	var tail := pow(clampf((through - 0.4) / 0.6, 0.0, 1.0), 1.3) * 1.12 - 0.12
+	for ray: MeshInstance3D in _glint_rays:
+		var look := ray.material_override as ShaderMaterial
+		look.set_shader_parameter(&"head", head)
+		look.set_shader_parameter(&"tail", tail)
+
+
+# --- Healing: the ensō -----------------------------------------------------------
+
+## The ensō: a circle painted in one brush stroke, in pale, softly glowing
+## ink, standing round him while he heals. It is painted on as the heal
+## charges (its progress IS the charge), wiped away if he lets go, and when
+## the heal completes it closes, flashes and dissolves into motes.
+func _build_enso() -> void:
+	var stroke := SurfaceTool.new()
+	stroke.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var steps := 64
+	var radius := 0.78
+	for i in steps:
+		for corner: Array in [[0, 0.0], [1, 0.0], [1, 1.0], [0, 0.0], [1, 1.0], [0, 1.0]]:
+			var t := float(i + corner[0]) / steps
+			var across: float = corner[1]
+			# The brush lands heavily, thins along the way, and ends in a
+			# dry flick that does not quite meet the start (as an ensō does).
+			var angle := deg_to_rad(-100.0) - t * deg_to_rad(345.0)
+			var width := lerpf(0.12, 0.045, t) * (1.0 + 0.25 * sin(t * 19.0))
+			var r := radius + (across - 0.5) * width
+			stroke.set_uv(Vector2(t, across))
+			stroke.add_vertex(Vector3(cos(angle) * r, sin(angle) * r, 0.0))
+	_enso = _sweep_strip(stroke.commit())
+	_enso.top_level = true
+	(_enso.material_override as ShaderMaterial).set_shader_parameter(&"tint", Color(0.98, 0.9, 0.72, 0.9))
+	add_child(_enso)
+	_motes = CPUParticles3D.new()
+	_motes.emitting = false
+	_motes.amount = 30
+	_motes.lifetime = 0.8
+	_motes.local_coords = false
+	_motes.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	_motes.emission_sphere_radius = 1.1
+	_motes.gravity = Vector3.ZERO
+	_motes.radial_accel_min = -7.0   # drawn inward, toward his chest
+	_motes.radial_accel_max = -5.0
+	_motes.scale_amount_min = 0.5
+	_motes.scale_amount_max = 1.2
+	var shrink := Curve.new()
+	shrink.add_point(Vector2(0.0, 0.2))
+	shrink.add_point(Vector2(0.4, 1.0))
+	shrink.add_point(Vector2(1.0, 0.0))
+	_motes.scale_amount_curve = shrink
+	var mote := QuadMesh.new()
+	mote.size = Vector2(0.05, 0.05)
+	var glow := StandardMaterial3D.new()
+	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glow.albedo_color = Color(1.0, 0.93, 0.76)
+	glow.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	glow.disable_fog = true
+	mote.material = glow
+	_motes.mesh = mote
+	_motes.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_motes.position = Vector3(0.0, 0.75, 0.2)
+	add_child(_motes)
+
+
+## Called by ronin.gd when a heal completes.
+func play_healed() -> void:
+	_enso_done = 0.0
+	_motes.emitting = false
+	# A burst outward: the circle dissolving.
+	var burst := _motes.duplicate() as CPUParticles3D
+	burst.one_shot = true
+	burst.explosiveness = 1.0
+	burst.amount = 40
+	burst.radial_accel_min = 6.0
+	burst.radial_accel_max = 10.0
+	burst.emission_sphere_radius = 0.78
+	get_tree().root.add_child(burst)
+	burst.global_position = global_position + Vector3(0.0, 0.75, 0.25)
+	burst.emitting = true
+	burst.finished.connect(burst.queue_free)
+	_ready_flash = 1.0  # his paper flashes, like the draw's ready moment
+
+
+func _update_enso(delta: float) -> void:
+	var look := _enso.material_override as ShaderMaterial
+	_enso.global_position = global_position + Vector3(0.0, 0.72, 0.3)
+	if _enso_done >= 0.0:
+		# Just healed: the circle closes, swells a little, and is wiped away.
+		_enso_done += delta
+		var u := clampf(_enso_done / 0.45, 0.0, 1.0)
+		_enso_head = 1.03
+		_enso_tail = pow(u, 1.4) * 1.12 - 0.12
+		_enso.scale = Vector3.ONE * (1.0 + 0.18 * u)
+		look.set_shader_parameter(&"tint", Color(1.0, 0.95, 0.8, 0.95 * (1.0 - u * 0.5)))
+		if u >= 1.0:
+			_enso_done = -1.0
+			_enso_head = 0.0
+			_enso_tail = 0.0
+	elif heal_charge >= 0.0:
+		# Charging: painted on, following the charge; motes drawn in.
+		_enso.scale = Vector3.ONE
+		look.set_shader_parameter(&"tint", Color(0.98, 0.9, 0.72, 0.9))
+		_enso_tail = 0.0
+		_enso_head = move_toward(_enso_head, heal_charge * 1.0, delta * 3.0)
+		_motes.emitting = true
+	else:
+		# Let go early: what was painted is wiped away.
+		_motes.emitting = false
+		if _enso_head > 0.0:
+			_enso_tail = move_toward(_enso_tail, _enso_head + 0.12, delta * 3.0)
+			if _enso_tail >= _enso_head + 0.1:
+				_enso_head = 0.0
+				_enso_tail = 0.0
+	_enso.visible = _enso_head > 0.0
+	look.set_shader_parameter(&"head", _enso_head)
+	look.set_shader_parameter(&"tail", _enso_tail)

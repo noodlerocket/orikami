@@ -23,6 +23,17 @@ const STREET_FRONT := 1.5
 const STREET_BACK := -8.0
 ## Depth of the house walls.
 const HOUSE_Z := -4.3
+## The pit: a hole in the street between these two x positions, reaching
+## back from the front edge to PIT_BACK. Behind it the street carries on.
+const PIT_LEFT := 10.0
+const PIT_RIGHT := 13.0
+const PIT_BACK := -3.2
+## The shrine courtyard past the torii, where the Kasa-obake waits: its left
+## and right x. (The level's right end is its right side.)
+const ARENA := Vector2(47.0, 63.5)
+## The torii at the courtyard's entrance (clear of the tall climbing wall,
+## which used to hide its left side).
+const TORII_X := 46.0
 
 const STREET := Color(0.21, 0.225, 0.31)
 const STREET_JOINT := Color(0.08, 0.09, 0.17)
@@ -66,6 +77,14 @@ const MOSS := Color(0.3, 0.34, 0.18)
 @export var enemy_positions: Array[Vector2] = [Vector2(19.0, 0.1), Vector2(24.5, 0.1), Vector2(37.0, 1.6)]
 
 var _rng := RandomNumberGenerator.new()
+## The Hannya's shrine hall in the courtyard (built by _build_arena).
+var stage: HannyaStage
+## The courtyard's stone lanterns: {light, fire, shine, energy, glow}.
+var arena_lanterns: Array[Dictionary] = []
+var _seal_wall: StaticBody3D
+var _seal_sheet: MeshInstance3D
+var _seal_pool: InkPool
+var _seal_jets: CPUParticles3D
 var _lanterns: Array[Node3D] = []
 var _bead_picture: GradientTexture2D
 
@@ -81,6 +100,8 @@ func _ready() -> void:
 	_build_houses()
 	_build_ground()
 	_build_props()
+	_build_climb_course()
+	_build_arena()
 	_build_foreground()
 	for spot: Vector2 in enemy_positions:
 		var husk: Node3D = HUSK_SCENE.instantiate()
@@ -193,7 +214,9 @@ func _build_houses() -> void:
 
 
 ## Hangs a lantern, gives it a real light, and smears its glow on the street.
-func _hang_lantern(hook: Vector3, string_length: float, size: float) -> void:
+## `shine` off for a lantern hung high above the street (it would be too far
+## up to smear its light on the paving).
+func _hang_lantern(hook: Vector3, string_length: float, size: float, shine: bool = true) -> void:
 	var lantern := Scenery.lantern(_rng, lantern_glow, size, string_length)
 	lantern.position = hook
 	add_child(lantern)
@@ -201,15 +224,28 @@ func _hang_lantern(hook: Vector3, string_length: float, size: float) -> void:
 	var light := _add_light(Vector3.ZERO, lantern_energy * size, lantern_range * size)
 	light.reparent(lantern)
 	light.position = (lantern.get_meta("light_at") as Vector3) + Vector3(0.0, 0.0, 0.7)
-	_add_wet_shine(hook.x, _street_height(hook.x), size)
+	if shine:
+		_add_wet_shine(hook.x, _street_height(hook.x), size)
 
 
 ## The streak of lantern light on the wet stones.
+## It lies flat on the street, so where the street is missing (over the pit)
+## it is trimmed off; otherwise it would hang in mid-air over the hole.
 func _add_wet_shine(x: float, ground: float, strength: float) -> void:
 	if wet_shine <= 0.0:
 		return
-	var shine := Scenery.reflection(Vector2(2.2, 9.0), Color(1.0, 0.6, 0.28, wet_shine * strength))
-	shine.position = Vector3(x, ground + 0.015, -1.6)
+	var left := x - 1.1
+	var right := x + 1.1
+	if ground == 0.0 and right > PIT_LEFT and left < PIT_RIGHT:
+		# Keep the piece that is on solid street.
+		if x < (PIT_LEFT + PIT_RIGHT) * 0.5:
+			right = PIT_LEFT - 0.05
+		else:
+			left = PIT_RIGHT + 0.05
+		if right - left < 0.4:
+			return
+	var shine := Scenery.reflection(Vector2(right - left, 9.0), Color(1.0, 0.6, 0.28, wet_shine * strength))
+	shine.position = Vector3((left + right) * 0.5, ground + 0.015, -1.6)
 	add_child(shine)
 
 
@@ -217,25 +253,51 @@ func _add_wet_shine(x: float, ground: float, strength: float) -> void:
 
 func _build_ground() -> void:
 	# [left edge, right edge, height of the top surface]
-	for g: Array in [[-17.0, 10.0, 0.0], [13.0, 30.0, 0.0], [30.0, 47.0, 1.5]]:
+	for g: Array in [[-17.0, PIT_LEFT, 0.0], [PIT_RIGHT, 30.0, 0.0], [30.0, ARENA.y + 0.5, 1.5]]:
 		_build_ground_block(g[0], g[1], g[2])
 	# [centre x, top height, width]
 	for p: Array in [[4.5, 1.9, 3.0], [8.0, 3.6, 2.6], [16.5, 2.1, 3.6], [22.0, 3.9, 3.0]]:
 		_build_platform(p[0], p[1], p[2])
-	# The pit: a dark gap with black water at the bottom.
-	var pit := PaperMesh.new(_rng.randi())
-	pit.shade_jitter = 0.0
-	pit.color = Color(0.035, 0.04, 0.085)
-	pit.rect(Vector2(11.5, -6.2), Vector2(3.4, 12.0), -3.2)
-	pit.color = Color(0.02, 0.022, 0.05)
-	pit.quad(Vector3(9.9, -3.0, -3.2), Vector3(13.1, -3.0, -3.2), Vector3(13.1, -3.0, STREET_FRONT + 0.3),
-			Vector3(9.9, -3.0, STREET_FRONT + 0.3), Vector3.UP)
-	var hole := pit.build(Color.WHITE, 0.0, true)
-	hole.cast_shadow = OFF
-	add_child(hole)
+	_build_pit()
 	# Invisible walls at both ends of the level.
-	for x: float in [-16.5, 46.5]:
+	for x: float in [-16.5, ARENA.y]:
 		_add_solid(Vector3(x, 10.0, 0.0), Vector3(1.0, 40.0, 4.0))
+
+
+## The pit: a hole in the street, not a cut right through it. The street
+## carries on behind it; its broken back edge, the earth walls either side
+## and black water at the bottom are all you see inside.
+func _build_pit() -> void:
+	var width := PIT_RIGHT - PIT_LEFT
+	var middle := (PIT_LEFT + PIT_RIGHT) * 0.5
+	# The earth under the street behind the pit. Its face is the back wall.
+	var earth := PaperMesh.new(_rng.randi())
+	earth.shade_jitter = 0.05
+	earth.color = EARTH
+	earth.box(Vector3(middle, -5.02, (PIT_BACK + STREET_BACK) * 0.5), Vector3(width, 10.0, PIT_BACK - STREET_BACK))
+	add_child(earth.build())
+	# Paving on top of it, matching the street either side.
+	_lay_paving(PIT_LEFT, PIT_RIGHT, 0.0, STREET_BACK, PIT_BACK)
+	# Its broken edge: torn sheets on the back wall, stepping down, like the
+	# front of the street.
+	var lip := PaperMesh.new(_rng.randi())
+	lip.shade_jitter = 0.04
+	lip.color = Color(0.17, 0.185, 0.27)
+	lip.torn_sheet(_torn_band(PIT_LEFT, PIT_RIGHT, 0.0, -1.0, 0.0), PIT_BACK + 0.02, Color(0.36, 0.39, 0.52), 0.03)
+	lip.color = Color(0.08, 0.087, 0.155)
+	lip.torn_sheet(_torn_band(PIT_LEFT, PIT_RIGHT, -0.35, -6.0, 0.13), PIT_BACK + 0.06, Color(0.16, 0.18, 0.28), 0.03)
+	var back := lip.build()
+	back.cast_shadow = OFF
+	add_child(back)
+	# Black water at the bottom.
+	var water := PaperMesh.new(_rng.randi())
+	water.shade_jitter = 0.0
+	water.color = Color(0.02, 0.022, 0.05)
+	water.quad(Vector3(PIT_LEFT - 0.1, -3.0, PIT_BACK), Vector3(PIT_RIGHT + 0.1, -3.0, PIT_BACK),
+			Vector3(PIT_RIGHT + 0.1, -3.0, STREET_FRONT + 0.3), Vector3(PIT_LEFT - 0.1, -3.0, STREET_FRONT + 0.3), Vector3.UP)
+	var pool := water.build(Color.WHITE, 0.0, true)
+	pool.cast_shadow = OFF
+	add_child(pool)
 
 
 func _build_ground_block(left: float, right: float, top: float) -> void:
@@ -253,35 +315,7 @@ func _build_ground_block(left: float, right: float, top: float) -> void:
 			Vector3(width, 10.0, STREET_FRONT - 0.15 - STREET_BACK))
 	add_child(earth.build())
 
-	# The wet paving, in short lengths so no piece is touched by too many
-	# lights at once (the web renderer allows about 8 per piece).
-	var x := left
-	while x < right - 0.01:
-		var x1 := minf(x + 4.5, right)
-		var b := PaperMesh.new(_rng.randi())
-		b.shade_jitter = 0.08
-		b.wrinkle_depth = 1.0
-		b.color = STREET
-		var z := STREET_BACK
-		while z < STREET_FRONT - 0.01:  # rows of paving stones
-			var z1 := minf(z + 1.15, STREET_FRONT)
-			var sx := x
-			while sx < x1 - 0.01:
-				var sx1 := minf(sx + _rng.randf_range(1.2, 1.9), x1)
-				b.quad(Vector3(sx + 0.02, top, z + 0.02), Vector3(sx1 - 0.02, top, z + 0.02),
-						Vector3(sx1 - 0.02, top, z1 - 0.02), Vector3(sx + 0.02, top, z1 - 0.02), Vector3.UP)
-				sx = sx1
-			z = z1
-		b.color = STREET_JOINT
-		b.quad(Vector3(x, top - 0.01, STREET_BACK), Vector3(x1, top - 0.01, STREET_BACK),
-				Vector3(x1, top - 0.01, STREET_FRONT), Vector3(x, top - 0.01, STREET_FRONT), Vector3.UP)
-		var paving := b.build()
-		var wet := paving.material_override as StandardMaterial3D
-		wet.roughness = 0.38
-		wet.metallic_specular = 0.6
-		paving.cast_shadow = OFF
-		add_child(paving)
-		x = x1
+	_lay_paving(left, right, top, STREET_BACK, STREET_FRONT)
 
 	_add_rain_splashes(left, right, top)
 
@@ -289,11 +323,15 @@ func _build_ground_block(left: float, right: float, top: float) -> void:
 	var front := PaperMesh.new(_rng.randi())
 	front.shade_jitter = 0.04
 	front.color = Color(0.23, 0.245, 0.34)
-	front.torn_sheet(_torn_band(left, right, top, top - 1.2, 0.0), STREET_FRONT, Color(0.5, 0.54, 0.68), 0.03)
+	# Where the street breaks off at the pit, the ends crumble too, each layer
+	# a little differently, instead of stopping in a straight cut.
+	var broken_left := left == PIT_RIGHT
+	var broken_right := right == PIT_LEFT
+	front.torn_sheet(_torn_band(left, right, top, top - 1.2, 0.0, broken_left, broken_right), STREET_FRONT, Color(0.5, 0.54, 0.68), 0.03)
 	front.color = Color(0.125, 0.135, 0.22)
-	front.torn_sheet(_torn_band(left, right, top - 0.3, top - 12.0, 0.13), STREET_FRONT + 0.1, Color(0.24, 0.265, 0.39), 0.03)
+	front.torn_sheet(_torn_band(left, right, top - 0.3, top - 12.0, 0.13, broken_left, broken_right), STREET_FRONT + 0.1, Color(0.24, 0.265, 0.39), 0.03)
 	front.color = Color(0.07, 0.076, 0.14)
-	front.torn_sheet(_torn_band(left, right, top - 0.82, top - 12.0, 0.22), STREET_FRONT + 0.2, Color(0.15, 0.165, 0.27), 0.03)
+	front.torn_sheet(_torn_band(left, right, top - 0.82, top - 12.0, 0.22, broken_left, broken_right), STREET_FRONT + 0.2, Color(0.15, 0.165, 0.27), 0.03)
 	# Loose chunks of stone in the broken edge, on each of the three layers.
 	# Each chunk gets its own depth, a few millimetres from its neighbours:
 	# two sheets at exactly the same depth flicker where they overlap.
@@ -330,7 +368,8 @@ func _build_ground_block(left: float, right: float, top: float) -> void:
 
 ## Outline of a long strip whose top edge is broken into flat runs and sudden
 ## steps, like the edge of cracked stone, for the torn front of the street.
-func _torn_band(left: float, right: float, top: float, bottom: float, rough: float) -> PackedVector2Array:
+func _torn_band(left: float, right: float, top: float, bottom: float, rough: float,
+		broken_left: bool = false, broken_right: bool = false) -> PackedVector2Array:
 	var line := PackedVector2Array()
 	var x := left
 	var y := top + _rng.randf_range(-rough, rough)
@@ -342,9 +381,62 @@ func _torn_band(left: float, right: float, top: float, bottom: float, rough: flo
 		y = top + _rng.randf_range(-rough, rough)
 	line.append(Vector2(right, y))
 	var outline := PaperMesh.tear(line, 0.25, 0.02, _rng, false)
+	if broken_right:
+		outline.append_array(_crumbled_end(right, y, bottom, -1.0))
 	outline.append(Vector2(right, bottom))
 	outline.append(Vector2(left, bottom))
+	if broken_left:
+		var up := _crumbled_end(left, outline[0].y, bottom, 1.0)
+		up.reverse()
+		outline.append_array(up)
 	return outline
+
+
+## The broken end of the street at the pit: a jagged line running down from
+## `top` to `bottom`, bitten inward (toward `inward`) by up to a third of a
+## metre in short steps, like crumbled stone. Never outward, so no paper
+## hangs out over the hole.
+func _crumbled_end(x: float, top: float, bottom: float, inward: float) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	var y := top - _rng.randf_range(0.05, 0.15)
+	while y > bottom + 0.3:
+		var bite := _rng.randf_range(0.04, 0.3)
+		points.append(Vector2(x + inward * bite, y))
+		y -= _rng.randf_range(0.12, 0.4)
+	return points
+
+
+## Wet paving stones between two x positions and two depths.
+func _lay_paving(left: float, right: float, top: float, back: float, front: float) -> void:
+	# The wet paving, in short lengths so no piece is touched by too many
+	# lights at once (the web renderer allows about 8 per piece).
+	var x := left
+	while x < right - 0.01:
+		var x1 := minf(x + 4.5, right)
+		var b := PaperMesh.new(_rng.randi())
+		b.shade_jitter = 0.08
+		b.wrinkle_depth = 1.0
+		b.color = STREET
+		var z := back
+		while z < front - 0.01:  # rows of paving stones
+			var z1 := minf(z + 1.15, front)
+			var sx := x
+			while sx < x1 - 0.01:
+				var sx1 := minf(sx + _rng.randf_range(1.2, 1.9), x1)
+				b.quad(Vector3(sx + 0.02, top, z + 0.02), Vector3(sx1 - 0.02, top, z + 0.02),
+						Vector3(sx1 - 0.02, top, z1 - 0.02), Vector3(sx + 0.02, top, z1 - 0.02), Vector3.UP)
+				sx = sx1
+			z = z1
+		b.color = STREET_JOINT
+		b.quad(Vector3(x, top - 0.01, back), Vector3(x1, top - 0.01, back),
+				Vector3(x1, top - 0.01, front), Vector3(x, top - 0.01, front), Vector3.UP)
+		var paving := b.build()
+		var wet := paving.material_override as StandardMaterial3D
+		wet.roughness = 0.38
+		wet.metallic_specular = 0.6
+		paving.cast_shadow = OFF
+		add_child(paving)
+		x = x1
 
 
 func _build_platform(center_x: float, top: float, width: float) -> void:
@@ -372,6 +464,307 @@ func _build_platform(center_x: float, top: float, width: float) -> void:
 	add_child(b.build())
 
 
+# --- The climbing course: two tall walls to wall-jump up ----------------------
+
+## [left edge, right edge, height of the top, opening underneath, roof?] of
+## each climbable wall. They stand on the raised street just before the torii.
+## The first is raised on timber posts like a gatehouse, so you walk under it
+## into the gap between the two; wall jumping zig-zags up the gap; the taller
+## one has a lookout ledge on top.
+const CLIMB_WALLS := [[37.9, 39.2, 8.5, 2.5, true], [41.6, 42.7, 11.5, 0.0, false]]
+## How far above a wall's top its little roof's ridge reaches. The solid part
+## of the wall goes up this far too, so you stand ON the ridge, not in the tiles.
+const CLIMB_ROOF := 0.62
+
+
+func _build_climb_course() -> void:
+	for w: Array in CLIMB_WALLS:
+		_build_climb_wall(w[0], w[1], _street_height(w[0]), w[2], w[3], w[4])
+	# The lookout: planks across the top of the tall wall, reaching out over
+	# the torii side, with a lantern on a post at the far end.
+	var tall: Array = CLIMB_WALLS[CLIMB_WALLS.size() - 1]
+	var top: float = tall[2]
+	var ledge_left: float = tall[0]
+	var ledge_right: float = tall[1] + 1.6
+	_add_solid(Vector3((ledge_left + ledge_right) * 0.5, top - 0.15, 0.0), Vector3(ledge_right - ledge_left, 0.3, 2.2))
+	var b := PaperMesh.new(_rng.randi())
+	b.shade_jitter = 0.22
+	b.color = Scenery.WOOD
+	var x := ledge_left
+	while x < ledge_right - 0.01:
+		var x1 := minf(x + _rng.randf_range(0.45, 0.7), ledge_right)
+		b.box(Vector3((x + x1) * 0.5, top - 0.11, 0.0), Vector3(x1 - x - 0.03, 0.22, 2.2))
+		x = x1
+	b.color = Color(0.45, 0.4, 0.42)
+	b.box(Vector3((ledge_left + ledge_right) * 0.5, top - 0.02, 1.1), Vector3(ledge_right - ledge_left, 0.04, 0.04))
+	# A timber bracket under the part that reaches out, back into the wall.
+	b.color = PaperMesh.TIMBER
+	b.extrude(PackedVector2Array([Vector2(tall[1], top - 1.3), Vector2(ledge_right - 0.2, top - 0.22),
+			Vector2(ledge_right - 0.45, top - 0.22), Vector2(tall[1], top - 1.1)]), -0.08, 0.08)
+	# The lantern post, standing on the far end of the ledge.
+	b.box(Vector3(ledge_right - 0.2, top + 0.9, -0.6), Vector3(0.1, 1.8, 0.1))
+	b.box(Vector3(ledge_right - 0.5, top + 1.75, -0.6), Vector3(0.7, 0.08, 0.08))
+	add_child(b.build())
+	# It hangs on the downwind (left) side of its arm, clear of the post.
+	_hang_lantern(Vector3(ledge_right - 0.75, top + 1.72, -0.6), 0.2, 0.75, false)
+
+
+## One climbable wall: a tall storehouse wall of dark boards with pale paper
+## plaster torn over them, timber posts at its corners, beams across it,
+## stains and ink drips, and a small tiled roof on top. It is solid all the
+## way through, so it looks right from every angle the camera reaches.
+## With an `opening`, the wall starts that high above the street, carried on
+## four corner posts (in front of and behind the path), with a heavy sill
+## beam along its underside: a gatehouse you walk through.
+func _build_climb_wall(left: float, right: float, street: float, top: float, opening: float = 0.0,
+		roofed: bool = true) -> void:
+	var width := right - left
+	var middle := (left + right) * 0.5
+	var ground := street + opening  # where the wall itself begins
+	var height := top - ground
+	var solid_top := top + (CLIMB_ROOF if roofed else 0.0)
+	var wall := _add_solid(Vector3(middle, (ground + solid_top) * 0.5, 0.0), Vector3(width, solid_top - ground, 2.2))
+	wall.set_meta(&"climbable", true)
+	if opening > 0.0:
+		var frame := PaperMesh.new(_rng.randi())
+		frame.shade_jitter = 0.18
+		frame.color = PaperMesh.TIMBER
+		# The sill: a heavy beam the whole depth of the wall, under it.
+		frame.box(Vector3(middle, ground - 0.1, 0.0), Vector3(width + 0.16, 0.22, 2.3))
+		# The posts it stands on, at its four corners, clear of the path.
+		for pz: float in [1.02, -1.02]:
+			for px: float in [left + 0.08, right - 0.08]:
+				frame.box(Vector3(px, street + opening * 0.5, pz), Vector3(0.16, opening, 0.16))
+			# A knee brace from each pair of posts up under the sill.
+			frame.extrude(PackedVector2Array([Vector2(left + 0.16, ground - 0.6), Vector2(middle - 0.04, ground - 0.21),
+					Vector2(middle - 0.2, ground - 0.21), Vector2(left + 0.16, ground - 0.42)]), pz - 0.05, pz + 0.05)
+			frame.extrude(PackedVector2Array([Vector2(right - 0.16, ground - 0.6), Vector2(right - 0.16, ground - 0.42),
+					Vector2(middle + 0.2, ground - 0.21), Vector2(middle + 0.04, ground - 0.21)]), pz - 0.05, pz + 0.05)
+		add_child(frame.build())
+
+	var b := PaperMesh.new(_rng.randi())
+	b.shade_jitter = 0.06
+	b.color = Scenery.WALL_DARK
+	b.box(Vector3(middle, ground + height * 0.5, 0.0), Vector3(width - 0.04, height, 2.16))
+	# Plaster on the face toward the camera, torn off near the ground.
+	b.color = Scenery.WALL_PAPER
+	var sheet := PackedVector2Array([Vector2(left + 0.1, top - 0.25)])
+	sheet.append(Vector2(right - 0.1, top - 0.25))
+	var y := top - 0.25
+	var base := ground + (0.3 if opening > 0.0 else _rng.randf_range(0.9, 1.4))
+	while y > base + 0.4:  # the right edge, flaking a little
+		y -= _rng.randf_range(0.6, 1.4)
+		sheet.append(Vector2(right - 0.1 - _rng.randf_range(0.0, 0.08), maxf(y, base)))
+	var tx := right - 0.1
+	while tx > left + 0.2:  # the torn bottom
+		tx -= _rng.randf_range(0.12, 0.22)
+		sheet.append(Vector2(maxf(tx, left + 0.1), base + _rng.randf_range(-0.25, 0.3)))
+	y = base
+	while y < top - 0.9:  # the left edge
+		y += _rng.randf_range(0.6, 1.4)
+		sheet.append(Vector2(left + 0.1 + _rng.randf_range(0.0, 0.08), minf(y, top - 0.4)))
+	b.torn_sheet(sheet, 1.105, Scenery.WALL_PAPER_RIM, 0.025)
+	# A couple of damp stains, and ink running down from the beams.
+	var stain_z := 1.112
+	for i in 2:
+		var at := Vector2(middle + _rng.randf_range(-0.15, 0.15), _rng.randf_range(base + 1.0, top - 1.0))
+		var blot := PackedVector2Array()
+		for k in 7:
+			var angle := TAU * k / 7.0
+			blot.append(at + Vector2(cos(angle) * _rng.randf_range(0.12, 0.25), sin(angle) * _rng.randf_range(0.3, 0.6)))
+		b.color = Scenery.WALL_STAIN
+		b.polygon(blot, stain_z)
+		stain_z += 0.004
+	# Beams across it every couple of metres, and posts up both front corners.
+	b.color = PaperMesh.TIMBER
+	var beam := ground + 2.3
+	while beam < top - 0.6:
+		b.box(Vector3(middle, beam, 1.08), Vector3(width + 0.06, 0.13, 0.16))
+		b.color = Scenery.INK_DRIP
+		var dx := left + _rng.randf_range(0.15, width - 0.15)
+		b.polygon(PackedVector2Array([Vector2(dx - 0.02, beam - 0.06), Vector2(dx + 0.02, beam - 0.06),
+				Vector2(dx + 0.008, beam - _rng.randf_range(0.35, 0.8)), Vector2(dx - 0.008, beam - 0.3)]), 1.13)
+		b.color = PaperMesh.TIMBER
+		beam += _rng.randf_range(2.1, 2.6)
+	for px: float in [left + 0.07, right - 0.07]:
+		b.box(Vector3(px, ground + height * 0.5, 1.06), Vector3(0.14, height, 0.16))
+	add_child(b.build())
+
+	# A small tiled roof, sloping both ways, so it is solid seen from the side.
+	# It does not overhang the wall's sides, so nothing pokes out over the
+	# faces you climb.
+	if roofed:
+		var roof_front := Scenery.tiled_roof(_rng, left, right, Vector2(top + 0.02, 1.35), Vector2(top + 0.4, 0.0), 3)
+		add_child(roof_front)
+		var roof_back := Scenery.tiled_roof(_rng, left, right, Vector2(top + 0.02, -1.35), Vector2(top + 0.4, 0.0), 3, false)
+		add_child(roof_back)
+
+
+# --- The shrine courtyard (the boss arena) ---------------------------------
+
+func _build_arena() -> void:
+	var ground := _street_height(ARENA.x)
+	var middle := (ARENA.x + ARENA.y) * 0.5
+	# The Hannya's shrine hall, its shoji screen facing the courtyard.
+	stage = HannyaStage.new()
+	stage.position = Vector3(middle, ground, -2.0)
+	add_child(stage)
+	var half: float = stage.screen_size.x * 0.5 + 0.8
+	# An old wooden fence across the back of the courtyard, either side of it.
+	for span: Vector2 in [Vector2(ARENA.x + 0.3, middle - half), Vector2(middle + half, ARENA.y - 0.3)]:
+		var fence := Scenery.fence(_rng, span.y - span.x, 1.4)
+		fence.position = Vector3(span.x, ground, -4.0)
+		add_child(fence)
+	# Two stone lanterns, one either side, lit.
+	for x: float in [ARENA.x + 2.2, ARENA.y - 2.0]:
+		_build_stone_lantern(Vector3(x, ground, -2.4))
+	# An old cherry leaning over from behind the fence.
+	var tree := Scenery.sakura_tree(_rng, 6.5, -0.12, 14)
+	tree.position = Vector3(ARENA.y - 2.6, ground, -5.2)
+	add_child(tree)
+
+
+## Seals the courtyard's entrance during the fight (on) or opens it (off).
+## A pool of ink spreads on the stones, then ink rises out of it into a dark,
+## running wall, thinning toward its top, with droplets spurting up out of
+## the pool and falling back; behind it, an invisible wall. Opening it, the ink sinks
+## back into the pool, which shrinks away.
+func set_arena_sealed(on: bool) -> void:
+	var x := ARENA.x - 0.35
+	var ground := _street_height(ARENA.x)
+	if on and not _seal_wall:
+		_seal_wall = _add_solid(Vector3(ARENA.x - 0.5, 8.0, 0.0), Vector3(1.0, 16.0, 4.0))
+		_seal_pool = InkPool.new()
+		_seal_pool.size = 2.8
+		add_child(_seal_pool)
+		_seal_pool.position = Vector3(x, ground, 0.0)
+		_seal_pool.open(0.35)
+		_seal_pool.splash()
+		Sound.play(self, &"ink_bleed", 6.0)
+		# The wall of ink: a sheet that rises out of the pool.
+		_seal_sheet = MeshInstance3D.new()
+		var quad := QuadMesh.new()
+		quad.size = Vector2(1.1, 6.5)
+		quad.center_offset = Vector3(0.0, 3.25, 0.0)
+		_seal_sheet.mesh = quad
+		var ink := ShaderMaterial.new()
+		ink.shader = preload("res://shaders/ink_wall.gdshader")
+		_seal_sheet.material_override = ink
+		_seal_sheet.cast_shadow = OFF
+		_seal_sheet.position = Vector3(x, ground, 0.3)
+		_seal_sheet.rotation.y = 0.0
+		add_child(_seal_sheet)
+		# Droplets of ink spurting up out of the pool and falling back: soft
+		# round drops, stretched a little as they fly (not hard rectangles).
+		_seal_jets = CPUParticles3D.new()
+		_seal_jets.amount = 60
+		_seal_jets.lifetime = 1.0
+		_seal_jets.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+		_seal_jets.emission_box_extents = Vector3(0.45, 0.02, 0.4)
+		_seal_jets.direction = Vector3.UP
+		_seal_jets.spread = 9.0
+		_seal_jets.initial_velocity_min = 5.0
+		_seal_jets.initial_velocity_max = 9.5
+		_seal_jets.gravity = Vector3(0.0, -14.0, 0.0)
+		_seal_jets.scale_amount_min = 0.6
+		_seal_jets.scale_amount_max = 1.4
+		var drop_size := Curve.new()
+		drop_size.add_point(Vector2(0.0, 0.6))
+		drop_size.add_point(Vector2(0.3, 1.0))
+		drop_size.add_point(Vector2(1.0, 0.5))
+		_seal_jets.scale_amount_curve = drop_size
+		var drop := QuadMesh.new()
+		drop.size = Vector2(0.11, 0.17)
+		drop.material = PaperMesh.soft_ink(Color(0.015, 0.015, 0.035))
+		_seal_jets.mesh = drop
+		_seal_jets.cast_shadow = OFF
+		_seal_jets.position = Vector3(x, ground + 0.05, 0.25)
+		add_child(_seal_jets)
+		var rise := create_tween()
+		rise.tween_interval(0.25)
+		rise.tween_method(func(v: float) -> void: ink.set_shader_parameter(&"rise", v), 0.0, 1.0, 0.7).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	elif not on and _seal_wall:
+		_seal_wall.queue_free()
+		_seal_wall = null
+		_seal_jets.emitting = false
+		var sheet := _seal_sheet
+		var pool := _seal_pool
+		var jets := _seal_jets
+		_seal_sheet = null
+		_seal_pool = null
+		_seal_jets = null
+		var sink := create_tween()
+		var look := sheet.material_override as ShaderMaterial
+		sink.tween_method(func(v: float) -> void: look.set_shader_parameter(&"rise", v), 1.0, 0.0, 0.6).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+		sink.tween_callback(sheet.queue_free)
+		sink.tween_callback(jets.queue_free)
+		pool.close(0.5, 0.6)
+
+
+## Puts out stone lantern `index` in the courtyard (for the cutscene): the
+## flame gutters and dies over `time` seconds.
+func snuff_arena_lantern(index: int, time: float = 0.6) -> void:
+	if index >= arena_lanterns.size():
+		return
+	var lantern: Dictionary = arena_lanterns[index]
+	var light: OmniLight3D = lantern["light"]
+	var fire: StandardMaterial3D = lantern["fire"]
+	var shine: GeometryInstance3D = lantern["shine"]
+	var gutter := create_tween()
+	gutter.tween_property(light, "light_energy", light.light_energy * 1.4, time * 0.15)
+	gutter.tween_property(light, "light_energy", light.light_energy * 0.3, time * 0.2)
+	gutter.tween_property(light, "light_energy", light.light_energy * 0.8, time * 0.15)
+	gutter.tween_property(light, "light_energy", 0.0, time * 0.5)
+	var dim := create_tween()
+	dim.tween_interval(time * 0.3)
+	dim.tween_property(fire, "emission_energy_multiplier", 0.0, time * 0.7)
+	dim.parallel().tween_property(fire, "albedo_color", Color(0.12, 0.11, 0.14), time * 0.7)
+	if shine:
+		dim.parallel().tween_property(shine, "transparency", 1.0, time * 0.7)
+
+
+## Lights the courtyard lanterns again (after the cutscene, or a retry).
+func relight_arena_lanterns() -> void:
+	for lantern: Dictionary in arena_lanterns:
+		(lantern["light"] as OmniLight3D).light_energy = lantern["energy"]
+		var fire: StandardMaterial3D = lantern["fire"]
+		fire.emission_energy_multiplier = lantern["glow"]
+		fire.albedo_color = Color.WHITE
+		if lantern["shine"]:
+			(lantern["shine"] as GeometryInstance3D).transparency = 0.0
+
+
+## A stone lantern (toro): a foot, a post, a lit fire box with paper
+## windows, and a cap. It gives off a real, low light.
+func _build_stone_lantern(at: Vector3) -> void:
+	var stone := Color(0.32, 0.33, 0.41)
+	var b := PaperMesh.new(_rng.randi())
+	b.shade_jitter = 0.15
+	b.color = stone
+	b.box(at + Vector3(0.0, 0.1, 0.0), Vector3(0.7, 0.2, 0.7))
+	b.frustum(6, Vector2(0.16, 0.16), Vector2(0.13, 0.13), 0.9, at + Vector3(0.0, 0.2, 0.0))
+	b.box(at + Vector3(0.0, 1.15, 0.0), Vector3(0.6, 0.12, 0.6))
+	b.box(at + Vector3(0.0, 1.62, 0.0), Vector3(0.5, 0.06, 0.5))
+	b.frustum(6, Vector2(0.52, 0.52), Vector2(0.08, 0.08), 0.34, at + Vector3(0.0, 1.65, 0.0))
+	b.color = stone.darkened(0.2)
+	for corner: Vector2 in [Vector2(-0.2, -0.2), Vector2(0.2, -0.2), Vector2(-0.2, 0.2), Vector2(0.2, 0.2)]:
+		b.box(at + Vector3(corner.x, 1.39, corner.y), Vector3(0.08, 0.36, 0.08))
+	add_child(b.build())
+	var fire := PaperMesh.new(_rng.randi())
+	fire.shade_jitter = 0.0
+	fire.color = PaperMesh.LANTERN
+	fire.box(at + Vector3(0.0, 1.39, 0.0), Vector3(0.3, 0.3, 0.3))
+	var flame := fire.build(Color.WHITE, lantern_glow * 0.8)
+	add_child(flame)
+	var light := _add_light(at + Vector3(0.0, 1.4, 0.7), lantern_energy * 0.45, lantern_range * 0.6)
+	var before := get_child_count()
+	_add_wet_shine(at.x, at.y, 0.5)
+	var shine: Node = get_child(get_child_count() - 1) if get_child_count() > before else null
+	var fire_material := flame.material_override as StandardMaterial3D
+	arena_lanterns.append({"light": light, "fire": fire_material, "shine": shine,
+			"energy": light.light_energy, "glow": fire_material.emission_energy_multiplier})
+
+
 # --- Props: the well, lanterns, a shoji screen, the torii --------------------
 
 func _build_props() -> void:
@@ -380,12 +773,12 @@ func _build_props() -> void:
 	add_child(well)
 	_hang_lantern(Vector3(-9.45, 2.75, -1.35), 0.25, 0.8)
 
-	_build_shoji_screen(Vector3(28.6, 0.0, -2.2))
+	_build_shoji_screen(Vector3(27.4, 0.0, -2.2))  # clear of the step up at x 30
 
 	var gate := Scenery.torii(_rng, PaperMesh.VERMILION)
-	gate.position = Vector3(44.6, 1.5, -1.3)
+	gate.position = Vector3(TORII_X, 1.5, -1.3)
 	add_child(gate)
-	_hang_lantern(Vector3(44.6, 4.75, -1.0), 0.2, 0.8)
+	_hang_lantern(Vector3(TORII_X, 4.75, -1.0), 0.2, 0.8)
 
 	var flag := Scenery.banner(_rng, 5.2)
 	flag.position = Vector3(31.95, 1.5, -2.4)
@@ -402,8 +795,8 @@ func _build_props() -> void:
 			thing.position.y += 0.9  # the small crate sits on the big one
 		add_child(thing)
 
-	# Broken fences either side of the pit, and at the far end.
-	for f: Array in [[6.3, 3.4, -3.0], [13.3, 2.6, -3.0], [45.0, 2.0, 1.0]]:
+	# Broken fences either side of the pit.
+	for f: Array in [[6.3, 3.4, -3.0], [13.3, 2.6, -3.0]]:
 		var rails := Scenery.fence(_rng, f[1])
 		rails.position = Vector3(f[0], _street_height(f[0] + 0.1), f[2])
 		add_child(rails)
@@ -677,7 +1070,7 @@ func _add_light(at: Vector3, energy: float, reach: float) -> OmniLight3D:
 
 
 ## An invisible solid box the Ronin and enemies collide with.
-func _add_solid(center: Vector3, size: Vector3) -> void:
+func _add_solid(center: Vector3, size: Vector3) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
@@ -686,3 +1079,4 @@ func _add_solid(center: Vector3, size: Vector3) -> void:
 	body.add_child(shape)
 	body.position = center
 	add_child(body)
+	return body

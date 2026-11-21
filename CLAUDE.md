@@ -64,6 +64,18 @@ in a browser via GitHub Pages.
 - What you see is what you hit: the hit area ends where the swoosh ends.
 - Nothing lingers after it is over (the sword goes away with the swoosh).
 - The camera is gentle: it must not lurch when he turns.
+- The camera stays at one height: it does not rise when he jumps or climbs
+  onto a platform (`FollowCamera.follow_height` 0; 1 was the old
+  follow-him-up behaviour, rejected). BUT his middle may never be above the
+  middle of the screen (`keep_below_center`): when he gets that high, the
+  camera rises exactly enough to keep him there. The exception is the climbing course
+  (`climb_zone`), where it follows him up and keeps him in the middle of the
+  screen, no higher than `climb_max_y`. `--zoom` close-ups always follow.
+- Falling into a pit fades the screen to sumi black and back (`Main.pit_fade_*`)
+  and puts him at the start; no ink, no blink. He asked for exactly this.
+- Wall slide: his BACK to the wall, both feet braced behind him flat on it,
+  one hand pressed back on it. (Facing the wall was tried and rejected.)
+- Anything that hurts must show its cause: touching a husk makes it shove.
 - Stock animation is not good enough. Meshy's preset clips were thrown out
   ("they don't look samurai at all"); his movement is posed by hand.
 
@@ -87,7 +99,10 @@ A single screenshot cannot show motion, and sound cannot be heard. Use these.
   `--hold=move_right` holds a control down.
 - **Frame sheets:** `tools/frame_sheet.gd` photographs a sequence and tiles it
   into one picture: `stances`, `cuts` (ten moments of each cut, 20 ms apart),
-  `endings`, `struck`, `hud`. Use it for every animation or effect change,
+  `endings`, `struck`, `hud`, `parry` (a real exchange with a husk: its
+  tell, the parry and clash, the stagger, the finishing cut; use
+  `--zoom=6`), `draw`, `iai`, `husk`, `climb`, `wall`, `pit`, `marks`
+  (see the top of the file for which need `--zoom`). Use it for every animation or effect change,
   and send him the sheet.
 - **Timing:** when two things must end together, print the times and compare
   them; do not trust the picture alone.
@@ -182,11 +197,70 @@ Julian owns both images.
   of paper along the blade's path: a ribbon wrapped round him for forward
   cuts, an upright crescent for up and down. It is drawn on from the end
   where the cut starts, wiped away from that same end, and lasts `cut_time`.
-- **Hit area = swoosh:** `Ronin.slash_reach` + half of `slash_size.x` (1.6 m)
-  matches `RoninPuppet.sweep_reach` (1.55). Change them together.
+- **Hit area = swoosh:** `Ronin.slash_reach` + half of `slash_size.x` (1.9 m)
+  matches `RoninPuppet.sweep_reach` (1.85). Change them together. (1.6 m was
+  a little short.)
 - Up and down cuts are posed at `aimed_cut_fps` (30) so the blade's travel
   shows. The sword goes away at `sword_away_at` (0.95), with the last of the
   swoosh, and he is re-posed that instant.
+- **Parry** (I): `SamuraiAnimator.parry` is a short draw into a guard, blade
+  slanted up before his face. A blow that lands within `Ronin.parry_window`
+  (0.2 s) of the press, from the side he faces, is deflected: no damage, a
+  hit-stop, a push back, and the clash (`_build_clash`: thin paper rays
+  fanned toward the blow, drawn out and wiped away with the swoosh shader,
+  plus white chips). A deflect resets the cooldown so a quick second blow
+  can be caught. Enemy attacks call `Ronin.receive_strike()`; touching an
+  enemy still calls `take_damage()` and cannot be parried.
+- **No cutting during a parry** (`_parrying`, as long as the parry stance).
+- **Block:** holding parry (I) past the parry window keeps his guard up
+  (the braced parry pose, shuffling at `guard_walk`). A blow from the front
+  does no harm and pushes him back; `block_breaks_after` (2) blocks close
+  together break the guard and stun him (`guard_break_stun`). A perfect
+  parry's clash is GOLD (`RoninPuppet.parry_color`, Julian asked); a block's
+  is a smaller dull grey.
+- **Duck (hold S on the ground):** a deep crouch, his body shrunk to
+  `duck_height` (0.85 m), so the Hannya's glide (at chest height,
+  `HannyaBoss.glide_band` 1.0 to 2.6 m) passes over. Her "walking into her
+  hurts" area is off while she gathers for and flies the glide (it used to
+  hurt him as she flew over, so ducking did not work). W stays aim-up only
+  (Julian tried W as jump too and took it back).
+- **Ink as liquid:** every ink drop, splash, drip and wisp uses
+  `PaperMesh.soft_ink()` (a soft round blot), never a hard rectangle (black
+  rectangles looked careless). Paper scraps stay rectangles. The ink wall's
+  spurting droplets are soft round drops (Julian wanted the spurting kept,
+  just not as rectangles).
+- **Healing (hold U):** an ensō is painted round him in pale glowing ink as
+  the heal charges (its progress is the charge), pale motes drawn in; let
+  go early and it is wiped away; on completion it closes, flashes and
+  bursts into motes, and his paper flashes. Julian asked for clearer
+  charging and finishing cues.
+- **Death:** he shreds into white strips and scraps (`RoninPuppet.shred`),
+  then the screen fades and he is revived whole at the start (`Ronin.died`,
+  `revive()`), like the pit fade.
+- **Iaijutsu draw:** on its own key, K (gamepad Y; it was U, and heal moved from K to U): hold it to crouch into
+  the iai stance at once, with no cut first (holding J was rejected: J cut
+  first, and making J wait would slow every cut); after `draw_charge_time`
+  an inch of blade shows and it is READY: a gleam on the blade, a flash of
+  his paper, and a chime (`draw_ready.mp3`); while held ready his paper
+  glows, breathing (`RoninPuppet._update_ready_cue`);
+  let go to dash `draw_distance` through everything in the way, cut a moment
+  after he arrives (`draw_cut_delay`). A paper streak is left along the path
+  and wiped away with the sword. K held straight after a parry
+  (`draw_combo_window`) goes into a ready stance at once: the
+  parry-then-draw combo. The draw keeps him safe with `_draw_safe` (no ink
+  shown), not `_invulnerable` (which shows the struck ink).
+- **Walls:** touching a wall marked `climbable` (meta) while falling, he
+  clings and slides at `wall_slide_speed`; jump to spring off
+  (`wall_jump_push`, `wall_jump_velocity`); holding back toward it climbs
+  even a single wall. Level edges and pit sides are not climbable.
+- **Ink marks:** `Ronin.ink_absorbed` counts every drop ever taken in (healing
+  does not wash it off). At `marks_full_at` (150) he is covered. The shader
+  draws thin flowing brush strokes from each point's resting position
+  (stored in CUSTOM0 by `_paint_cloth`), spreading and thickening, with
+  soaked blots near the end; they are drawn on at `marks_draw_speed`.
+  `--marks=0.5` starts him half-inked.
+- **Finishing cut:** a cut on a staggered enemy (`is_staggered()`) kills it
+  at once, with a bigger burst, a longer hit-stop and `finish_ink` extra ink.
 - **Dash:** an almost flat lunge, stretched along its direction, with white
   speed lines.
 - **Cloth:** `shaders/paper_cloth.gdshader` swings the cloak, side drapes and
@@ -203,9 +277,26 @@ Julian owns both images.
   15,000 target triangles, meshy-n1 texture, a-pose.
 
 ### Enemies
-- Low-poly, flat-shaded paper figures built from RIGID pieces (pivot
-  `Node3D`s rotated in code), posed at ~12 fps, meshes built with `PaperMesh`.
-  The paper husk still has its first-pass look.
+- Low-poly, flat-shaded paper figures, posed at ~12 fps.
+- **The paper husk** is a Meshy model (`models/husk.glb`, 7,118 triangles,
+  same 24-bone skeleton as the Ronin) posed by hand: its stances are in
+  `scripts/husk_poses.gd` and `SamuraiAnimator.apply()` bends the skeleton
+  to fit. Shamble, tell (both arms raised high behind its head, so it reads
+  whichever way it faces), swipe, shove, stagger. `PaperHusk.use_model` off
+  brings back the older figure folded from rigid pieces. Meshy ids:
+  reference image `01a1ff5b-b853-72f6-923e-c586eff0fa96`, model
+  `01a1ff5c-2442-71c0-b068-3d7173aefe25`, rig
+  `01a1ff5e-19d7-752f-93a2-5355c1d32a6c` (meshy-t2.5, 8,000 target, meshy-n1,
+  a-pose). Its reference is `docs/reference/husk_front.png`.
+- **Touching a husk** that hurts him makes it shove (`shove_time`), unless it
+  is already swiping.
+- **The husk's attack:** when the Ronin is within `attack_range` in front of
+  it, it rears back with an arm raised behind its head (`attack_windup`
+  0.4 s, the tell; 0.55 was too slow), then lunges and swipes. A cut interrupts the swipe.
+- **Posture:** each parried swipe adds 1; at `max_posture` (2) it staggers
+  for `stagger_time`, folded over, with a small vermilion seal stamped on
+  its body (the sign that a finishing cut is ready). Posture drains one
+  point per `posture_recover_time` without a parry.
 
 ### The world
 - **Kirigami diorama:** flat paper cut-outs at real depths, so layers slide
@@ -238,6 +329,67 @@ Julian owns both images.
 - **Colour grading:** `Village.color_saturation` / `color_contrast` keep the
   night muted. Tune there before changing individual colours.
 - **No two flat sheets may share a depth where they overlap** (they flicker).
+- **The climbing course** (`Village.CLIMB_WALLS`, `_build_climb_wall`): two
+  tall plastered timber walls before the torii. The first is raised on posts
+  like a gatehouse (walk under it into the gap); its solid part reaches the
+  ridge of its little roof (`CLIMB_ROOF`) so you stand on the ridge, not in
+  the tiles. The second carries a lookout ledge with a lantern at 11.5 m.
+- **The torii** stands at `Village.TORII_X` (46.0), the courtyard's gateway,
+  clear of the tall climbing wall (at 44.6 the wall hid its left side).
+- **The shrine courtyard** past the torii (`Village.ARENA`, x 47 to 63.5):
+  the Hannya's shrine hall (`HannyaStage`), a fence, two lit stone lanterns
+  (`arena_lanterns`, snuffed in the cutscene), a cherry. The camera follows
+  him in as anywhere else and stops at its middle (`FollowCamera.max_x`).
+  (A hard lock on the courtyard made it jump left when he stepped out:
+  rejected.)
+
+### The Weeping Hannya (first boss)
+- Chosen by Julian over the Kasa-obake ("not scary"). Meshy models:
+  `models/hannya.glb` (rigged, 2.6 m; reference `docs/reference/hannya_front.png`;
+  image `01a1ff82-5cb1-74f2-af57-33d8f905d86c`, model
+  `01a1ff83-2572-77c6-8489-0b0c8a48860d`, rig `01a1ff85-a583-7695-bd2f-b4e629bcbd0b`)
+  and `models/hannya_mask.glb` (close-up mask, meshy-7.1 with a 4K texture;
+  image `01a1ff82-6a99-7641-94aa-210e4a826f5b`, model
+  `01a1ff83-2d64-72ec-92b6-ff8ad6928c7a`). Posed by hand (`hannya_poses.gd`);
+  Julian asked whether Meshy animation would be better: no, timing must
+  match the hit areas, and he rejected stock clips before.
+- **The shoji screen** (`hannya_stage.gd`, `shaders/shoji_screen.gdshader`):
+  a hidden camera at the lamp films her silhouette double (render layer 20,
+  `Hannya.SHADOW_LAYER`; every other camera must leave that layer out) and
+  the screen prints it, softened, as her shadow. The lamp is low on the floor
+  and she kneels side-on near it, so the shadow is a tall profile. The
+  screen also bleeds ink from her shape, opens slashes and tears.
+- **The cutscene** (`hannya_cutscene.gd`, 40 s, 2.5D, scored to
+  `music_hannya_intro.mp3`; the rip lands on the music's eruption at 28 s):
+  he creeps in (`SamuraiAnimator.sneak`), lanterns die, her shadow weeps,
+  turns, bleeds ink, the paper rips, the mask comes through, she towers, the
+  title is painted (`hannya_title.gd`). It plays the first time he enters the
+  courtyard; hold jump to skip. `--cutscene` plays it at once.
+- **Lettering:** the brush font Yuji Syuku lives in `art_source/` (ignored by
+  Godot, never shipped); `tools/render_lettering.gd` renders the few lines
+  needed into `textures/`. Julian wants Japanese, samurai-feeling lettering.
+- **The fight** (`hannya_boss.gd`, 30 health, 6 posture): sleeve slash
+  (sometimes double), glide (at chest height: duck or parry; its tell: she rises with sleeves spread like wings, ink streaming
+  off her, a wail, and a streak of pale light along her path; the old small
+  draw-back was too easy to miss), ink rain (`ink_drop.gd`, dodge it), ink blades
+  (`ink_blade.gd`, pale crescents, parry each), ink step (sinks into an ink
+  pool, `ink_pool.gd`, rises behind him; Julian asked for this instead of a
+  paper burst), weeping masks from half health (`phantom_mask.gd`). Julian
+  asked for more projectile and supernatural moves. A finishing cut takes
+  `finish_damage` (6). While she fights, the courtyard entrance is sealed
+  by a wall of ink that erupts out of a spreading ink pool and rises
+  (`Village.set_arena_sealed`, `shaders/ink_wall.gdshader`; ink falling
+  from nowhere was rejected), so the fight
+  cannot be walked out of (walking out used to reset her: rejected); only
+  dying resets her. Walking into her hurts and knocks him back, and she
+  swats (`contact_damage`, `swat_time`), like a husk. Her bar: `boss_bar.gd`. Fight music
+  `music_hannya_fight.ogg` (seamless loop). Dying resets her: she waits at
+  the courtyard's right end (`waiting_gap`), facing the way he comes back
+  in; coming back restarts the fight without the cutscene.
+- **The pit** (`Village._build_pit`, `PIT_LEFT`/`PIT_RIGHT`/`PIT_BACK`) is a
+  hole in the street, not a cut through it: the street carries on behind
+  it, the street's torn front crumbles at its edges, and lantern
+  reflections (`_add_wet_shine`) are trimmed so none hangs over the hole.
 
 ### Wind
 - One shared wind (`scripts/wind.gd`): a breeze plus gusts that roll along the
@@ -253,8 +405,9 @@ Julian owns both images.
 
 ### Sound
 - `scripts/sound.gd` (the `Sound` node in `main.tscn`). Any script plays a
-  sound with `Sound.play(self, &"name")`. Rain (two layers) and wind loop all
-  the time. M mutes. There is no music yet.
+  sound with `Sound.play(self, &"name")`. Rain (two layers), wind and the
+  village music (`music_village.ogg`, `Sound.music_volume`) loop all the
+  time. M mutes. Loops that must be seamless are OGG: MP3 leaves a gap.
 - Files are in `audio/`; `audio/README.md` lists each one, when it plays and
   the words used to generate it.
 - Generating with ElevenLabs: make `audio/raw/` first (the tool will not
@@ -281,7 +434,15 @@ Julian owns both images.
 | `scripts/ronin_puppet.gd` | Player looks: picks the stance, draws the swoosh, blows the cloak, shows the ink |
 | `scripts/samurai_animator.gd` | Poses the model's skeleton; holds all his stances |
 | `models/ronin.glb` | The Ronin, sculpted and rigged by Meshy (the `.png` beside it is its texture) |
-| `scripts/paper_husk.gd` | Enemy: patrol, 3 hits, crumple, confetti |
+| `scripts/paper_husk.gd` | Enemy: patrol, tell + swipe, shove, posture/stagger, 3 hits, crumple, confetti |
+| `scripts/husk_poses.gd` | The husk's hand-made stances |
+| `scripts/hannya*.gd`, `ink_*.gd`, `phantom_mask.gd`, `boss_bar.gd` | The Weeping Hannya: stage, poses, cutscene, title, fight, projectiles, health bar |
+| `shaders/shoji_screen.gdshader` | The backlit shoji with her shadow, ink and tears |
+| `art_source/` | Source art Godot ignores (the brush font) |
+| `textures/` | Lettering rendered from the brush font |
+| `tools/model_look.gd` | Photographs an unrigged model from three sides (rigged ones: check in game) |
+| `tools/render_lettering.gd` | Renders brush lettering into `textures/` |
+| `models/husk.glb` | The husk, sculpted and rigged by Meshy |
 | `scripts/village.gd` | The level LAYOUT: ground, houses, lanterns, props, lighting, wind sway, rain splashes |
 | `scripts/scenery.gd` | The prop kit: houses, roofs, lanterns, curtains, banner, well, torii, pines, cherry trees |
 | `scripts/backdrop.gd` | Everything far away: sky, moon, clouds, peaks, hills, castle, far village, river, mist |
@@ -302,8 +463,10 @@ Julian owns both images.
 | `tools/frame_sheet.gd` | Photographs animation and effects frame by frame |
 | `.github/workflows/deploy.yml` | Builds the web version and deploys to GitHub Pages on push to `main` |
 
-Controls (keyboard + gamepad): A/D move, Space jump, J cut (W/S to aim), L
-dash, hold K heal, M mute.
+Controls (keyboard + gamepad): A/D move, S duck, Space jump (also off walls), J cut
+(W/S to aim), hold K then let go for the iaijutsu draw (gamepad Y), L or Shift dash,
+I parry, hold I to block (gamepad left shoulder or trigger), hold U heal,
+M mute.
 
 ## Commands
 
@@ -321,7 +484,7 @@ Godot_v4.7.2-stable_win64_console.exe --headless --path . --script tools/smoke_t
 Godot_v4.7.2-stable_win64_console.exe --path . -- --x=21 --screenshot=C:\full\path\shot.png
 # Close-up of the Ronin
 Godot_v4.7.2-stable_win64_console.exe --path . -- --zoom=4.2 --screenshot=C:\full\path\ronin.png
-# Frame sheet: stances | cuts | endings | struck | hud
+# Frame sheet: stances | cuts | endings | struck | hud | parry | draw | iai | husk | climb | wall | pit | marks | sneak | cutscene | boss [new|step]
 Godot_v4.7.2-stable_win64_console.exe --path . --script tools/frame_sheet.gd -- cuts C:\full\path\cuts.png
 ```
 
@@ -343,10 +506,16 @@ sheet when the change can be seen.
       test, exports and deploys; the game loads and takes input in a browser
       with no console errors (checked 2026-11-21)
 - [ ] **M1 follow-ups:** Julian playtests the browser version for speed and
-      sound; music
-- [ ] **M2 Combat core:** parry + posture/stagger, iaijutsu draw, finishing cut
-- [ ] **M3 Ink:** ink-marking on the Ronin's body, Refold heal polish, Smudge on death, shrines
-- [ ] **M4 Kasa-obake** boss fight
+      sound (music added 2026-11-21)
+- [x] **M2 Combat core:** parry + posture/stagger, finishing cut, iaijutsu
+      draw with the parry-then-draw combo (2026-11-21; feel not yet judged
+      in play by Julian)
+- [x] **Movement:** wall slide and wall jump, climbing course, pit fade
+      (2026-11-21)
+- [ ] **M3 Ink:** ink-marking on the Ronin's body (first version done
+      2026-11-21), Refold heal polish, Smudge on death, shrines
+- [x] **M4 First boss:** the Weeping Hannya, with her cutscene (first pass,
+      2026-11-21; not yet played by Julian)
 - [ ] **M5 Bamboo of Folded Wind** region + Crane Glide
 - [ ] **M6** Vertical slice polish: audio, menus, save at shrines, map
 
@@ -365,6 +534,13 @@ sheet when the change can be seen.
   through his legs.
 - The ink blots when struck follow the model's texture layout, so they are
   angular rather than round.
-- Heal (hold K) is a placeholder: 3 ink for 1 health, with no animation of
-  its own beyond kneeling.
+- Heal (hold U) costs 3 ink for 1 health; he kneels while an ensō (brush
+  circle, `RoninPuppet._update_enso`) is painted round him as the charge
+  builds, then it closes, flashes and dissolves when the heal lands.
 - Death just respawns at the well; falling in the pit costs 1 health.
+- Ink marks are not saved between sessions (there is no saving yet).
+- The husk's model is lit like the rest of the scene but has no wind cloth.
+- `models/hannya_mask.glb` is 12 MB (its 4K texture), for one close-up: the
+  web download grew. Shrink its texture if loading is slow.
+- The Hannya fight was checked by the automated test and frame sheets only;
+  its difficulty and pace are first guesses, not yet played.

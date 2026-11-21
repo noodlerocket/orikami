@@ -126,7 +126,7 @@ func _draw() -> void:
 
 	if show_controls_hint:
 		draw_string(ThemeDB.fallback_font, Vector2(20.0, size.y - 18.0),
-				"A/D move   Space jump   J slash (W/S to aim)   L dash   hold K heal    M mute",
+				"A/D move   S duck   Space jump   J slash (W/S to aim)   L or Shift dash   I parry (hold to block)   hold K draw   hold U heal    M mute",
 				HORIZONTAL_ALIGNMENT_LEFT, -1.0, 14, Color(1.0, 1.0, 1.0, 0.4))
 
 

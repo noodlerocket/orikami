@@ -443,3 +443,151 @@ static func slash(u: float, direction: Vector2) -> Dictionary:
 			"hand_l": SAYA - DRAW * 0.08,
 			"blade": Vector3(-0.97, 0.2, 0.15), "blade_out": 1.0})],
 	], u)
+
+
+## The parry. `u` goes 0 to 1 over the whole parry.
+##
+## Like every cut it starts as a draw: the blade comes a little way out of the
+## scabbard and up, until it stands slanted in front of his face with the edge
+## turned outward, to catch the blow on the flat near the guard. He braces low
+## on his front foot, holds it there, and slides it back in at the end.
+static func parry(u: float) -> Dictionary:
+	var feet := {"foot_r": Vector3(-0.14, 0.0, 0.24), "foot_l": Vector3(0.15, 0.0, -0.3), "toe_l": 22.0}
+	var draw := stance({
+		"hips": Vector3(0.0, -0.12, 0.03), "hips_rot": Vector3(8.0, 12.0, 0.0),
+		"spine": Vector3(10.0, 16.0, 0.0), "head": Vector3(-6.0, -24.0, 0.0),
+		"hand_r": HILT + DRAW * 0.2, "hand_l": SAYA - DRAW * 0.05,
+		"blade": -DRAW, "blade_out": 1.0}, feet)
+	# The guard: fist before his chest, blade slanted up and forward, his
+	# left hand pressing the back of the blade to take the weight of the blow.
+	var guard := stance({
+		"hips": Vector3(0.0, -0.17, 0.05), "hips_rot": Vector3(10.0, 4.0, 0.0),
+		"spine": Vector3(6.0, 4.0, 0.0), "head": Vector3(-12.0, -6.0, 0.0),
+		"reach_r": Vector3(-0.06, 0.06, 0.32), "aim_r": 1.0,
+		"reach_l": Vector3(0.1, 0.16, 0.34), "aim_l": 1.0,
+		"blade": Vector3(0.0, 0.82, 0.57), "blade_out": 1.0}, feet)
+	# The same guard, pressed a touch further out (the moment he holds).
+	var braced := stance({
+		"hips": Vector3(0.0, -0.18, 0.06), "hips_rot": Vector3(11.0, 2.0, 0.0),
+		"spine": Vector3(7.0, 2.0, 0.0), "head": Vector3(-12.0, -4.0, 0.0),
+		"reach_r": Vector3(-0.06, 0.07, 0.35), "aim_r": 1.0,
+		"reach_l": Vector3(0.1, 0.17, 0.37), "aim_l": 1.0,
+		"blade": Vector3(0.0, 0.8, 0.6), "blade_out": 1.0}, feet)
+	return along([[0.0, draw], [0.22, guard], [0.8, braced], [1.0, braced]], u)
+
+
+
+## The iai stance: crouched low and still, front foot forward, body turned to
+## hide the sword, head bowed so the hat hides his eyes. Right hand on the
+## hilt, left thumb on the guard. `charge` goes 0 to 1 as he settles lower;
+## at 1 the thumb has pushed an inch of blade out of the scabbard (the sign
+## that the draw is ready).
+static func iai(charge: float, time: float) -> Dictionary:
+	var breath := sin(time * 1.6) * (1.0 - charge)
+	var sink := smoothstep(0.0, 1.0, charge)
+	var pose := stance({
+		"hips": Vector3(0.0, -0.24 - sink * 0.06 + breath * 0.005, 0.06),
+		"hips_rot": Vector3(12.0 + sink * 4.0, 22.0, 0.0),
+		"spine": Vector3(16.0 + sink * 4.0, 16.0, 0.0),
+		"head": Vector3(6.0 + sink * 4.0, -24.0, 0.0),
+		"foot_r": Vector3(-0.15, 0.0, 0.36), "foot_l": Vector3(0.15, 0.0, -0.36), "toe_l": 34.0,
+		"hand_r": HILT, "hand_l": SAYA + DRAW * 0.03,
+	})
+	if charge >= 1.0:
+		pose["hand_r"] = HILT + DRAW * 0.08
+		pose["blade"] = -DRAW
+		pose["blade_out"] = 1.0
+	return pose
+
+
+## The draw: caught at the end of the cut, low and stretched along the line
+## he travelled, sword arm flung out behind him, blade level.
+static func iai_strike() -> Dictionary:
+	return stance({
+		"hips": Vector3(0.0, -0.3, 0.16), "hips_rot": Vector3(16.0, -22.0, 0.0),
+		"spine": Vector3(10.0, -32.0, 0.0), "head": Vector3(-14.0, 34.0, 0.0),
+		"foot_r": Vector3(-0.14, 0.0, 0.56), "foot_l": Vector3(0.15, 0.06, -0.52), "toe_l": 45.0,
+		"reach_r": Vector3(-0.42, 0.04, 0.02), "aim_r": 1.0,
+		"hand_l": SAYA - DRAW * 0.08,
+		"blade": Vector3(-0.92, 0.12, -0.36), "blade_out": 1.0,
+	})
+
+
+
+## Clinging to a wall and sliding down it, with his BACK to the wall (it is
+## behind him, at -Z), looking out. Both feet are braced behind him with the
+## soles pressed back flat against the wall, toes down, knees bent forward,
+## one a little higher than the other; his left hand is pressed to the wall
+## behind his hip and his right keeps the sword still. Head bowed under the
+## hat.
+##
+## The wall's surface is WALL_REACH behind his centre (the Ronin's collision
+## radius), so that is where the soles are put.
+const WALL_REACH := 0.3
+
+static func wall_slide(time: float) -> Dictionary:
+	var scrape := sin(time * 9.0) * 0.006  # the shiver of paper sliding on plaster
+	return stance({
+		"hips": Vector3(0.0, -0.1, 0.04), "hips_rot": Vector3(12.0, 0.0, 0.0),
+		"spine": Vector3(10.0, 0.0, 0.0), "head": Vector3(14.0, 0.0, 0.0),
+		"foot_r": Vector3(-0.12, 0.34 + scrape, -(WALL_REACH - 0.03)), "toe_r": 78.0,
+		"foot_l": Vector3(0.12, 0.12 - scrape, -(WALL_REACH - 0.03)), "toe_l": 72.0,
+		"reach_l": Vector3(0.24, -0.3, -(WALL_REACH - 0.02)), "aim_l": 1.0,
+	})
+
+
+## Springing off a wall: thrown out and up, back leg still straight from the
+## push, front knee driving up, the hand that was on the wall swept out behind.
+static func wall_jump() -> Dictionary:
+	return stance({
+		"hips_rot": Vector3(-6.0, 0.0, 0.0), "spine": Vector3(-10.0, 0.0, 0.0), "head": Vector3(-14.0, 0.0, 0.0),
+		"foot_r": Vector3(-0.12, 0.34, 0.2), "toe_r": 30.0,
+		"foot_l": Vector3(0.11, 0.02, -0.34), "toe_l": 70.0,
+		"reach_l": Vector3(0.3, 0.1, -0.24), "aim_l": 1.0,
+	})
+
+
+
+## Creeping forward on the balls of his feet: short steps, heels raised, each
+## foot lifted only a little and set down toe first; knees bent, hips low and
+## level, back straight, both hands on the sword. `phase` 0 to 1 over a full
+## stride (two steps).
+static func sneak(phase: float) -> Dictionary:
+	var left := _tiptoe(phase)
+	var right := _tiptoe(fposmod(phase + 0.5, 1.0))
+	var roll := sin(phase * TAU)
+	return stance({
+		"hips": Vector3(0.0, -0.13 + absf(roll) * 0.012, 0.03),
+		"hips_rot": Vector3(9.0, roll * 4.0, 0.0),
+		"spine": Vector3(6.0, -roll * 4.0, 0.0),
+		"head": Vector3(4.0, 0.0, 0.0),
+		"foot_l": Vector3(0.11, left.y, left.z), "toe_l": left.x,
+		"foot_r": Vector3(-0.12, right.y, right.z), "toe_r": right.x,
+		"hand_r": HILT,
+	})
+
+
+## One foot through a creeping stride: (toe angle, height, forward). Planted
+## on its toes for the first half while the body passes over it, then lifted
+## a hand's breadth, carried forward and set down toe first.
+static func _tiptoe(p: float) -> Vector3:
+	if p < 0.5:
+		var plant := p / 0.5
+		return Vector3(lerpf(24.0, 34.0, plant), 0.045, lerpf(0.17, -0.17, plant))
+	var swing := (p - 0.5) / 0.5
+	var lift := sin(PI * swing)
+	return Vector3(lerpf(40.0, 24.0, swing), 0.045 + lift * 0.1, lerpf(-0.17, 0.17, smoothstep(0.0, 1.0, swing)))
+
+
+
+## Ducking: dropped low onto his heels, one knee nearly to the ground, back
+## bent and head down so the wide hat covers him; hand on the sword. Low
+## enough that a sweep at chest height passes over the brim of his hat.
+static func duck(time: float) -> Dictionary:
+	var breath := sin(time * 2.2) * 0.008
+	return stance({
+		"hips": Vector3(0.0, -0.5 + breath, -0.04), "hips_rot": Vector3(22.0, 0.0, 0.0),
+		"spine": Vector3(34.0, 0.0, 0.0), "head": Vector3(26.0, 0.0, 0.0),
+		"foot_r": Vector3(-0.14, 0.0, 0.22), "toe_r": 0.0,
+		"foot_l": Vector3(0.14, 0.04, -0.3), "toe_l": 72.0,
+	})
