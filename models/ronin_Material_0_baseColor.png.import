@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://ou5jt5uxn7py"
 path.s3tc="res://.godot/imported/ronin_Material_0_baseColor.png-04ee7afa897365d0955c0a7b8736510f.s3tc.ctex"
+path.etc2="res://.godot/imported/ronin_Material_0_baseColor.png-04ee7afa897365d0955c0a7b8736510f.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://models/ronin_Material_0_baseColor.png"
-dest_files=["res://.godot/imported/ronin_Material_0_baseColor.png-04ee7afa897365d0955c0a7b8736510f.s3tc.ctex"]
+dest_files=["res://.godot/imported/ronin_Material_0_baseColor.png-04ee7afa897365d0955c0a7b8736510f.s3tc.ctex", "res://.godot/imported/ronin_Material_0_baseColor.png-04ee7afa897365d0955c0a7b8736510f.etc2.ctex"]
 
 [params]
 
