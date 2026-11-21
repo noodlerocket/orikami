@@ -16,6 +16,7 @@ extends Node3D
 var _fade: ColorRect
 var _cutscene_played := false
 var _boss: HannyaBoss
+var _warming := false
 var _boss_bar: BossBar
 
 @onready var _ronin: Ronin = $Ronin
@@ -35,9 +36,20 @@ func _ready() -> void:
 	_ronin.died.connect(_on_died)
 	_build_fade()
 	_debug_screenshot()
+	# The browser version prepares every material and effect once, behind a
+	# loading cover, so the game does not freeze the first time each appears.
+	if OS.has_feature("web") or "--warmup" in OS.get_cmdline_user_args():
+		_warm_up()
 
 
 func _process(_delta: float) -> void:
+	# The Hannya's shadow is only filmed while her shrine could be on screen.
+	var stage: HannyaStage = $Village.stage
+	if stage and not _warming:
+		stage.set_shadow_active(absf(_camera.global_position.x - stage.global_position.x) < 26.0
+				or (_boss != null and is_instance_valid(_boss)))
+	if _warming:
+		return  # (he is moved about during the warm-up: no cutscene, no fight)
 	var in_arena := _ronin.global_position.x > Village.ARENA.x + 0.6
 	# Walking into the shrine courtyard for the first time plays the cutscene.
 	if not _cutscene_played and in_arena:
@@ -60,6 +72,119 @@ func play_hannya_cutscene() -> void:
 	scene.game_camera = _camera
 	scene.finished.connect(_start_boss_fight)
 	add_child(scene)
+
+
+# --- Warming up (the browser version) -------------------------------------
+# In a browser, the graphics card prepares (compiles) each new kind of
+# material the first time it is drawn, and that can freeze the game for a
+# second or more. So at the start, behind a cover, everything is shown once:
+# the whole level (the camera sweeps along it) and every effect.
+
+func _warm_up() -> void:
+	_warming = true
+	var layer := CanvasLayer.new()
+	layer.layer = 30
+	add_child(layer)
+	var cover := LoadingCover.new()
+	layer.add_child(cover)
+	_ronin.set_physics_process(false)
+	var stage: HannyaStage = $Village.stage
+	stage.set_shadow_active(true)
+	var village: Village = $Village
+	var puppet: RoninPuppet = _ronin.get_node("Puppet")
+	var stops: Array[Vector3] = []
+	for x in range(-8, 58, 6):
+		stops.append(Vector3(x, 4.2, _camera.distance))
+	stops.append(Vector3(40.9, 9.0, _camera.distance))  # up the climbing walls
+	stops.append(Vector3(40.9, 13.0, _camera.distance))
+	var total := stops.size() + 14
+	var done := 0
+	# 1. The level, from end to end.
+	for stop: Vector3 in stops:
+		_camera.global_position = stop
+		await _two_frames()
+		done += 1
+		cover.progress = float(done) / total
+	# 2. Every effect, once, in front of the camera at the courtyard.
+	var here := Vector3(52.0, 1.5, 0.0)
+	_camera.global_position = Vector3(52.0, 4.2, _camera.distance)
+	_ronin.global_position = here
+	var effects: Array[Callable] = [
+		func() -> void: puppet.play_slash(Vector2(1, 0)),
+		func() -> void: puppet.play_deflect(),
+		func() -> void: puppet.play_block(),
+		func() -> void:
+			puppet.state = &"iai"
+			puppet.iai_charge = 1.0,
+		func() -> void:
+			puppet.state = &"heal"
+			puppet.heal_charge = 0.6,
+		func() -> void:
+			puppet.heal_charge = -1.0
+			puppet.play_healed(),
+		func() -> void:
+			puppet.state = &"idle"
+			puppet.play_draw(here.x - 3.0)
+			puppet.end_draw(here.x),
+		func() -> void: Confetti.burst(village, here + Vector3(1.0, 1.0, 0.0), 20),
+		func() -> void:
+			var drop := InkDrop.new()
+			village.add_child(drop)
+			drop.global_position = here + Vector3(1.5, 0.0, 0.0),
+		func() -> void:
+			var pool := InkPool.new()
+			village.add_child(pool)
+			pool.global_position = here + Vector3(-1.5, 0.0, 0.0)
+			pool.open(0.05)
+			pool.splash()
+			pool.close(0.3, 0.1),
+		func() -> void: village.set_arena_sealed(true),
+		func() -> void:
+			village.set_arena_sealed(false)
+			var blade := InkBlade.new()
+			village.add_child(blade)
+			blade.global_position = here + Vector3(2.0, 1.0, 0.0)
+			var mask := PhantomMask.new()
+			village.add_child(mask)
+			mask.global_position = here + Vector3(3.0, 2.0, 0.0)
+			mask.dive_at = 0.2,
+		func() -> void:
+			# Hit flashes (a different look of the same paper) on her and a husk.
+			stage.hannya.show_body(true)
+			stage.hannya.flash(true)
+			for node: Node in village.get_children():
+				if node is PaperHusk:
+					node.call("_set_flash", true),
+		func() -> void:
+			stage.hannya.flash(false)
+			stage.hannya.show_body(false)
+			for node: Node in village.get_children():
+				if node is PaperHusk:
+					node.call("_set_flash", false),
+	]
+	for effect: Callable in effects:
+		effect.call()
+		await _two_frames()
+		done += 1
+		cover.progress = float(done) / total
+	# Put everything back as it was.
+	puppet.state = &"idle"
+	puppet.iai_charge = 0.0
+	_ronin.global_position = _ronin.get("_spawn_position")
+	_ronin.velocity = Vector3.ZERO
+	_ronin.set_physics_process(true)
+	_camera.snap_to_target()
+	_warming = false
+	await get_tree().create_timer(0.4).timeout
+	var fade := create_tween()
+	fade.tween_property(cover, "modulate:a", 0.0, 0.6)
+	fade.tween_callback(layer.queue_free)
+
+
+func _two_frames() -> void:
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	await get_tree().process_frame
 
 
 ## After the cutscene: the Hannya steps down onto the courtyard and the fight

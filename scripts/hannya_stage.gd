@@ -31,6 +31,7 @@ var front_light: OmniLight3D   # the warm spill from the screen onto the courtya
 var inner_light: OmniLight3D   # the lamp inside, which lights her when the paper is torn
 
 var _slash_open := Vector2.ZERO
+var _shadow_done := false
 var _viewport: SubViewport
 var _shadow_camera: Camera3D
 var _rng := RandomNumberGenerator.new()
@@ -80,6 +81,17 @@ func screen_uv(world: Vector3) -> Vector2:
 	return Vector2(local.x / screen_size.x + 0.5, 1.0 - local.y / screen_size.y)
 
 
+## Films her shadow (on) or rests the shadow camera (off) when her shrine
+## is too far away to be seen. (Not once she has come out of it.)
+func set_shadow_active(on: bool) -> void:
+	if _shadow_done:
+		return
+	var mode := SubViewport.UPDATE_ALWAYS if on else SubViewport.UPDATE_DISABLED
+	if _viewport.render_target_update_mode != mode:
+		_viewport.render_target_update_mode = mode
+		hannya.set_process(on)
+
+
 ## She has come out through the paper: her shadow leaves the screen (the ink
 ## she bled stays, frozen), and the shadow camera stops, to save time.
 func stop_shadow() -> void:
@@ -88,6 +100,8 @@ func stop_shadow() -> void:
 		screen_material.set_shader_parameter(&"ink_shape", ImageTexture.create_from_image(last))
 	screen_material.set_shader_parameter(&"shadow_strength", 0.0)
 	_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	_shadow_done = true
+	hannya.set_process(true)  # she is out: keep her moving, whatever the camera does
 	hannya.hide_double()
 
 
