@@ -392,6 +392,44 @@ func _run(main: Node) -> void:
 	_check("then he is back at the start, whole, at full health",
 			puppet_rig.visible and ronin.health == ronin.max_health and ronin.global_position.distance_to(ronin.get("_spawn_position")) < 1.0)
 
+	# The pause screen: Esc stops the game, Esc again starts it.
+	var pause := InputEventAction.new()
+	pause.action = &"pause"
+	pause.pressed = true
+	Input.parse_input_event(pause)
+	await _frames(20)
+	var x_paused := ronin.global_position.x
+	Input.action_press("move_right")
+	await _frames(20)
+	_check("Esc pauses the game (he does not move: %.2f m)" % absf(ronin.global_position.x - x_paused),
+			paused and absf(ronin.global_position.x - x_paused) < 0.01)
+	Input.action_release("move_right")
+	Input.parse_input_event(pause)
+	await _frames(30)
+	_check("Esc again carries on", not paused)
+	# The volume settings change and come back.
+	var music_before := Sound.music_level
+	var quieter := Sound.change_level(&"music", -1)
+	_check("the music volume can be turned down (%.1f -> %.1f)" % [music_before, quieter], quieter < music_before or music_before == 0.0)
+	Sound.change_level(&"music", 1)
+
+	# The title screen opens with its menu.
+	main.queue_free()
+	await _frames(5)
+	var title: Node = load("res://scenes/title.tscn").instantiate()
+	root.add_child(title)
+	await _frames(20)
+	var title_menu: TitleMenu = title.get("_menu")
+	_check("the title screen opens with its menu", title_menu != null and title_menu.menu.current_page() == &"main")
+	title_menu.show_menu_now()
+	title_menu.menu.open_page(&"settings")
+	await _frames(5)
+	_check("its Settings page opens, and Esc comes back", title_menu.menu.current_page() == &"settings")
+	title_menu.menu.go_back()
+	_check("...to the main list", title_menu.menu.current_page() == &"main")
+	title.queue_free()
+	await _frames(5)
+
 	print("SMOKE TEST: ", "ALL PASSED" if _failures == 0 else "%d FAILED" % _failures)
 	Engine.time_scale = 1.0
 	quit(_failures)

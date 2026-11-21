@@ -18,6 +18,7 @@ var _cutscene_played := false
 var _boss: HannyaBoss
 var _warming := false
 var _boss_bar: BossBar
+var _pause: PauseMenu
 
 @onready var _ronin: Ronin = $Ronin
 @onready var _camera: FollowCamera = $Camera
@@ -25,6 +26,7 @@ var _boss_bar: BossBar
 
 
 func _ready() -> void:
+	UiStyle.load_settings()
 	_apply_debug_start()
 	_camera.target = _ronin
 	_camera.snap_to_target()
@@ -35,6 +37,7 @@ func _ready() -> void:
 	_ronin.fell_in_pit.connect(_on_fell_in_pit)
 	_ronin.died.connect(_on_died)
 	_build_fade()
+	_build_pause()
 	_debug_screenshot()
 	# The browser version prepares every material and effect once, behind a
 	# loading cover, so the game does not freeze the first time each appears.
@@ -207,6 +210,25 @@ func _start_boss_fight() -> void:
 	_begin_fight()
 
 
+## The pause screen (Esc, P or Start). It stays awake while the game is
+## paused; the rain and music keep playing under it. No pausing during the
+## loading cover or the Hannya cutscene (hold Space skips that instead).
+func _build_pause() -> void:
+	$Sound.process_mode = Node.PROCESS_MODE_ALWAYS
+	var layer := CanvasLayer.new()
+	layer.layer = 20
+	layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(layer)
+	_pause = PauseMenu.new()
+	_pause.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_pause.can_pause = func() -> bool:
+		for child: Node in get_children():
+			if child is HannyaCutscene:
+				return false
+		return not _warming
+	layer.add_child(_pause)
+
+
 ## A sheet over the whole screen (above the HUD too), normally see-through.
 func _build_fade() -> void:
 	_fade = ColorRect.new()
@@ -262,6 +284,7 @@ func _on_fell_in_pit() -> void:
 #   --hold=move_right      hold a control down (to photograph him running)
 #   --marks=0.5            start this inked (0 = blank, 1 = covered)
 #   --cutscene             play the Hannya cutscene straight away
+#   --pause                open the pause screen straight away
 
 func _apply_debug_start() -> void:
 	for arg: String in OS.get_cmdline_user_args():
@@ -287,6 +310,10 @@ func _apply_debug_start() -> void:
 		elif arg == "--cutscene":
 			_ronin.position = Vector3(43.2, 1.6, 0.0)
 			play_hannya_cutscene.call_deferred()
+		elif arg == "--pause":
+			(func() -> void:
+				await get_tree().create_timer(0.5).timeout
+				_pause.open()).call_deferred()
 		elif arg.begins_with("--hold="):
 			Input.action_press(arg.trim_prefix("--hold="))
 

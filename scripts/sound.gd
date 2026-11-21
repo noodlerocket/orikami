@@ -51,6 +51,15 @@ const SOUNDS := {
 @export var wind_quiet := -30.0
 @export var wind_loud := -11.0
 
+## The player's own volume settings (0 to 1), set in the pause menu and
+## remembered between plays in user://settings.cfg. "Sounds" covers
+## everything that is not music: steps, cuts, rain and wind.
+static var music_level := 1.0
+static var sounds_level := 1.0
+static var _levels_loaded := false
+
+const SETTINGS_FILE := "user://settings.cfg"
+
 var _streams := {}                       # sound name -> the loaded files
 var _voices: Array[AudioStreamPlayer] = []  # a few players, shared by all one-off sounds
 var _next_voice := 0
@@ -59,6 +68,8 @@ var _rain_far: AudioStreamPlayer
 var _wind: AudioStreamPlayer
 var _music: AudioStreamPlayer
 var _wind_hush := 0.0   # taken off the wind while the rain is hushed
+var _rain_drop := 0.0   # taken off the rain while it is hushed
+var _music_ducked := false
 
 
 ## Plays a one-off sound from anywhere. `from` is any node in the scene.
@@ -69,6 +80,7 @@ static func play(from: Node, sound: StringName, louder: float = 0.0) -> void:
 
 func _ready() -> void:
 	add_to_group(&"sound")
+	Sound.load_levels()
 	AudioServer.set_bus_volume_db(0, master_volume)
 	for sound: StringName in SOUNDS:
 		var files: Array[AudioStream] = []
@@ -83,9 +95,9 @@ func _ready() -> void:
 		_voices.append(voice)
 	# Two rain layers at slightly different speeds, so the pattern of drops
 	# takes a long time to repeat.
-	_rain_near = _start_loop("rain_close.mp3", rain_volume, 1.0)
-	_rain_far = _start_loop("rain_far.mp3", rain_volume - 3.0, 0.93)
-	_wind = _start_loop("wind.mp3", wind_quiet, 1.0)
+	_rain_near = _start_loop("rain_close.mp3", rain_volume + _sounds_db(), 1.0)
+	_rain_far = _start_loop("rain_far.mp3", rain_volume - 3.0 + _sounds_db(), 0.93)
+	_wind = _start_loop("wind.mp3", wind_quiet + _sounds_db(), 1.0)
 	# The music loops seamlessly on its own (its end was blended into its
 	# start when it was made); OGG, unlike MP3, adds no gap at the seam.
 	var music := load(FOLDER + "music_village.ogg") as AudioStreamOggVorbis
@@ -93,7 +105,7 @@ func _ready() -> void:
 		music.loop = true
 		_music = AudioStreamPlayer.new()
 		_music.stream = music
-		_music.volume_db = music_volume
+		_music.volume_db = music_volume + _music_db()
 		add_child(_music)
 		_music.play()
 
@@ -104,7 +116,7 @@ func _process(_delta: float) -> void:
 	if camera == null or _wind == null:
 		return
 	var gust := clampf((Wind.speed_at(camera.global_position.x) - Wind.breeze) / maxf(Wind.gusts, 0.1), 0.0, 1.0)
-	_wind.volume_db = lerpf(wind_quiet, wind_loud, sqrt(gust)) + _wind_hush
+	_wind.volume_db = lerpf(wind_quiet, wind_loud, sqrt(gust)) + _wind_hush + _sounds_db()
 	_wind.pitch_scale = lerpf(0.92, 1.1, gust)
 
 
@@ -128,16 +140,18 @@ static func duck_rain(on: bool) -> void:
 
 func _fade_music(on: bool) -> void:
 	if _music:
-		create_tween().tween_property(_music, "volume_db", -60.0 if on else music_volume, 1.5)
+		_music_ducked = on
+		create_tween().tween_property(_music, "volume_db", -60.0 if on else music_volume + _music_db(), 1.5)
 
 
 func _fade_rain(on: bool) -> void:
 	var drop := -14.0 if on else 0.0
 	var t := create_tween().set_parallel()
+	_rain_drop = drop
 	if _rain_near:
-		t.tween_property(_rain_near, "volume_db", rain_volume + drop, 1.2)
+		t.tween_property(_rain_near, "volume_db", rain_volume + drop + _sounds_db(), 1.2)
 	if _rain_far:
-		t.tween_property(_rain_far, "volume_db", rain_volume - 3.0 + drop, 1.2)
+		t.tween_property(_rain_far, "volume_db", rain_volume - 3.0 + drop + _sounds_db(), 1.2)
 	_wind_hush = drop
 
 
@@ -150,7 +164,7 @@ func play_sound(sound: StringName, louder: float = 0.0) -> void:
 	var voice := _voices[_next_voice]
 	_next_voice = (_next_voice + 1) % _voices.size()
 	voice.stream = files[randi() % files.size()]
-	voice.volume_db = settings["volume"] + effects_volume + louder
+	voice.volume_db = settings["volume"] + effects_volume + louder + _sounds_db()
 	var vary: float = settings["vary"]
 	voice.pitch_scale = 1.0 + randf_range(-vary, vary)
 	voice.play()
@@ -168,3 +182,66 @@ func _start_loop(file: String, volume: float, pitch: float) -> AudioStreamPlayer
 	add_child(player)
 	player.play()
 	return player
+
+
+# --- The player's volume settings -------------------------------------------------
+
+static func _music_db() -> float:
+	return linear_to_db(maxf(music_level, 0.0001))
+
+
+static func _sounds_db() -> float:
+	return linear_to_db(maxf(sounds_level, 0.0001))
+
+
+## Reads the saved volume settings (once).
+static func load_levels() -> void:
+	if _levels_loaded:
+		return
+	_levels_loaded = true
+	var file := ConfigFile.new()
+	if file.load(SETTINGS_FILE) == OK:
+		music_level = clampf(float(file.get_value("volume", "music", 1.0)), 0.0, 1.0)
+		sounds_level = clampf(float(file.get_value("volume", "sounds", 1.0)), 0.0, 1.0)
+
+
+## Changes a volume setting by `step` tenths, applies it at once and saves it.
+## Returns the new level. (Used by the pause menu's sliders.)
+static func change_level(which: StringName, step: int) -> float:
+	var level := music_level if which == &"music" else sounds_level
+	level = clampf(snappedf(level + step * 0.1, 0.1), 0.0, 1.0)
+	if which == &"music":
+		music_level = level
+	else:
+		sounds_level = level
+	if step != 0:
+		var file := ConfigFile.new()
+		file.load(SETTINGS_FILE)
+		file.set_value("volume", "music", music_level)
+		file.set_value("volume", "sounds", sounds_level)
+		file.save(SETTINGS_FILE)
+		var tree := Engine.get_main_loop() as SceneTree
+		tree.call_group(&"sound", &"_apply_levels")
+	return level
+
+
+## For a player made somewhere else (the boss's music, the cutscene's): sets
+## its volume to `base_db` plus the player's music or sounds setting, and keeps
+## it there when the setting changes.
+static func follow_level(player: AudioStreamPlayer, base_db: float, which: StringName = &"music") -> void:
+	player.set_meta(&"base_db", base_db)
+	player.add_to_group(&"music_level" if which == &"music" else &"sounds_level")
+	player.volume_db = base_db + (_music_db() if which == &"music" else _sounds_db())
+
+
+func _apply_levels() -> void:
+	for player: AudioStreamPlayer in get_tree().get_nodes_in_group(&"music_level"):
+		player.volume_db = float(player.get_meta(&"base_db")) + _music_db()
+	for player: AudioStreamPlayer in get_tree().get_nodes_in_group(&"sounds_level"):
+		player.volume_db = float(player.get_meta(&"base_db")) + _sounds_db()
+	if _music and not _music_ducked:
+		_music.volume_db = music_volume + _music_db()
+	if _rain_near:
+		_rain_near.volume_db = rain_volume + _rain_drop + _sounds_db()
+	if _rain_far:
+		_rain_far.volume_db = rain_volume - 3.0 + _rain_drop + _sounds_db()

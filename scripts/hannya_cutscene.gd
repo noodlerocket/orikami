@@ -81,7 +81,7 @@ func _ready() -> void:
 	stage.open_slash(1, 0.0)
 	_music = AudioStreamPlayer.new()
 	_music.stream = load("res://audio/music_hannya_intro.mp3")
-	_music.volume_db = -3.0
+	Sound.follow_level(_music, -3.0)
 	add_child(_music)
 	_music.play()
 	Sound.duck_music(true)
@@ -271,7 +271,7 @@ func _start_sob() -> void:
 	var stream: AudioStreamMP3 = load("res://audio/hannya_sob.mp3")
 	stream.loop = true
 	_sob.stream = stream
-	_sob.volume_db = -4.0
+	Sound.follow_level(_sob, -4.0, &"sounds")
 	add_child(_sob)
 	_sob.play()
 

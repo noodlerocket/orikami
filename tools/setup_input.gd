@@ -17,6 +17,7 @@ func _init() -> void:
 		"heal": [_key(KEY_U), _button(JOY_BUTTON_B)],
 		"draw": [_key(KEY_K), _button(JOY_BUTTON_Y)],
 		"parry": [_key(KEY_I), _button(JOY_BUTTON_LEFT_SHOULDER), _axis(JOY_AXIS_TRIGGER_LEFT, 1.0)],
+		"pause": [_key(KEY_ESCAPE), _key(KEY_P), _button(JOY_BUTTON_START)],
 	}
 	for action: String in actions:
 		ProjectSettings.set_setting("input/" + action, {"deadzone": 0.4, "events": actions[action]})

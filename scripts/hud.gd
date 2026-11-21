@@ -41,6 +41,10 @@ var _started := false
 
 
 ## Start listening to a Ronin's health and ink.
+func _enter_tree() -> void:
+	add_to_group(&"hud")
+
+
 func watch(ronin: Ronin) -> void:
 	_heal_cost = maxi(ronin.heal_cost, 1)
 	ronin.health_changed.connect(_on_health_changed)
@@ -124,10 +128,10 @@ func _draw() -> void:
 	var seal_at := corner + Vector2(width - 32.0, 58.0)
 	_draw_seal(seal_at, _can_heal())
 
-	if show_controls_hint:
-		draw_string(ThemeDB.fallback_font, Vector2(20.0, size.y - 18.0),
-				"A/D move   S duck   Space jump   J slash (W/S to aim)   L or Shift dash   I parry (hold to block)   hold K draw   hold U heal    M mute",
-				HORIZONTAL_ALIGNMENT_LEFT, -1.0, 14, Color(1.0, 1.0, 1.0, 0.4))
+	if show_controls_hint and UiStyle.show_hints and not get_tree().paused:
+		UiStyle.text(self, Vector2(20.0, size.y - 18.0),
+				"A D move    S duck    Space jump    J cut (W S aim)    L dash    I parry (hold: block)    hold K draw    hold U heal    Esc pause",
+				15, Color(0.95, 0.92, 0.86, 0.5), 0.0, 0.8)
 
 
 ## The paper strip: torn edges, a paler torn rim, and a shadow beneath.

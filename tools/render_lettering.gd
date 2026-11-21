@@ -26,10 +26,11 @@ func _initialize() -> void:
 
 
 func _render(font: FontFile, file: String, text: String, font_size: int) -> void:
-	var measure := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
+	var measure := font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
 	var pad := font_size / 4
 	var view := SubViewport.new()
-	view.size = Vector2i(int(measure.x) + pad * 2, int(font_size * 1.45) + pad * 2)
+	var lines := text.count("\n") + 1
+	view.size = Vector2i(int(measure.x) + pad * 2, int(maxf(measure.y * 1.15, font_size * 1.45 * lines)) + pad * 2)
 	view.transparent_bg = true
 	view.render_target_update_mode = SubViewport.UPDATE_ONCE
 	var label := Label.new()

@@ -255,7 +255,7 @@ func _ready() -> void:
 	_music = AudioStreamPlayer.new()
 	_music.stream = load("res://audio/music_hannya_fight.ogg")
 	(_music.stream as AudioStreamOggVorbis).loop = true
-	_music.volume_db = -7.0
+	Sound.follow_level(_music, -7.0)
 	add_child(_music)
 
 

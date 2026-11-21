@@ -14,6 +14,9 @@ renderer); playable in a browser and as Windows/Mac downloads.
   runs the automated check, rebuilds the web page and the downloads, and
   publishes them in about two minutes.
 - Design doc (story, mechanics, style): `docs/design.md`
+- The lore, in story order, and the chapter plan: `docs/lore.md` (parts
+  marked "proposed" still wait for Julian). The game is built in story
+  order: title, the well, the village, the Hannya, what comes after her.
 - What it looks like: `docs/screenshots/` (frame sheets of every move)
 
 **Before changing anything, read "Working with Julian" and "What Julian
@@ -31,9 +34,12 @@ courtyard, with:
 - the first boss, **the Weeping Hannya**, with a 40-second shadow-puppet
   cutscene and a full fight.
 
-Not built yet (the likely next steps): an ending after the Hannya, a title
-screen and pause menu, saving (and shrines to save at), the Smudge on death,
-the Bamboo of Folded Wind region and the Crane Glide, a map. See Milestones.
+Since then: a title screen on Julian's looping video, a pause screen, and
+settings and controls pages, in one UI style.
+
+Not built yet (the likely next steps): the opening in the well, an ending
+after the Hannya, saving (and shrines to save at), the Smudge on death, the
+Bamboo of Folded Wind region and the Crane Glide, a map. See Milestones.
 
 ## Working with Julian
 
@@ -97,6 +103,12 @@ the Bamboo of Folded Wind region and the Crane Glide, a map. See Milestones.
   as "not scary"). He likes supernatural and projectile moves.
 - Cinematics are 2.5D (camera in front of the diorama: pushes, cranes,
   pans), scored to their music.
+- **The title screen is his looping video** (a still of it is
+  `docs/reference/title_reference.jpg`), not a scene rebuilt in code: a paper
+  diorama copy was built and he found it "pretty bad". Claude cannot make
+  video; he makes it, Claude converts and loops it (see "Title and pause").
+  Menus must look like a finished game's: crisp text, soft shading, no hard
+  boxes or stripes.
 
 **Motion**
 - Natural, never mechanical. Rejected: a fast small jitter, a slow pendulum,
@@ -224,7 +236,8 @@ Julian owns them. The art references are in `docs/reference/`.
 Keyboard (gamepad): A/D move; S duck (on the ground); Space jump (also off
 walls) (A); J cut, W/S to aim it up/down (X); hold K, let go, for the
 iaijutsu draw (Y); L or Shift dash (right shoulder or trigger); I parry, hold
-I to block (left shoulder or trigger); hold U heal (B); M mute. W is aim-up
+I to block (left shoulder or trigger); hold U heal (B); Esc or P pause
+(Start); M mute. W is aim-up
 only. The table is in `tools/setup_input.gd`: edit it, re-run it, and update
 the controls line in `scripts/hud.gd`.
 
@@ -446,6 +459,42 @@ the controls line in `scripts/hud.gd`.
   the last one throbs), a brush stroke for ink with a tick per heal, a red
   seal when a heal is ready, and the controls line at the bottom.
 
+### Title and pause
+- `scenes/title.tscn` is the main scene. `title_screen.gd` plays Julian's
+  looping video `video/title_loop.ogv` (1280x720, 30 fps, 4.7 s, 3 MB; its
+  last 1.2 s are blended into its start so it loops without a jump), with
+  the village music and rain. A still from it (`textures/title_backdrop.jpg`)
+  stands in if the video is missing. **The ffmpeg on this computer writes
+  broken Theora files** (coloured blocks); make .ogv with Godot's Movie
+  Maker instead: `tools/make_title_video.gd` has the steps.
+- **The UI** (Julian: the first menus "do not look good"; this is the
+  overhaul): real text in the brush font, cut down to the characters used
+  (`fonts/yuji_syuku_ui.ttf`, 188 KB, OFL). A new kanji in the UI must be
+  added to that cut (fonttools: `subset.Subsetter` on
+  `art_source/fonts/YujiSyuku-Regular.ttf`). `ui_style.gd` (`UiStyle`):
+  colours, text with a soft shadow, smooth shading textures, the chosen-line
+  wash, key caps and gamepad buttons, prompts that switch to gamepad buttons
+  when a pad is used, and the display settings.
+- `ink_menu.gd` (`InkMenu`): pages of lines (button, link to a page,
+  slider, on/off, back). The chosen line: a feathered ink wash wiped on, a
+  vermilion diamond, slides right. Controls page: a dark panel with key caps.
+- `title_menu.gd` (`TitleMenu`): soft shading top, bottom and bottom-left;
+  the logo (a vermilion seal with 折神 beside ORIKAMI, "THE FOLDED GOD"
+  under); "Press any key" first (also lets a browser start sound); then
+  Begin / Settings / Controls / Quit on the dark rock; prompts bottom right.
+- `pause_menu.gd` (`PauseMenu`, built by `Main._build_pause`): Esc, P or
+  Start. Wash, ink down the left, 休 seal and RESTING; Resume / Settings /
+  Controls / Return to the title (asks first). Not during the loading cover
+  or the cutscene. The `Sound` node keeps running while paused.
+- Settings (both menus): Music and Sounds volume, Full screen (not in the
+  browser), Control hints (the HUD's hint line). Saved in
+  `user://settings.cfg` (`Sound.music_level` / `sounds_level`,
+  `UiStyle.show_hints` / `fullscreen`). Music made elsewhere follows the
+  volume through `Sound.follow_level()`.
+- Any command-line option skips the title and starts the game, so the usual
+  screenshot commands still work; `--title` photographs the title, with
+  `--menu` (skip "Press any key") or `--page=settings` / `--page=controls`.
+
 ### Builds, speed and downloads
 - **Web freezes:** the browser prepares each new kind of material the first
   time it is drawn (up to 3.4 s). `Main._warm_up()` (web only; `--warmup`
@@ -500,6 +549,10 @@ the controls line in `scripts/hud.gd`.
 | `tools/setup_input.gd` | Writes the controls into `project.godot` |
 | `tools/render_lettering.gd` | Renders brush lettering into `textures/` |
 | `tools/model_look.gd` | Photographs an unrigged model from three sides |
+| `tools/make_title_video.gd` | Turns frames into the title video (`video/title_loop.ogv`) |
+| `scripts/title_screen.gd`, `title_menu.gd`, `pause_menu.gd`, `ink_menu.gd`, `ui_style.gd` | Title screen, pause screen, the shared menu and UI style |
+| `fonts/` | The brush font, cut down for the UI (and its licence) |
+| `video/` | The title video |
 | `export_presets.cfg` | Web, Windows and Mac export settings (and the page's download link) |
 | `.github/workflows/deploy.yml` | Check, build, release and deploy on every push to `main` |
 
@@ -518,6 +571,10 @@ Godot_v4.7.2-stable_win64_console.exe --headless --path . --script tools/smoke_t
 Godot_v4.7.2-stable_win64_console.exe --headless --path . --import
 # Screenshot (flags: --x=, --zoom=, --face=-1, --hold=, --marks=, --cutscene, --warmup)
 Godot_v4.7.2-stable_win64_console.exe --path . -- --x=21 --screenshot=C:\full\path\shot.png
+# The title screen (--menu, --page=settings, --page=controls), or the pause screen
+Godot_v4.7.2-stable_win64_console.exe --path . -- --title --screenshot=C:\full\path\title.png
+Godot_v4.7.2-stable_win64_console.exe --path . -- --title --page=controls --screenshot=C:\full\path\controls.png
+Godot_v4.7.2-stable_win64_console.exe --path . -- --x=21 --pause --screenshot=C:\full\path\pause.png
 # Frame sheet (see "Checking work" for the list)
 Godot_v4.7.2-stable_win64_console.exe --path . --script tools/frame_sheet.gd -- cuts C:\full\path\cuts.png
 # After a push: watch the build, then check the release
@@ -539,8 +596,10 @@ frame sheet when the change can be seen.
 - [x] **Online:** web page with a loading warm-up; Windows and Mac downloads.
 - [ ] **M3 Ink:** ink marks (first version done; not saved), Refold heal
       polish, the Smudge on death, shrines.
-- [ ] **Finish the slice:** an ending after the Hannya, a title screen and
-      pause menu (with volume and controls), saving at shrines.
+- [x] **Title and pause:** title screen on Julian's looping video, pause
+      menu, settings and controls, all in one UI style (2026-11-21)
+- [ ] **Finish the slice:** the opening in the well, an ending after the
+      Hannya, saving at shrines.
 - [ ] **M5:** the Bamboo of Folded Wind region and the Crane Glide.
 - [ ] **M6:** vertical slice polish: audio balance, map.
 
