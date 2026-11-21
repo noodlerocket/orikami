@@ -1,5 +1,7 @@
-# Builds the web version of Orikami and publishes it to GitHub Pages
-# every time something is pushed to the "main" branch.
+# Builds Orikami every time something is pushed to the "main" branch:
+#   - the web version, published to GitHub Pages;
+#   - downloadable Windows and Mac versions, attached to a GitHub Release
+#     called "latest" (the page links to them: "Download: Windows · Mac").
 #
 # One-time setup on GitHub: repository Settings > Pages > Source: "GitHub Actions".
 name: Build and deploy to GitHub Pages
@@ -10,7 +12,7 @@ on:
   workflow_dispatch:   # also lets you press "Run workflow" by hand
 
 permissions:
-  contents: read
+  contents: write   # to publish the "latest" release with the downloads
   pages: write
   id-token: write
 
@@ -52,6 +54,27 @@ jobs:
           mkdir -p build/web
           "$RUNNER_TEMP/godot" --headless --path . --export-release "Web" build/web/index.html
           test -f build/web/index.html
+
+      - name: Export the Windows and Mac builds
+        run: |
+          mkdir -p build/windows build/mac
+          "$RUNNER_TEMP/godot" --headless --path . --export-release "Windows" build/windows/Orikami.exe
+          "$RUNNER_TEMP/godot" --headless --path . --export-release "Mac" build/mac/Orikami.zip
+          test -f build/windows/Orikami.exe
+          test -f build/mac/Orikami.zip
+          (cd build/windows && zip -q -r ../Orikami-Windows.zip .)
+          cp build/mac/Orikami.zip build/Orikami-Mac.zip
+          ls -la build
+
+      - name: Publish the downloads (release "latest")
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest build/Orikami-Windows.zip build/Orikami-Mac.zip \
+            --target "${{ github.sha }}" --latest \
+            --title "Orikami (latest build)" \
+            --notes "The newest build of Orikami, made automatically from the main branch. Windows: unzip and run Orikami.exe; the first time, if Windows says it protected your PC, click More info, then Run anyway. Mac: unzip, then the first time right-click Orikami and choose Open (macOS asks because the game is not signed by Apple)."
 
       - name: Set up Pages
         uses: actions/configure-pages@v5

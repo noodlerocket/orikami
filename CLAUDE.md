@@ -5,6 +5,9 @@ first game. Built with Godot 4.7.2 (standard, GDScript), meant to be playable
 in a browser via GitHub Pages.
 
 - Play it: https://noodlerocket.github.io/orikami/
+- Download it: https://github.com/noodlerocket/orikami/releases/latest
+  (Orikami-Windows.zip, Orikami-Mac.zip; rebuilt on every push to `main`,
+  linked from the game page's top-right corner)
 - Code: https://github.com/noodlerocket/orikami (public; every push to `main`
   rebuilds and redeploys the page in about a minute)
 - Design doc (story, mechanics, style): `docs/design.md`
@@ -422,6 +425,24 @@ Julian owns both images.
   and blooms when you heal; the last one throbs), a brush stroke for ink with
   a tick at every heal's worth, and a red seal that lights when a heal is
   ready.
+
+### Builds and speed
+- **Web:** the browser prepares each new kind of material the first time it
+  is drawn, which froze the game for up to 3.4 s. `Main._warm_up()` (web
+  only; `--warmup` forces it natively) shows the whole level and every
+  effect once behind a sumi cover with a pale ensō (`loading_cover.gd`).
+  ANY NEW EFFECT, MATERIAL OR ENEMY must be added to that warm-up list, or
+  it will hitch the first time it appears in the browser. Measured on the
+  live site: 15 slow frames and a 3.4 s freeze while running became 1 slow
+  frame (51 ms). The Hannya's shadow camera rests while her shrine is out
+  of view (`HannyaStage.set_shadow_active`).
+- **Downloads:** export presets "Windows" (one .exe, everything inside) and
+  "Mac" (universal .app, ad-hoc signed, not notarized). The workflow exports
+  both and replaces the GitHub Release "latest" with
+  `Orikami-Windows.zip` and `Orikami-Mac.zip`. The page's link to them is
+  in the Web preset's `html/head_include`. Unsigned: Windows shows
+  "protected your PC" (More info, Run anyway); a Mac needs right-click, Open
+  the first time.
 
 ## Layout
 
