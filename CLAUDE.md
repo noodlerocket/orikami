@@ -4,6 +4,9 @@ A 2.5D samurai metroidvania where everything is folded paper. It is Julian's
 first game. Built with Godot 4.7.2 (standard, GDScript), meant to be playable
 in a browser via GitHub Pages.
 
+- Play it: https://noodlerocket.github.io/orikami/
+- Code: https://github.com/noodlerocket/orikami (public; every push to `main`
+  rebuilds and redeploys the page in about a minute)
 - Design doc (story, mechanics, style): `docs/design.md`
 - What it looks like right now: `docs/screenshots/`
 - Read "Working with Julian" and "What Julian likes" before changing anything.
@@ -336,9 +339,11 @@ sheet when the change can be seen.
 - [x] **M1 feel pass:** wind on scenery and cloth, sound, solid houses, rooted
       cherry trees, ink when struck, reworked run / dash / draw-cut, the
       swoosh, rain splashes, gentle camera, upgraded backdrop and HUD
-- [ ] **M1 follow-ups:** first commit; first push to GitHub and confirm the
-      Pages build works in a browser (never tested, and the scene is much
-      heavier than when the workflow was written); music
+- [x] **Online:** pushed to GitHub; the Pages workflow builds, runs the smoke
+      test, exports and deploys; the game loads and takes input in a browser
+      with no console errors (checked 2026-11-21)
+- [ ] **M1 follow-ups:** Julian playtests the browser version for speed and
+      sound; music
 - [ ] **M2 Combat core:** parry + posture/stagger, iaijutsu draw, finishing cut
 - [ ] **M3 Ink:** ink-marking on the Ronin's body, Refold heal polish, Smudge on death, shrines
 - [ ] **M4 Kasa-obake** boss fight
@@ -350,7 +355,12 @@ sheet when the change can be seen.
 - **Never judged in motion or by ear by Claude.** Animation, wind and effects
   were checked from frame sheets; sounds by measurement. Volumes in
   `sound.gd` are first guesses.
-- The web build and the GitHub Pages deploy have never been run.
+- The browser version was only checked to load, draw and take input. Its
+  frame rate and its sound have not been checked by anyone yet.
+- The Pages workflow warns that its actions (`checkout@v4`,
+  `configure-pages@v5`, `upload-pages-artifact@v3`, `deploy-pages@v4`) target
+  Node.js 20, which GitHub is retiring; move to newer versions when they
+  stop working.
 - The cloak does not collide with his body, so a very strong gust can push it
   through his legs.
 - The ink blots when struck follow the model's texture layout, so they are
