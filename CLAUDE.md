@@ -1,19 +1,22 @@
-# ORIKAMI (prototype, frozen)
+# ORIKAMI
 
-> **This is the finished prototype, kept as it is.** The real game is
-> developed in `noodlerocket/orikami` (folder `C:\Users\JulianUribe\OrikamiGame`),
-> which started as a copy of this at the tag `prototype-v1`. Work on the
-> game there, not here.
+> **This is the real game.** It started as a copy of the finished
+> prototype (tag `prototype-v1`), which is kept as it was in
+> `noodlerocket/orikamiprototype` (folder `C:\Users\JulianUribe\Orikami`;
+> playable at https://noodlerocket.github.io/orikamiprototype/). Everything
+> below was written while building the prototype: the lessons about how
+> Julian works and what he likes still apply in full; the parts describing
+> the level, the boss and the milestones describe where the game stands now.
 
 A 2.5D samurai metroidvania where everything is folded paper. It is Julian's
 first game. Built with Godot 4.7.2 (standard, GDScript), meant to be playable
 in a browser via GitHub Pages.
 
-- Play it: https://noodlerocket.github.io/orikamiprototype/
-- Download it: https://github.com/noodlerocket/orikamiprototype/releases/latest
+- Play it: https://noodlerocket.github.io/orikami/
+- Download it: https://github.com/noodlerocket/orikami/releases/latest
   (Orikami-Windows.zip, Orikami-Mac.zip; rebuilt on every push to `main`,
   linked from the game page's top-right corner)
-- Code: https://github.com/noodlerocket/orikamiprototype (public; every push to `main`
+- Code: https://github.com/noodlerocket/orikami (public; every push to `main`
   rebuilds and redeploys the page in about a minute)
 - Design doc (story, mechanics, style): `docs/design.md`
 - What it looks like right now: `docs/screenshots/`
