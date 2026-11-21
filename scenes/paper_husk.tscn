@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/paper_husk.gd" id="1_husk"]
+
+[node name="PaperHusk" type="CharacterBody3D"]
+script = ExtResource("1_husk")

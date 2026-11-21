@@ -1,0 +1,19 @@
+# Godot 4 generated files (rebuilt automatically when the project opens)
+.godot/
+*.translation
+
+# Exported builds (the web build is made by GitHub Actions, not committed)
+build/
+
+# Export signing secrets (export_presets.cfg itself IS committed on purpose)
+.godot/export_credentials.cfg
+export_credentials.cfg
+
+# OS / editor clutter
+.DS_Store
+Thumbs.db
+*.tmp
+.vscode/
+
+# Personal Claude Code settings
+.claude/settings.local.json

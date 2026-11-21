@@ -1,0 +1,55 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://scripts/village.gd" id="2_village"]
+[ext_resource type="PackedScene" path="res://scenes/ronin.tscn" id="3_ronin"]
+[ext_resource type="Script" path="res://scripts/follow_camera.gd" id="4_camera"]
+[ext_resource type="Script" path="res://scripts/rain.gd" id="5_rain"]
+[ext_resource type="Shader" path="res://shaders/paper_grain.gdshader" id="6_grain"]
+[ext_resource type="Script" path="res://scripts/hud.gd" id="7_hud"]
+[ext_resource type="Script" path="res://scripts/sound.gd" id="8_sound"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_grain"]
+shader = ExtResource("6_grain")
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1_main")
+
+[node name="Village" type="Node3D" parent="."]
+script = ExtResource("2_village")
+
+[node name="Ronin" parent="." instance=ExtResource("3_ronin")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 0.3, 0)
+
+[node name="Camera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 2.7, 18)
+current = true
+fov = 38.0
+script = ExtResource("4_camera")
+
+[node name="Rain" type="Node3D" parent="."]
+script = ExtResource("5_rain")
+
+[node name="Sound" type="Node" parent="."]
+script = ExtResource("8_sound")
+
+[node name="Overlay" type="CanvasLayer" parent="."]
+
+[node name="PaperGrain" type="ColorRect" parent="Overlay"]
+material = SubResource("ShaderMaterial_grain")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="HUD" type="Control" parent="Overlay"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("7_hud")
