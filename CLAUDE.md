@@ -547,10 +547,9 @@ sheet when the change can be seen.
   `sound.gd` are first guesses.
 - The browser version was only checked to load, draw and take input. Its
   frame rate and its sound have not been checked by anyone yet.
-- The Pages workflow warns that its actions (`checkout@v4`,
-  `configure-pages@v5`, `upload-pages-artifact@v3`, `deploy-pages@v4`) target
-  Node.js 20, which GitHub is retiring; move to newer versions when they
-  stop working.
+- The workflow's actions were moved to Node 24 versions (checkout v7,
+  configure-pages v6, upload-pages-artifact v5, deploy-pages v5) on
+  2026-11-21, after GitHub warned that Node 20 was being retired.
 - The cloak does not collide with his body, so a very strong gust can push it
   through his legs.
 - The ink blots when struck follow the model's texture layout, so they are
@@ -561,7 +560,9 @@ sheet when the change can be seen.
 - Death just respawns at the well; falling in the pit costs 1 health.
 - Ink marks are not saved between sessions (there is no saving yet).
 - The husk's model is lit like the rest of the scene but has no wind cloth.
-- `models/hannya_mask.glb` is 12 MB (its 4K texture), for one close-up: the
-  web download grew. Shrink its texture if loading is slow.
+- `models/hannya_mask.glb` keeps its 4K source texture in the repo, but the
+  game imports it at 1024 (`hannya_mask_0.jpg.import`, `process/size_limit`):
+  in the close-up 1024 looks the same as 4096, and it is 0.7 MB in the game
+  instead of 17 MB.
 - The Hannya fight was checked by the automated test and frame sheets only;
   its difficulty and pace are first guesses, not yet played.
