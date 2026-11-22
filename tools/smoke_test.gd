@@ -101,9 +101,17 @@ func _run(main: Node) -> void:
 	husk.set("_attack_cooldown_left", 1.0)
 	ronin.position = husk.position
 	ronin.velocity = Vector3.ZERO
-	await _frames(10)
+	# (Watched every frame, and every husk: on a slow computer the short
+	# shove can be over before a single look at the end, and the touch can
+	# come from the husk next to the one he was put on.)
+	var all_husks: Array[Node] = main.get_node("Village").find_children("*", "PaperHusk", true, false)
+	var shoved := false
+	for f in 12:
+		await physics_frame
+		for h: Node in all_husks:
+			shoved = shoved or (is_instance_valid(h) and h.mode == &"shove")
 	_check("touching an enemy costs health (%d/%d)" % [ronin.health, ronin.max_health], ronin.health == ronin.max_health - 1)
-	_check("the husk shoves when touching hurts him (%s)" % husk.mode, husk.mode == &"shove")
+	_check("the husk shoves when touching hurts him", shoved)
 
 	# The husk's swipe, and the parry.
 	husk = husks[2]
