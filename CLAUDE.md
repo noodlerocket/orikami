@@ -18,34 +18,38 @@ screen, but Begin there offers the downloads instead of starting.
 - The lore, in story order, and the chapter plan: `docs/lore.md` (parts
   marked "proposed" still wait for Julian). The game is built in story
   order: title, the well, the village, the Hannya, what comes after her.
-- **Now in progress: the expanded village** (`docs/village_map.png`, see
-  "The expanded village" below).
+- **The expanded village is built** (overnight 2026-11-22, not yet played
+  by Julian): `docs/village_map.png` (as built) and `docs/overnight_report.md`
+  (what was done, settings, what only he can judge).
 - What it looks like: `docs/screenshots/` (frame sheets of every move)
 
 **Before changing anything, read "Working with Julian" and "What Julian
 likes".** They were learned the slow way and save rounds of rework.
 
-## Where the game stands (2026-11-21)
+## Where the game stands (2026-11-22)
 
 Title screen (Julian's looping video), a 45 s pop-up-book prologue, the
-cutscene of him leaping out of the well, a tutorial, then one level:
-Kamiyama Village at night in the rain, about 75 m from the well to the
-shrine courtyard, with:
+cutscene of him leaping out of the well, a tutorial, then Kamiyama Village
+at night in the rain, about 210 m from the well to the shrine courtyard in
+three layers (canals, street, Rooftop Road), and the first stretch of the
+Bamboo of Folded Wind after it (see "The expanded village"), with:
 - the Blank Ronin: run, jump, dash, wall slide and wall jump, duck, a 4-way
   iaijutsu cut with pogo, parry (gold) and block, the charged iaijutsu draw,
   healing with ink, ink marks that build up on his paper, shredding death;
 - paper husks that patrol, wind up, swipe, shove and stagger;
 - a climbing course, a pit, wind, rain, sound and music;
 - the first boss, **the Weeping Hannya**, with a 40-second shadow-puppet
-  cutscene and a full fight.
+  cutscene, a full fight, and an ending cutscene after it (proposed lore);
+- the paper dog, the paper bird and the lantern husk (folded in code);
+- four shrines that save; paper cranes to find; the Smudge; a map; the
+  Crane Glide.
 Pause, settings and controls pages share one UI style. Downloads for
 Windows and Mac carry Julian's icon.
 
-**Next (Julian chose it, 2026-11-21): expand the village** from a
-prototype-sized street into a real first region, about 230 m on three
-layers, built to feel alive. The plan is `docs/village_map.png`; the rules
-are in "The expanded village". After that: an ending after the Hannya, the
-Smudge on death, the Bamboo of Folded Wind and the Crane Glide.
+**Next:** Julian plays the overnight work and judges it (the report lists
+what only he can judge). Then: the rest of the Bamboo of Folded Wind (Akane),
+the Paper-Maker as a figure (only her shadow exists), saving the ink marks'
+look per ending.
 
 ## Working with Julian
 
@@ -185,15 +189,16 @@ the game)**
   rejected). Wind sway: `sway_speed` 2.4 (6, 1.4 and 3 rejected).
 - Husk tell: `PaperHusk.attack_windup` 0.4 s (0.55 too slow).
 - Sword reach 1.9 m (1.6 m a little short).
-- Pit or death: the screen fades to sumi black and he is back at the start;
-  no ink, no blink.
+- Deep water, the river or death: the screen fades to sumi black and he is
+  back at the last shrine he rested at; no ink, no blink. (The old pit is now
+  the Fallen Street's way down.)
 
 ## Checking work without eyes or ears
 
 A single screenshot cannot show motion, and sound cannot be heard. Use these,
 and always say plainly what was checked this way and what only he can judge.
 
-- **The automated check** (`tools/smoke_test.gd`, about 60 checks): movement,
+- **The automated check** (`tools/smoke_test.gd`, about 100 checks): movement,
   combat, walls, pit, death, husks and the whole Hannya fight. Must print
   ALL PASSED after every change. It proves rules work, nothing about looks.
   When fixing a bug, add a check that fails without the fix (and, when in
@@ -203,8 +208,10 @@ and always say plainly what was checked this way and what only he can judge.
 - **Frame sheets** (`tools/frame_sheet.gd`) photograph a sequence and tile
   it into one picture. Use one for every animation or effect change and send
   it to him. Sheets: `stances`, `cuts`, `endings`, `struck`, `hud`, `parry`,
-  `draw`, `iai`, `husk`, `climb`, `wall`, `pit`, `marks`, `sneak`, `heal`,
-  `death`, `seal`, `cutscene`, `boss` (optionally `new`, `step`, `glide` or
+  `draw`, `iai`, `husk`, `climb`, `wall`, `pit` (now the plank drop), `marks`,
+  `sneak`, `heal`, `death`, `seal`, `cutscene`, `boss`, and since the
+  expanded village `dog`, `bird`, `lantern`, `ladder`, `crawl`, `cranes`,
+  `smudge`, `ending` (with `--ending`) (optionally `new`, `step`, `glide` or
   `duck` after the file name). The top of the file says which need `--zoom`.
   Crop and enlarge a tile when details matter.
 - **Timing:** when two things must end together, print the times and compare.
@@ -370,7 +377,8 @@ There is no controls line along the bottom of the game screen any more
   away while he is invulnerable (shader `ink`).
 - **Death:** he shreds into white strips and scraps (`RoninPuppet.shred`),
   the screen fades, he is revived whole at the well (`died`, `revive()`).
-  Falling into the pit fades the same way and costs `pit_damage` (1).
+  Deep water and the river fade the same way and cost `pit_damage` (1).
+  Dying leaves the Smudge (the ink he carried) where he fell.
 
 ### Enemies: the paper husk
 - A Meshy model (`models/husk.glb`, 7,118 triangles, the Ronin's 24-bone
@@ -490,7 +498,63 @@ There is no controls line along the bottom of the game screen any more
   ripples, a landing splash) and Julian had it all undone: "I liked the
   ground before better". Leave the ground as it is.
 
-### The expanded village (planned, `docs/village_map.png`)
+### The expanded village (built overnight 2026-11-22; `docs/village_map.png` as built)
+Game x = plan metres - 16. Left to right: Well Square and Market Street
+(-17 to 62), the Fallen Street (62 to 80, `Village.FALL_LEFT/RIGHT`), the
+river (82 to 120, `Village.RIVER`), the Gatehouse (`CLIMB_WALLS` at 128.5
+and 132.2), the Shrine Steps (158 to 171, `Village.STEPS`), the courtyard
+(`ARENA` 174 to 190.5; `EAST` is 127), the bamboo (191 to 258). Each area
+has its own script, built from `Village._ready`:
+- `fallen_street.gd` + `soggy_plank.gd`: planks over the hole sag, creak and
+  snap a moment after he lands (`give_time` 0.55): the way DOWN, not a death.
+- `canals.gd`: the cut-away underworld. The drain pipe (`Village.PIPE`) with a
+  crawlspace (`Canals.CRAWL`; ducked he crawls, `Ronin.crawl_speed`) and a
+  chamber whose grate into Well Square opens with two upward cuts
+  (`open_grate`); the canal hall (`Canals.WALKWAYS`, shallow water slows him:
+  `Ronin.wading_speed`; `SLUICES` press him down: `sluice_press`; `DEEP`
+  water carries him back to the last shrine: `Ronin.fall_in()`); the shaft
+  out east (`Village.SHAFT`). The chamber's front fades (material alpha)
+  only while he is inside it.
+- Camera underground: `FollowCamera.under_zone`/`under_height`, blended in by
+  his depth (`under_from` to `under_full`), so it never jumps. The dark
+  foreground (`Village._near`) sinks away as the camera goes down; rain is
+  cut off at the street while it is under (`shaders/rain_streak.gdshader`,
+  identical above ground); the rain sound is hushed.
+- `river_bridge.gd`: the river, the arched red bridge (smooth convex pieces
+  along `deck_at`), its fallen middle (`GAP` 97 to 103: jump + dash), gusts
+  carrying him west (`Ronin.drift`, `gust_drift` 0.45), the river warehouse
+  with shrine 2.
+- `gatehouse.gd`: the gate under the first wall, barred from the east (cut
+  the bar from there: a shortcut); its west face is sheer. The broken castle
+  road leaves the lookout (scenery).
+- `shrine_steps.gd`: 20 steps (a smooth ramp underfoot; step tops at the
+  ramp's middle), stone lanterns (`_build_stone_lantern(at, false)`: NOT the
+  courtyard's, which the cutscene snuffs), a cherry, shrine 3 at the foot.
+- `rooftop_road.gd` + `ladder.gd`: drying decks on posts (bell, barrels,
+  drying paper), the burnt-out house over the hole, the Crane Glide gap
+  (`GLIDE_GAP` 97.6 to 107) over the river; the ladder at the end of Market
+  Street is lowered by cutting its cord from the deck, then climbed (he
+  turns his back to us: `SamuraiAnimator.climb`).
+- `bamboo_grove.gd`: past the courtyard's far gate (opens when the Hannya
+  falls): paper bamboo, ravines, shrine 4, the altar where he learns the
+  Crane Glide (`Ronin.has_glide`, `glide_*` settings; paper wings on the
+  puppet, `_build_wings`).
+- Life: `villager_shadow.gd` (shadows behind lit shoji that sink away as he
+  passes; `Village.SHUTTERS` slide shut instead), `perched_birds.gd`
+  (`Village.PERCHES`), petals stirred by a dash (`Ronin.dashed`), drips,
+  water loops placed with `Sound.place_loop`.
+- Enemies (`Village.dog_positions`, `bird_roosts`, `lantern_husk_positions`):
+  `paper_critter.gd` (shared: health, flash overlay, posture, seal),
+  `paper_dog.gd`, `paper_bird.gd` (pogo-able), `lantern_husk.gd` +
+  `burning_paper.gd` (a parried wad flies back at the thrower).
+- Systems: `save_game.gd` (user://save.cfg; the automated check and any
+  debug-flag run use their own files), Continue on the title, `crane_bundle.gd`
+  (`Village.CRANE_BUNDLES` + the back room; HUD tag), `smudge.gd` (death
+  leaves his ink; cut it back), the Map page in the pause menu, corner
+  nudge / ledge hop / skid / shaking off water (`Ronin` "Forgiveness"),
+  `FollowCamera.run_lead`, `hannya_ending.gd` (after the fight; proposed lore).
+
+The original plan, kept for reference:
 Drawn by `tools/village_map.py` (Python + Pillow: edit its lists, re-run).
 Julian has seen this plan; build it area by area, with screenshots and
 frame sheets as each one comes together. About 230 m (today: 75 m), on
@@ -529,12 +593,7 @@ through:
   keep the desktop smooth: build long things in short lengths (the
   8-lights-per-mesh limit still applies).
 
-**Built so far (2026-11-21): areas 1 and 2.** The far end of the level
-(raised street, climbing course, torii, courtyard, the Hannya) is shifted
-right by `Village.EAST` (44 m now; it grows as areas go in between, and
-everything that used fixed positions there follows it: camera, cutscene,
-smoke test). The pit sits at the end of Market Street (`PIT_LEFT` 64) until
-the Fallen Street replaces it.
+**Areas 1 and 2 (2026-11-21):**
 - **Well Square:** the Paper-Maker's workshop (`paper_maker_yard.gd`):
   sheets drying on two lines (each sways on its own), the vat with its
   mould frame, a drying board, paper bundles; the first **RestShrine**
@@ -755,6 +814,19 @@ the Fallen Street replaces it.
 - The workflow's actions are on their Node 24 versions (checkout v7,
   configure-pages v6, upload-pages-artifact v5, deploy-pages v5).
 
+## Pitfalls learned overnight (2026-11-22)
+- `GeometryInstance3D.transparency` does nothing in the Compatibility
+  renderer: fade a mesh through its material's alpha (and set it opaque
+  again at 0).
+- Measuring sound: `ffmpeg -ac 1` sums stereo channels and overstates the
+  peak; decode the channels as they are for the peak, mono for the spectrum.
+- ElevenLabs names files after the prompt's first five letters: a colon
+  there ("Bark:") cannot be saved on Windows.
+- Python edits sent through a Bash heredoc can lose tabs: write the .py
+  file with the Write tool and assert every replacement.
+- A shrine must tell a respawn from a walk-up (`Ronin.respawns`): deep water
+  next to the warehouse shrine was healing him.
+
 ## Layout
 
 | Path | What it is |
@@ -783,6 +855,11 @@ the Fallen Street replaces it.
 | `textures/` | Brush lettering rendered from the font |
 | `art_source/` | Source art Godot ignores (the brush font and its licence) |
 | `docs/design.md`, `docs/reference/`, `docs/screenshots/` | Design doc, art references, frame sheets |
+| `scripts/canals.gd`, `fallen_street.gd`, `soggy_plank.gd`, `river_bridge.gd`, `gatehouse.gd`, `shrine_steps.gd`, `rooftop_road.gd`, `ladder.gd`, `bamboo_grove.gd` | The expanded village's areas (see "The expanded village") |
+| `scripts/paper_critter.gd`, `paper_dog.gd`, `paper_bird.gd`, `lantern_husk.gd`, `burning_paper.gd` | The new enemies |
+| `scripts/save_game.gd`, `crane_bundle.gd`, `smudge.gd`, `ability_card.gd`, `hannya_ending.gd` | Saving, cranes, the Smudge, ability card, the ending after the Hannya |
+| `scripts/water_fx.gd`, `villager_shadow.gd`, `perched_birds.gd` | Splashes and water, shadows behind shoji, perched birds |
+| `docs/overnight_report.md` | What was built overnight on 2026-11-22, and what to judge |
 | `tools/smoke_test.gd` | The automated check |
 | `tools/frame_sheet.gd` | Frame sheets |
 | `tools/setup_input.gd` | Writes the controls into `project.godot` |
@@ -809,7 +886,8 @@ Godot_v4.7.2-stable_win64.exe --path .
 Godot_v4.7.2-stable_win64_console.exe --headless --path . --script tools/smoke_test.gd
 # Import (after adding files or a new class_name)
 Godot_v4.7.2-stable_win64_console.exe --headless --path . --import
-# Screenshot (flags: --x=, --zoom=, --face=-1, --hold=, --marks=, --cutscene, --warmup)
+# Screenshot (flags: --x=, --y= (underground), --zoom=, --face=-1, --hold= (repeatable), --marks=,
+# --cutscene, --warmup, --map (pause map, all explored), --ending (her fall), --glide (has the glide))
 Godot_v4.7.2-stable_win64_console.exe --path . -- --x=21 --screenshot=C:\full\path\shot.png
 # The prologue as a frame sheet; the climb out of the well (play, or photograph with --well-sheet=)
 Godot_v4.7.2-stable_win64_console.exe --path . -- --well
@@ -847,11 +925,13 @@ frame sheet when the change can be seen.
 - [x] **The well:** a cutscene of him jumping out of it, seen from the
       street, the camera gliding into the game view
 - [x] **Tutorial, icon, download page** (2026-11-21)
-- [ ] **The expanded village** (in progress): three layers, seven areas,
-      shrines and saving, the Paper-Maker, new enemies, shortcuts, cranes;
-      everything alive. Plan: `docs/village_map.png`.
-- [ ] **Finish the slice:** an ending after the Hannya.
-- [ ] **M5:** the Bamboo of Folded Wind region and the Crane Glide.
+- [x] **The expanded village** (overnight 2026-11-22, awaiting Julian's
+      judgement): three layers, seven areas, four shrines that save, new
+      enemies, shortcuts, cranes, the Smudge, a map. (The Paper-Maker is
+      only a shadow.)
+- [x] **An ending after the Hannya** (proposed lore; awaiting Julian).
+- [ ] **M5:** the Bamboo of Folded Wind region (first stretch and the Crane
+      Glide built; the rest, and Akane, not).
 - [ ] **M6:** vertical slice polish: audio balance, map.
 
 ## Known gaps
@@ -867,8 +947,12 @@ frame sheet when the change can be seen.
   through his legs.
 - The ink blots when struck follow the model's texture layout, so they are
   angular rather than round.
-- Death and the pit always send him back to the well (no checkpoints yet).
-- Nothing is saved between sessions (ink marks reset).
+- Overnight work (2026-11-22) was checked by the automated check, screenshots
+  and frame sheets only: never played by a person. See the report.
+- The castle road from the lookout is scenery: the glide does not open it
+  (it belongs to a later chapter).
+- The Paper-Maker exists only as a shadow behind her shoji, rocking her
+  mould.
 - The husk's model has no wind cloth.
 - `docs/design.md` still names the Kasa-obake as the first boss.
 - One foreground rock near the climbing course cannot be filled (a warning
