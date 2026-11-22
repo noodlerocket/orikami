@@ -55,8 +55,13 @@ func _run(main: Node) -> void:
 	_check("dash covers ground (%.2f m)" % (ronin.position.x - start_x), ronin.position.x - start_x > 2.5)
 	await _frames(30)
 
+	# (The new enemies are held still while the husk is checked: a lantern
+	# husk stands near one of the husks and would throw at him.)
+	for other: Node in main.get_node("Village").get_children():
+		if other is LanternHusk or other is PaperCritter:
+			other.set_physics_process(false)
 	# Three side slashes kill a husk.
-	var husks := main.get_node("Village").get_children().filter(func(n: Node) -> bool: return n is PaperHusk)
+	var husks := main.get_node("Village").get_children().filter(func(n: Node) -> bool: return n is PaperHusk and not n is LanternHusk)
 	_check("level has enemies", husks.size() >= 3)
 	var husk: PaperHusk = husks[0]
 	for i in 3:
@@ -258,6 +263,9 @@ func _run(main: Node) -> void:
 	_check("resting at a shrine heals him (%d/%d)" % [ronin.health, ronin.max_health], ronin.health == ronin.max_health)
 	_check("and he will come back there (%.1f m from it)" % absf(rest_spot.x - shrine.global_position.x), absf(rest_spot.x - shrine.global_position.x) < 0.1)
 
+	for other: Node in main.get_node("Village").get_children():
+		if other is LanternHusk or other is PaperCritter:
+			other.set_physics_process(true)
 	await _expanded_village(main, ronin)
 
 	# Falling into deep water: the screen fades and he is back at the shrine.
@@ -686,6 +694,7 @@ func _expanded_village(main: Node, ronin: Ronin) -> void:
 	await _frames(30)
 	_check("then he climbs it from the street up onto the deck (y %.1f)" % ronin.global_position.y,
 			climbed and ronin.global_position.y > steps_up.top - 0.3 and ronin.is_on_floor())
+	await _new_enemies(village, ronin)
 	# Three shrines to rest at.
 	_check("there are three shrines", village.find_children("*", "RestShrine", true, false).size() >= 3)
 	# Up the Shrine Steps.
@@ -703,6 +712,101 @@ func _expanded_village(main: Node, ronin: Ronin) -> void:
 	await _frames(20)
 	ronin.set("_draw_safe", 0.0)
 	ronin.health = ronin.max_health
+
+
+## The paper dog, the paper bird and the lantern husk.
+func _new_enemies(village: Village, ronin: Ronin) -> void:
+	var dog: PaperDog = village.find_children("*", "PaperDog", true, false)[1]
+	var bird: PaperBird = village.find_children("*", "PaperBird", true, false)[0]
+	var keeper: LanternHusk = village.find_children("*", "LanternHusk", true, false)[0]
+	ronin.set("_draw_safe", 0.0)
+	# The dog: seeing him ahead, it gives its tell, then charges; a parried
+	# charge staggers it, and a cut then finishes it.
+	dog.global_position.x = 93.0
+	ronin.position = dog.global_position + Vector3(4.5, 0.1, 0.0)
+	ronin.velocity = Vector3.ZERO
+	ronin.facing = -1.0
+	dog.set("_dir", 1.0)
+	dog.set("_cooldown", 0.0)
+	ronin.set("_invulnerable", 0.0)
+	ronin.health = ronin.max_health
+	var told := false
+	var charged := false
+	for f in 90:
+		await physics_frame
+		told = told or dog.mode == &"tell"
+		charged = charged or dog.mode == &"charge"
+		ronin.velocity.x = 0.0
+		# Parry just before the charge reaches him.
+		if dog.mode == &"charge" and absf(dog.global_position.x - ronin.global_position.x) < 2.6 and ronin.get("_parry_time") <= 0.0 \
+				and ronin.get("_parry_cooldown_left") <= 0.0:
+			Input.action_press("parry")
+			await physics_frame
+			Input.action_release("parry")
+		if dog.is_staggered():
+			break
+	_check("the dog gives its tell, then charges", told and charged)
+	_check("a parried charge staggers it (%s)" % dog.mode, dog.is_staggered())
+	await _frames(30)  # (out of the parry stance first: no cutting in it)
+	ronin.position = dog.global_position + Vector3(1.2, 0.1, 0.0)
+	ronin.facing = -1.0
+	await _frames(2)
+	Input.action_press("slash")
+	await _frames(2)
+	Input.action_release("slash")
+	await _frames(20)
+	_check("and one cut finishes it", not is_instance_valid(dog))
+	# The bird: cut down onto from above, he bounces off it.
+	await _frames(40)  # (the last cut's cooldown, slowed by its hit-stop)
+	ronin.set("_invulnerable", 5.0)
+	bird.set_physics_process(false)
+	bird.call("_set_mode", &"patrol")
+	ronin.position = bird.global_position + Vector3(0.0, 1.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	Input.action_press("aim_down")
+	await _frames(3)
+	Input.action_press("slash")
+	await _frames(2)
+	Input.action_release("slash")
+	Input.action_release("aim_down")
+	var best := -99.0
+	for i in 12:
+		await _frames(1)
+		best = maxf(best, ronin.velocity.y)
+	_check("he can pogo off a paper bird (%.1f m/s)" % best, best > 6.0)
+	if is_instance_valid(bird):
+		bird.set_physics_process(true)
+	# The lantern husk throws burning paper; parried, it flies back and
+	# burns the thrower.
+	ronin.set("_invulnerable", 0.0)
+	ronin.set("_draw_safe", 0.0)
+	keeper.set("_dir", 1.0)
+	keeper.call("_set_mode", &"patrol")
+	keeper.set("_throw_cooldown", 0.0)
+	ronin.position = keeper.global_position + Vector3(6.0, 0.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	ronin.facing = -1.0
+	var thrown: BurningPaper = null
+	var hp: int = keeper.health
+	for f in 200:
+		await physics_frame
+		ronin.velocity.x = 0.0
+		ronin.facing = -1.0
+		if thrown == null:
+			for node: Node in village.get_children():
+				if node is BurningPaper:
+					thrown = node
+		elif is_instance_valid(thrown) and not thrown.get("_returned") and thrown.global_position.distance_to(ronin.global_position + Vector3(0.0, 0.8, 0.0)) < 1.6 \
+				and ronin.get("_parry_cooldown_left") <= 0.0:
+			Input.action_press("parry")
+			await physics_frame
+			Input.action_release("parry")
+		if is_instance_valid(keeper) and keeper.health < hp:
+			break
+		if not is_instance_valid(keeper):
+			break
+	_check("the lantern husk throws burning paper", thrown != null)
+	_check("a parried wad flies back and burns the thrower", not is_instance_valid(keeper) or keeper.health < hp)
 
 
 ## Puts the Ronin just in front of the husk, the two facing each other.

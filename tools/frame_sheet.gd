@@ -26,7 +26,16 @@ extends SceneTree
 ##             gatehouse, onto the tall wall, wall jumps up to the ledge
 ##   wall      close-up: sliding down a wall, springing off it, and the
 ##             gatehouse wall you walk under (use --zoom=6)
-##   pit       falling into the pit: the fade out, black, back at the start
+##   pit       through the Fallen Street: onto a soggy plank, it sags and gives
+##             way, he drops into the canals and the camera goes down with him
+##   dog       close-up of the paper dog: trot, the tell, the charge, the skid,
+##             shaking itself off, staggered (use --zoom=3)
+##   bird      close-up of the paper bird: wingbeats, the tell, the dive,
+##             knocked, staggered (use --zoom=3)
+##   lantern   close-up of the lantern husk: shamble, the throw's tell, the
+##             throw (use --zoom=5)
+##   ladder    the ladder: let down from the deck, then climbed (use --zoom=6)
+##   crawl     close-up: crawling through the crawlspace (use --zoom=4.6)
 ##   marks     close-up of his permanent ink marks: blank, a little, half,
 ##             most, covered (use --zoom=4.6)
 ##   cutscene  the Hannya cutscene, 18 moments through it (times printed)
@@ -101,6 +110,18 @@ func _initialize() -> void:
 			sheet = await _seal()
 		"heal":
 			sheet = await _heal()
+		"dog":
+			sheet = await _critter(PaperDog, [[&"patrol", 0.0], [&"patrol", 0.3], [&"tell", 0.15], [&"tell", 0.45],
+					[&"charge", 0.05], [&"charge", 0.12], [&"skid", 0.1], [&"recover", 0.12], [&"recover", 0.3], [&"stagger", 0.3]])
+		"bird":
+			sheet = await _critter(PaperBird, [[&"patrol", 0.0], [&"patrol", 0.2], [&"patrol", 0.4], [&"tell", 0.2],
+					[&"tell", 0.5], [&"dive", 0.1], [&"knocked", 0.1], [&"stagger", 0.3]])
+		"lantern":
+			sheet = await _lantern()
+		"ladder":
+			sheet = await _ladder()
+		"crawl":
+			sheet = await _crawl()
 		_:
 			push_error("Unknown sheet: " + args[0])
 			quit(1)
@@ -365,7 +386,8 @@ func _husk() -> Image:
 
 
 func _climb() -> Image:
-	_ronin.position = Vector3(36.6, 1.6, 0.0)
+	_ronin.position = Vector3(Village.CLIMB_WALLS[0][0] - 1.3, 0.1, 0.0)
+	_main.get_node("Village").gatehouse.open_gate(true)
 	_ronin.set("_draw_safe", 60.0)
 	_main.get_node("Camera").snap_to_target()
 	await create_timer(0.5).timeout
@@ -445,14 +467,14 @@ func _wall() -> Image:
 
 
 func _pit() -> Image:
-	_ronin.position = Vector3(9.4, 0.0, 0.0)
+	_ronin.position = Vector3(Village.FALL_LEFT - 2.5, 0.1, 0.0)
 	_main.get_node("Camera").snap_to_target()
 	await create_timer(0.4).timeout
 	var tile := Vector2i(427, 240)
-	var sheet := Image.create(tile.x * 3, tile.y * 2, false, Image.FORMAT_RGB8)
+	var sheet := Image.create(tile.x * 3, tile.y * 3, false, Image.FORMAT_RGB8)
 	Input.action_press("move_right")
 	var started := Time.get_ticks_msec()
-	var times := [0.25, 0.55, 0.75, 1.05, 1.45, 2.0]
+	var times := [0.2, 0.45, 0.65, 0.85, 1.05, 1.3, 1.6, 2.0, 2.6]
 	for i in times.size():
 		while (Time.get_ticks_msec() - started) / 1000.0 < times[i]:
 			await process_frame
@@ -627,4 +649,114 @@ func _heal() -> Image:
 		sheet.blit_rect(piece, Rect2i(Vector2i.ZERO, tile), Vector2i((i % 5) * tile.x, (i / 5) * tile.y))
 		print("%d: health %d" % [i, _ronin.health])
 	Input.action_release("heal")
+	return sheet
+
+
+## Close-ups of one of the paper creatures in each of its poses.
+func _critter(kind: Variant, shots: Array) -> Image:
+	var critter: PaperCritter = null
+	for node: Node in _main.get_node("Village").get_children():
+		if is_instance_of(node, kind):
+			critter = node
+			break
+	critter.set_physics_process(false)
+	critter.set_process(false)
+	critter.set("_dir", 1.0)
+	_ronin.set_physics_process(false)
+	_ronin.visible = false
+	_ronin.position = critter.position + Vector3(0.0, -0.3, 0.0)
+	_main.get_node("Camera").snap_to_target()
+	var columns := 5 if shots.size() > 8 else 4
+	var tile := Vector2i(400, 400)
+	var sheet := Image.create(tile.x * columns, tile.y * ceili(shots.size() / float(columns)), false, Image.FORMAT_RGB8)
+	await create_timer(0.5).timeout
+	for i in shots.size():
+		critter.mode = shots[i][0]
+		critter.set("_mode_time", shots[i][1])
+		critter.set("_clock", shots[i][1] * 3.0 + 0.2)
+		critter.set("_stride", shots[i][1])
+		critter.set("_beat", shots[i][1])
+		critter.set("_seal_show", 1.0 if critter.mode == &"stagger" else 0.0)
+		if critter.mode == &"dive":
+			critter.set("_dive_dir", Vector3(0.6, -0.8, 0.0).normalized())
+		critter.call("_pose")
+		critter.call("_process", 0.0)
+		await create_timer(0.05).timeout
+		var piece := await _snap(Rect2i(360, 80, 560, 560), tile)
+		sheet.blit_rect(piece, Rect2i(Vector2i.ZERO, tile), Vector2i((i % columns) * tile.x, (i / columns) * tile.y))
+	return sheet
+
+
+func _lantern() -> Image:
+	var keeper: LanternHusk = null
+	for node: Node in _main.get_node("Village").get_children():
+		if node is LanternHusk:
+			keeper = node
+			break
+	keeper.set_physics_process(false)
+	_ronin.set_physics_process(false)
+	_ronin.visible = false
+	_ronin.position = keeper.position
+	keeper.set("_dir", 1.0)
+	_main.get_node("Camera").snap_to_target()
+	var tile := Vector2i(400, 400)
+	var sheet := Image.create(tile.x * 4, tile.y, false, Image.FORMAT_RGB8)
+	await create_timer(0.5).timeout
+	var shots := [[&"patrol", 0.3], [&"throw_windup", 0.2], [&"throw_windup", 0.55], [&"throw", 0.1]]
+	for i in shots.size():
+		keeper.mode = shots[i][0]
+		keeper.set("_mode_time", shots[i][1])
+		keeper.call("_pose_model")
+		await create_timer(0.08).timeout
+		var piece := await _snap(Rect2i(360, 80, 560, 560), tile)
+		sheet.blit_rect(piece, Rect2i(Vector2i.ZERO, tile), Vector2i(i * tile.x, 0))
+	return sheet
+
+
+func _ladder() -> Image:
+	var steps_up: Ladder = _main.get_node("Village").rooftops.ladder
+	_ronin.set("_draw_safe", 60.0)
+	_ronin.position = Vector3(steps_up.global_position.x - 0.9, steps_up.top + 0.05, 0.0)
+	_ronin.facing = 1.0
+	_main.get_node("Camera").snap_to_target()
+	await create_timer(0.6).timeout
+	var tile := Vector2i(400, 400)
+	var sheet := Image.create(tile.x * 4, tile.y * 2, false, Image.FORMAT_RGB8)
+	var shot := 0
+	sheet.blit_rect(await _snap(Rect2i(360, 80, 560, 560), tile), Rect2i(Vector2i.ZERO, tile), Vector2i.ZERO)
+	shot += 1
+	Input.action_press("slash")
+	await create_timer(0.05).timeout
+	Input.action_release("slash")
+	for t: float in [0.3, 0.9]:
+		await create_timer(t).timeout
+		sheet.blit_rect(await _snap(Rect2i(360, 80, 560, 560), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((shot % 4) * tile.x, (shot / 4) * tile.y))
+		shot += 1
+	_ronin.position = Vector3(steps_up.global_position.x, 0.05, 0.0)
+	_main.get_node("Camera").snap_to_target()
+	await create_timer(0.3).timeout
+	Input.action_press("aim_up")
+	while shot < 8:
+		await create_timer(0.45).timeout
+		sheet.blit_rect(await _snap(Rect2i(360, 80, 560, 560), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((shot % 4) * tile.x, (shot / 4) * tile.y))
+		print("ladder shot %d: y %.2f %s" % [shot, _ronin.position.y, _puppet.state])
+		shot += 1
+	Input.action_release("aim_up")
+	return sheet
+
+
+func _crawl() -> Image:
+	_ronin.set("_draw_safe", 60.0)
+	_ronin.position = Vector3(Canals.CRAWL.x - 0.8, Village.PIPE_FLOOR + 0.05, 0.0)
+	_main.get_node("Camera").snap_to_target()
+	await create_timer(0.5).timeout
+	var tile := Vector2i(400, 400)
+	var sheet := Image.create(tile.x * 4, tile.y, false, Image.FORMAT_RGB8)
+	Input.action_press("aim_down")
+	Input.action_press("move_right")
+	for i in 4:
+		await create_timer(0.35).timeout
+		sheet.blit_rect(await _snap(Rect2i(360, 80, 560, 560), tile), Rect2i(Vector2i.ZERO, tile), Vector2i(i * tile.x, 0))
+	Input.action_release("aim_down")
+	Input.action_release("move_right")
 	return sheet

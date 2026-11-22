@@ -27,14 +27,14 @@ var _pause: PauseMenu
 
 func _ready() -> void:
 	UiStyle.load_settings()
+	# Underground (the drain pipe and the canals) the camera goes down with him.
+	_camera.under_zone = Vector2(Village.CHAMBER.x - 1.0, Village.CANAL.y + 0.5)
 	_apply_debug_start()
 	_camera.target = _ronin
 	# The climbing course and the courtyard's middle (the far end of the
 	# level moves as the village grows).
 	_camera.climb_zone = Vector2(Village.CLIMB_WALLS[0][0] - 0.7, Village.CLIMB_WALLS[1][1] + 1.9)
 	_camera.max_x = (Village.ARENA.x + Village.ARENA.y) * 0.5
-	# Underground (the drain pipe and the canals) the camera goes down with him.
-	_camera.under_zone = Vector2(Village.CHAMBER.x - 1.0, Village.CANAL.y + 0.5)
 	_camera.snap_to_target()
 	_hud.watch(_ronin)
 	_ronin.slash_landed.connect(_camera.add_shake.bind(0.07))
@@ -129,6 +129,10 @@ func _warm_up() -> void:
 	var stops: Array[Vector3] = []
 	for x in range(-8, int(Village.ARENA.y) - 5, 6):
 		stops.append(Vector3(x, 4.2, _camera.distance))
+	for x in range(int(Village.CHAMBER.x), int(Village.CANAL.y), 8):
+		stops.append(Vector3(x, -2.6, _camera.distance))  # the canals and the drain pipe
+	for x in range(46, 120, 8):
+		stops.append(Vector3(x, 9.0, _camera.distance))  # the Rooftop Road
 	stops.append(Vector3(Village.CLIMB_WALLS[1][0] - 0.7, 9.0, _camera.distance))  # up the climbing walls
 	stops.append(Vector3(Village.CLIMB_WALLS[1][0] - 0.7, 13.0, _camera.distance))
 	var total := stops.size() + 14
@@ -195,6 +199,19 @@ func _warm_up() -> void:
 			for node: Node in village.get_children():
 				if node is PaperHusk:
 					node.call("_set_flash", false),
+		func() -> void:
+			# The new enemies, flashed, and a burning wad of paper.
+			for node: Node in village.get_children():
+				if node is PaperCritter:
+					node.call("_set_flash", true)
+			var wad := BurningPaper.new()
+			village.add_child(wad)
+			wad.global_position = here + Vector3(2.0, 1.5, 0.0),
+		func() -> void:
+			for node: Node in village.get_children():
+				if node is PaperCritter:
+					node.call("_set_flash", false)
+			WaterFx.splash(village, here + Vector3(1.0, 0.0, 0.0), 1.0),
 	]
 	for effect: Callable in effects:
 		effect.call()
@@ -330,9 +347,10 @@ func _apply_debug_start() -> void:
 		elif arg.begins_with("--zoom="):
 			_camera.distance = float(arg.trim_prefix("--zoom="))
 			_camera.height_offset = 0.95
-			_camera.min_y = 0.0
+			_camera.min_y = -100.0
 			_camera.follow_height = 1.0  # close-ups follow him up onto platforms
 			_camera.climb_zone = Vector2.ZERO  # and keep him centred, climbing or not
+			_camera.under_zone = Vector2.ZERO
 			_camera.min_x = -1000.0
 			_camera.max_x = 1000.0
 			_camera.look_ahead = 0.0

@@ -114,7 +114,13 @@ const MOSS := Color(0.3, 0.34, 0.18)
 @export_group("Layout")
 ## Change this to reshuffle the random details (torn edges, drips, tiles).
 @export var layout_seed := 7
-@export var enemy_positions: Array[Vector2] = [Vector2(27.5, 0.1), Vector2(44.0, 0.1), Vector2(143.0, 0.1)]
+@export var enemy_positions: Array[Vector2] = [Vector2(27.5, 0.1), Vector2(44.0, 0.1), Vector2(143.0, 0.1), Vector2(87.0, 0.6)]
+## Paper dogs, in the canals.
+@export var dog_positions: Array[Vector2] = [Vector2(76.0, -4.1), Vector2(94.0, -4.9), Vector2(129.0, -4.7)]
+## Paper birds: the middle of each one's loop, over the rooftops.
+@export var bird_roosts: Array[Vector2] = [Vector2(52.0, 10.0), Vector2(70.5, 12.2), Vector2(90.0, 9.6)]
+## Lantern husks (they throw burning paper).
+@export var lantern_husk_positions: Array[Vector2] = [Vector2(111.0, 0.8), Vector2(148.0, 0.1)]
 
 var _rng := RandomNumberGenerator.new()
 ## The Hannya's shrine hall in the courtyard (built by _build_arena).
@@ -183,6 +189,18 @@ func _ready() -> void:
 		var husk: Node3D = HUSK_SCENE.instantiate()
 		husk.position = Vector3(spot.x, spot.y, 0.0)
 		add_child(husk)
+	for spot: Vector2 in dog_positions:
+		var dog := PaperDog.new()
+		dog.position = Vector3(spot.x, spot.y, 0.0)
+		add_child(dog)
+	for spot: Vector2 in bird_roosts:
+		var bird := PaperBird.new()
+		bird.position = Vector3(spot.x, spot.y, 0.0)
+		add_child(bird)
+	for spot: Vector2 in lantern_husk_positions:
+		var keeper := LanternHusk.new()
+		keeper.position = Vector3(spot.x, spot.y, 0.0)
+		add_child(keeper)
 
 
 func _process(_delta: float) -> void:
