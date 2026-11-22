@@ -55,6 +55,8 @@ extends SceneTree
 ##             (it flips over and lands flat), and the hole it leaves
 ##   blind     a bamboo blind over a lit window: rolled up, unrolling as he
 ##             walks up, down, and rolling up again once he has gone
+##   papermaker the Paper-Maker at her vat, close up: working, then turning to him
+##   tale      the Paper-Maker's pictures for him, 8 moments
 ##   gates     the gate between the town and the bamboo grove, from both sides
 ##   iai       close-up of the stance: settling, half-way, ready, and the
 ##             pose he ends the draw in (use --zoom=4.6)
@@ -145,6 +147,10 @@ func _initialize() -> void:
 			sheet = await _blind()
 		"gates":
 			sheet = await _gates()
+		"papermaker":
+			sheet = await _papermaker()
+		"tale":
+			sheet = await _tale()
 		_:
 			push_error("Unknown sheet: " + args[0])
 			quit(1)
@@ -919,4 +925,54 @@ func _gates() -> Image:
 		_main.get_node("Camera").snap_to_target()
 		await create_timer(0.5).timeout
 		sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((i % 2) * tile.x, (i / 2) * tile.y))
+	return sheet
+
+
+## The Paper-Maker at her vat, close up (the camera held on her): rocking
+## the mould, lifting it to drain, then turning to him and nodding as he
+## comes near.
+func _papermaker() -> Image:
+	var maker: PaperMaker = _main.get_node("Village").find_children("*", "PaperMaker", true, false)[0]
+	_ronin.set("_draw_safe", 60.0)
+	_ronin.position = Vector3(maker.global_position.x + 9.0, 0.05, 0.0)
+	var cam: Camera3D = _main.get_node("Camera")
+	cam.set_process(false)
+	cam.set_physics_process(false)
+	cam.global_position = maker.global_position + Vector3(0.6, 1.0, 5.2)
+	cam.rotation = Vector3(-0.05, 0.0, 0.0)
+	var tile := Vector2i(480, 360)
+	var sheet := Image.create(tile.x * 4, tile.y * 2, false, Image.FORMAT_RGB8)
+	var crop := Rect2i(160, 0, 960, 720)
+	var shot := 0
+	for t: float in [0.3, 0.4, 0.4, 3.2]:
+		await create_timer(t).timeout
+		sheet.blit_rect(await _snap(crop, tile), Rect2i(Vector2i.ZERO, tile), Vector2i((shot % 4) * tile.x, (shot / 4) * tile.y))
+		shot += 1
+	# He comes near: she turns to him and nods.
+	_ronin.position = Vector3(maker.global_position.x + 3.0, 0.05, 0.0)
+	for t: float in [0.4, 0.5, 0.4, 1.2]:
+		await create_timer(t).timeout
+		sheet.blit_rect(await _snap(crop, tile), Rect2i(Vector2i.ZERO, tile), Vector2i((shot % 4) * tile.x, (shot / 4) * tile.y))
+		shot += 1
+	return sheet
+
+
+## The Paper-Maker's tale: he walks up to her, she lifts a sheet, and the
+## three pictures are brushed on it and wiped away. 8 moments.
+func _tale() -> Image:
+	PaperMakerTale.force = true
+	var maker: PaperMaker = _main.get_node("Village").find_children("*", "PaperMaker", true, false)[0]
+	_ronin.position = Vector3(maker.global_position.x - 5.0, 0.05, 0.0)
+	_main.get_node("Camera").snap_to_target()
+	await create_timer(0.5).timeout
+	Input.action_press("move_right")
+	await create_timer(0.45).timeout
+	Input.action_release("move_right")
+	var tile := Vector2i(480, 270)
+	var sheet := Image.create(tile.x * 4, tile.y * 2, false, Image.FORMAT_RGB8)
+	var shot := 0
+	for t: float in [0.5, 1.6, 2.6, 2.3, 2.7, 2.6, 1.6, 2.2]:
+		await create_timer(t).timeout
+		sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((shot % 4) * tile.x, (shot / 4) * tile.y))
+		shot += 1
 	return sheet

@@ -98,6 +98,13 @@ const MOSS := Color(0.3, 0.34, 0.18)
 ## 1 = full colour, 0 = black and white.
 @export var color_saturation := 0.8
 @export var color_contrast := 1.05
+@export_group("Daylight (the bamboo grove)")
+@export var sun_energy := 1.7
+@export var day_ambient := 0.6
+@export var day_fog := 0.004
+## Colour in the grove (the town's night is 0.8).
+@export var day_saturation := 1.05
+@export var day_contrast := 1.12
 
 @export_group("Wind")
 ## The steady breeze, in metres per second.
@@ -137,6 +144,9 @@ var stage: HannyaStage
 ## The courtyard's stone lanterns: {light, fire, shine, energy, glow}.
 var arena_lanterns: Array[Dictionary] = []
 var _seal_wall: StaticBody3D
+var _env: Environment
+var _moon: DirectionalLight3D
+var daylight := false
 var _seal_sheet: MeshInstance3D
 var _seal_pool: InkPool
 var _seal_jets: CPUParticles3D
@@ -309,6 +319,7 @@ func _build_light_and_air() -> void:
 	var world := WorldEnvironment.new()
 	world.environment = env
 	add_child(world)
+	_env = env
 
 	# Moonlight. It shines from the front, so each paper layer casts a soft
 	# shadow onto the layer behind it. That is what sells the diorama look.
@@ -319,6 +330,35 @@ func _build_light_and_air() -> void:
 	moon.shadow_enabled = true
 	moon.directional_shadow_max_distance = 45.0
 	add_child(moon)
+	_moon = moon
+
+
+## Night in the town, day in the bamboo grove (Julian's picture: warm sun,
+## golden haze). Switched at once, while the screen is black between them.
+func set_daylight(on: bool) -> void:
+	daylight = on
+	if on:
+		_env.background_color = Color(0.93, 0.87, 0.72)
+		_env.ambient_light_color = Color(1.0, 0.93, 0.8)
+		_env.ambient_light_energy = day_ambient
+		_env.fog_light_color = Color(0.9, 0.86, 0.72)
+		_env.fog_density = day_fog
+		_env.adjustment_saturation = day_saturation
+		_env.adjustment_contrast = day_contrast
+		_moon.light_color = Color(1.0, 0.86, 0.62)
+		_moon.light_energy = sun_energy
+		_moon.rotation_degrees = Vector3(-38.0, -28.0, 0.0)
+	else:
+		_env.background_color = Color(0.04, 0.045, 0.12)
+		_env.ambient_light_color = Color(0.5, 0.55, 0.8)
+		_env.ambient_light_energy = ambient_energy
+		_env.fog_light_color = Color(0.2, 0.24, 0.46)
+		_env.fog_density = fog_density
+		_env.adjustment_saturation = color_saturation
+		_env.adjustment_contrast = color_contrast
+		_moon.light_color = Color(0.64, 0.72, 0.96)
+		_moon.light_energy = moon_energy
+		_moon.rotation_degrees = Vector3(-42.0, 24.0, 0.0)
 
 
 # --- Houses -----------------------------------------------------------------
@@ -366,7 +406,9 @@ func _build_houses() -> void:
 			if x in SHUTTERS and not shadow.round_window:
 				shadow.shutter = true
 			elif x == 5.6:
-				shadow.activity = "papermaker"
+				# (She is out at her vat now; at her window, someone kneels
+				# at some small work.)
+				shadow.activity = "kneel"
 			else:
 				shadow.activity = ["pace", "kneel"][_rng.randi() % 2]
 			shadow.position = window + Vector3(0.0, 0.0, 0.1)

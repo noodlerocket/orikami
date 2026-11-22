@@ -10,6 +10,7 @@ extends RefCounted
 ##  - the shortcuts opened (the drain grate, the gatehouse gate, the ladder),
 ##  - whether the Hannya's cutscene has been seen, and whether she has fallen,
 ##  - the Smudge (where he last died, and the ink it holds),
+##  - whether the Paper-Maker has told him, in pictures,
 ##  - the parts of the village he has explored (for the map).
 ## Everything lives in static variables, so it survives changing scenes
 ## (from the title into the game).
@@ -28,6 +29,8 @@ static var hannya_fallen := false
 ## Abilities learned ("glide").
 static var abilities: Array[String] = []
 static var smudge_at := Vector3.INF
+## Whether the Paper-Maker has told him, in pictures (paper_maker_tale.gd).
+static var papermaker_told := false
 static var smudge_ink := 0
 ## Explored map cells: "layer:x" keys (layers "under", "street", "roofs").
 static var explored := {}
@@ -53,6 +56,7 @@ static func reset() -> void:
 	smudge_ink = 0
 	explored = {}
 	continuing = false
+	papermaker_told = false
 
 
 static func write() -> void:
@@ -67,6 +71,7 @@ static func write() -> void:
 	cfg.set_value("game", "abilities", abilities)
 	cfg.set_value("game", "smudge_at", smudge_at if smudge_at != Vector3.INF else Vector3(0, -999, 0))
 	cfg.set_value("game", "smudge_ink", smudge_ink)
+	cfg.set_value("game", "papermaker_told", papermaker_told)
 	cfg.set_value("game", "explored", explored.keys())
 	cfg.save(file)
 
@@ -86,6 +91,7 @@ static func read() -> bool:
 	var at: Vector3 = cfg.get_value("game", "smudge_at", Vector3(0, -999, 0))
 	smudge_at = at if at.y > -900.0 else Vector3.INF
 	smudge_ink = cfg.get_value("game", "smudge_ink", 0)
+	papermaker_told = cfg.get_value("game", "papermaker_told", false)
 	explored = {}
 	for key: String in cfg.get_value("game", "explored", []):
 		explored[key] = true

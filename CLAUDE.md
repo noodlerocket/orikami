@@ -47,9 +47,9 @@ Pause, settings and controls pages share one UI style. Downloads for
 Windows and Mac carry Julian's icon.
 
 **Next:** Julian plays the overnight work and judges it (the report lists
-what only he can judge). Then: the rest of the Bamboo of Folded Wind (Akane),
-the Paper-Maker as a figure (only her shadow exists), saving the ink marks'
-look per ending.
+what only he can judge). Then: the rest of the Bamboo of Folded Wind with Akane (needs Julian's
+story decision); the endings (the ink marks are saved; nothing reads them
+yet).
 
 ## Working with Julian
 
@@ -378,7 +378,7 @@ There is no controls line along the bottom of the game screen any more
   and it is wiped away; on completion it closes, flashes and bursts.
 - **Ink marks:** `ink_absorbed` counts every drop ever taken in (healing
   does not wash it off); at `marks_full_at` (150) he is covered in flowing
-  brush strokes (shader, drawn on at `marks_draw_speed`). Not saved yet.
+  brush strokes (shader, drawn on at `marks_draw_speed`). Saved (`SaveGame.ink_absorbed`).
 - **Struck:** ink drops fly off, his paper is soaked black, the blots shrink
   away while he is invulnerable (shader `ink`).
 - **Death:** he shreds into white strips and scraps (`RoninPuppet.shred`),
@@ -548,7 +548,20 @@ has its own script, built from `Village._ready`:
   moon and far bamboo; walking through the courtyard's open far gate fades
   to black and puts him at the grove's west end (`Main._travel`,
   `travel_fade`), and back through the grove's gate home. Camera limits
-  per place: `Main._set_camera_limits`. Paper bamboo, ravines, shrine 4, the altar where he learns the
+  per place: `Main._set_camera_limits`. **In DAYLIGHT, copied from Julian's
+  bamboo picture** (`Village.set_daylight`, settings in its "Daylight"
+  group; switched while the screen is black; no rain there): thick
+  segmented stems in fresh greens with leaf sprays from the nodes, the
+  forest floor reaching back so every stem stands on ground (`stem_feet`,
+  checked: none over a ravine), framing stems in front rising from below
+  the screen; cliff faces of faceted rock with torn red washi patches
+  printed with sakura and seigaiha, a shaggy moss lip; a rope bridge over
+  the second ravine, a snapped one over the first (the glide gap); a warm
+  sky, red paper sun, misty mountains with a pagoda, far cliffs with a torii
+  and waterfalls; a lantern, a crane banner, petals, sun shafts. Its colours
+  are the `const`s at the top of the script. Its west end is the path running off
+  into deep mist with a stone lantern (`_build_mist_way`; a copy of the
+  courtyard's gate there was "a weird scene arrangement"). Shrine 4, the altar where he learns the
   Crane Glide (`Ronin.has_glide`, `glide_*` settings; paper wings on the
   puppet, `_build_wings`).
 - Life: `villager_shadow.gd` (shadows behind lit shoji that sink away as he
@@ -607,6 +620,19 @@ through:
   8-lights-per-mesh limit still applies).
 
 **Areas 1 and 2 (2026-11-21):**
+- **The Paper-Maker** (`paper_maker.gd`): a Meshy model
+  (`models/papermaker.glb`, 1.38 m; picture `docs/reference/papermaker_front.png`
+  made image-to-image from the Ronin's and husk's references; ids in the
+  script), posed by hand with `SamuraiAnimator` (stances at the bottom of
+  her script). She stands at her vat rocking the mould and lifting it to
+  drain; when he comes near (`notice_distance`) she straightens, turns her
+  head to him and nods. Her window's shadow is someone else now (kneeling).
+  The first time he comes to her (after the tutorial), she holds up a sheet
+  and tells him in pictures (`paper_maker_tale.gd`, no words, about 16 s,
+  hold Space to skip, `SaveGame.papermaker_told`): the castle shut, weeping;
+  the village bleeding ink, a husk; him, blank, in a vermilion ensō. Only in
+  a real game (`PaperMakerTale.allowed`; the check and debug starts set
+  `force`). Sheets: `papermaker`, `tale`.
 - **Well Square:** the Paper-Maker's workshop (`paper_maker_yard.gd`):
   sheets drying on two lines (each sways on its own), the vat with its
   mould frame, a drying board, paper bundles; the first **RestShrine**
@@ -871,6 +897,7 @@ through:
 | `docs/design.md`, `docs/reference/`, `docs/screenshots/` | Design doc, art references, frame sheets |
 | `scripts/canals.gd`, `fallen_street.gd`, `soggy_plank.gd`, `river_bridge.gd`, `gatehouse.gd`, `shrine_steps.gd`, `rooftop_road.gd`, `ladder.gd`, `bamboo_grove.gd` | The expanded village's areas (see "The expanded village") |
 | `scripts/paper_critter.gd`, `paper_dog.gd`, `paper_bird.gd`, `lantern_husk.gd`, `burning_paper.gd` | The new enemies |
+| `scripts/paper_maker.gd` | The Paper-Maker at her vat (Meshy model `models/papermaker.glb`, posed by hand) |
 | `scripts/save_game.gd`, `crane_bundle.gd`, `smudge.gd`, `ability_card.gd`, `hannya_ending.gd` | Saving, cranes, the Smudge, ability card, the ending after the Hannya |
 | `scripts/water_fx.gd`, `villager_shadow.gd`, `perched_birds.gd` | Splashes and water, shadows behind shoji, perched birds |
 | `docs/overnight_report.md` | What was built overnight on 2026-11-22, and what to judge |
@@ -930,7 +957,7 @@ frame sheet when the change can be seen.
 - [x] **M4 First boss:** the Weeping Hannya, her cutscene and fight.
 - [x] **Online:** Windows and Mac downloads; the web page shows the title
       and offers them.
-- [ ] **M3 Ink:** ink marks (first version done; not saved), Refold heal
+- [ ] **M3 Ink:** ink marks (saved), Refold heal
       polish, the Smudge on death, shrines.
 - [x] **Title and pause:** title screen on Julian's looping video, pause
       menu, settings and controls, all in one UI style (2026-11-21)
@@ -965,8 +992,6 @@ frame sheet when the change can be seen.
   and frame sheets only: never played by a person. See the report.
 - The castle road from the lookout is scenery: the glide does not open it
   (it belongs to a later chapter).
-- The Paper-Maker exists only as a shadow behind her shoji, rocking her
-  mould.
 - The husk's model has no wind cloth.
 - `docs/design.md` still names the Kasa-obake as the first boss.
 - One foreground rock near the climbing course cannot be filled (a warning

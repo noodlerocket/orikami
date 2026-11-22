@@ -309,6 +309,33 @@ func _run(main: Node) -> void:
 			other.set_physics_process(true)
 	await _expanded_village(main, ronin)
 
+	# The Paper-Maker tells him, in pictures, the first time he comes to her
+	# (switched on here: the check normally keeps her quiet); it stops play,
+	# can be skipped, and is remembered.
+	PaperMakerTale.force = true
+	SaveGame.papermaker_told = false
+	var maker: PaperMaker = main.get_node("Village").find_children("*", "PaperMaker", true, false)[0]
+	ronin.position = Vector3(maker.global_position.x - 6.0, 0.05, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(10)
+	Input.action_press("move_right")
+	var tale: PaperMakerTale = null
+	for f in 120:
+		await physics_frame
+		var found := main.find_children("*", "PaperMakerTale", true, false)
+		if not found.is_empty():
+			tale = found[0]
+			break
+	Input.action_release("move_right")
+	_check("the Paper-Maker shows him her pictures when he comes to her", tale != null and not ronin.is_physics_processing())
+	Input.action_press("jump")
+	await _frames(70)
+	Input.action_release("jump")
+	await _frames(40)
+	_check("they can be skipped, and are remembered", SaveGame.papermaker_told and ronin.is_physics_processing()
+			and main.find_children("*", "PaperMakerTale", true, false).is_empty())
+	PaperMakerTale.force = false
+
 	# Falling into deep water: the screen fades and he is back at the shrine.
 	var spawn: Vector3 = ronin.get("_spawn_position")
 	before = ronin.health
@@ -538,6 +565,16 @@ func _run(main: Node) -> void:
 		await _frames(90)
 		_check("and walking back through the grove's gate takes him home to the courtyard (x %.1f)" % ronin.global_position.x,
 				home and absf(ronin.global_position.x - BambooGrove.RETURN_X) < 1.5 and not BambooGrove.in_grove(cam.global_position.x))
+		# Every bamboo stem stands on ground: none over a ravine, none in the air.
+		var floating := 0
+		for f: Vector2 in grove.stem_feet:
+			var on := false
+			for g: Array in BambooGrove.GROUND:
+				if f.x - 0.3 >= g[0] and f.x + 0.3 <= g[1] and absf(f.y - (g[2] - 0.05)) < 0.01:
+					on = true
+			if not on:
+				floating += 1
+		_check("every bamboo stem stands on ground (%d stems, %d not)" % [grove.stem_feet.size(), floating], floating == 0 and grove.stem_feet.size() > 50)
 		# The Crane Glide carries him over the first ravine.
 		ronin.has_glide = true
 		ronin.position = Vector3(BambooGrove.SHIFT + BambooGrove.GROUND[0][1] - 0.6, BambooGrove.GROUND[0][2] + 0.05, 0.0)

@@ -41,13 +41,13 @@ func _build(rng: RandomNumberGenerator) -> void:
 	var milk := water.build()
 	(milk.material_override as StandardMaterial3D).roughness = 0.25
 	add_child(milk)
-	# The mould frame (su) resting across the vat.
-	var frame := PaperMesh.new(rng.randi())
-	frame.color = Color(0.5, 0.44, 0.32)
-	frame.box(Vector3(6.6, 0.72, -2.9), Vector3(1.1, 0.04, 0.6))
-	frame.color = PaperMesh.WASHI.darkened(0.12)
-	frame.box(Vector3(6.6, 0.745, -2.9), Vector3(0.95, 0.01, 0.48))
-	add_child(frame.build())
+	# (The mould is in the Paper-Maker's hands: she works at the vat.) The
+	# random draws the old resting mould made are kept, so nothing after it
+	# in the yard changes.
+	rng.randi()
+	var maker := PaperMaker.new()
+	maker.position = Vector3(5.65, 0.0, -2.9)
+	add_child(maker)
 
 	# A drying board leaning on the workshop wall, sheets pressed flat on it.
 	var board := PaperMesh.new(rng.randi())

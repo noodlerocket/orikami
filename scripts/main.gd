@@ -75,6 +75,12 @@ func _process(delta: float) -> void:
 		return  # (he is moved about during the warm-up: no cutscene, no fight)
 	var village: Village = $Village
 	_set_camera_limits()
+	# Day in the grove, night in the town; no rain in the grove.
+	var grove := BambooGrove.in_grove(_ronin.global_position.x)
+	if grove != village.daylight:
+		village.set_daylight(grove)
+		($Rain as Rain).ease_off(0.0 if grove else 1.0, 0.05)
+		Sound.duck_rain(grove)
 	# Through the courtyard's open far gate: fade out, and he is in the
 	# bamboo grove (its own place); back through the grove's gate, the same
 	# way home.
