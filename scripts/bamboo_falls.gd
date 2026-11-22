@@ -33,10 +33,13 @@ func _ready() -> void:
 	b.texture_world = false
 	b.shade_jitter = 0.08
 	var top := _cliff_top - 0.6
-	LashedDeck.stem(b, Vector3(CLIMB_STEM, ground - 0.05, 0.0), top + 5.0 - ground, 0.26, _rng)
-	LashedDeck.climb_marks(b, CLIMB_STEM, 0.0, ground, top, 0.26)
+	# (Its foot stands just behind him and its solid part starts above his
+	# head, so he walks in under it into the gap and jumps up between: Julian.)
+	LashedDeck.climb_stem(b, Vector3(CLIMB_STEM, ground - 0.05, LashedDeck.CLIMB_Z), top + 5.0 - ground, 0.26, _rng)
+	LashedDeck.climb_marks(b, CLIMB_STEM, LashedDeck.CLIMB_Z, ground, top, 0.26)
 	add_child(b.build())
-	grove._solid(Vector3(CLIMB_STEM, (ground + top) * 0.5, 0.0), Vector3(0.5, top - ground, 0.6)).set_meta(&"climbable", true)
+	var low := ground + LashedDeck.CLIMB_CLEAR
+	grove._solid(Vector3(CLIMB_STEM, (low + top) * 0.5, 0.0), Vector3(0.5, top - low, 0.6)).set_meta(&"climbable", true)
 	_build_stream()
 	_build_falls()
 	_build_pool()

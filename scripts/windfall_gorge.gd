@@ -184,10 +184,13 @@ func _build_climb_stem() -> void:
 	var b := PaperMesh.new(_rng.randi())
 	b.texture_world = false
 	b.shade_jitter = 0.08
-	LashedDeck.stem(b, Vector3(CLIMB_STEM, _floor - 0.05, 0.0), top + 6.0 - _floor, 0.26, _rng)
-	LashedDeck.climb_marks(b, CLIMB_STEM, 0.0, _floor, top, 0.26)
+	# (Its foot stands just behind him and its solid part starts above his
+	# head, so he walks in under it into the gap and jumps up between: Julian.)
+	LashedDeck.climb_stem(b, Vector3(CLIMB_STEM, _floor - 0.05, LashedDeck.CLIMB_Z), top + 6.0 - _floor, 0.26, _rng)
+	LashedDeck.climb_marks(b, CLIMB_STEM, LashedDeck.CLIMB_Z, _floor, top, 0.26)
 	add_child(b.build())
-	var solid := grove._solid(Vector3(CLIMB_STEM, (_floor + top) * 0.5, 0.0), Vector3(0.5, top - _floor, 0.6))
+	var low := _floor + LashedDeck.CLIMB_CLEAR
+	var solid := grove._solid(Vector3(CLIMB_STEM, (low + top) * 0.5, 0.0), Vector3(0.5, top - low, 0.6))
 	solid.set_meta(&"climbable", true)
 
 

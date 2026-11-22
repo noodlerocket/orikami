@@ -3,6 +3,10 @@ extends Node3D
 ## the camera follows the Ronin, the HUD listens to him, hits shake the camera.
 ## It also fades the screen out and in when he falls into a pit.
 
+## How strong the paper grain over the screen is in the bamboo, as a share
+## of the town's (1 = the same).
+@export var day_grain := 0.45
+
 @export_group("Falling in a pit")
 ## Seconds for the screen to fade to black after he falls in.
 @export var pit_fade_out := 0.45
@@ -82,6 +86,13 @@ func _process(delta: float) -> void:
 		village.set_daylight(grove)
 		($Rain as Rain).ease_off(0.0 if grove else 1.0, 0.05)
 		Sound.duck_rain(grove)
+		# The paper grain over the screen is lighter in the bright bamboo
+		# (Julian: too strong there).
+		var grain := $Overlay/PaperGrain.material as ShaderMaterial
+		var k := day_grain if grove else 1.0
+		grain.set_shader_parameter(&"grain_strength", 0.2 * k)
+		grain.set_shader_parameter(&"fiber_strength", 0.14 * k)
+		grain.set_shader_parameter(&"blotch_strength", 0.1 * k)
 	# Through the courtyard's open far gate: fade out, and he is in the
 	# bamboo grove (its own place); back through the grove's gate, the same
 	# way home.

@@ -24,6 +24,10 @@ extends Node3D
 
 const STRAW := Color(0.62, 0.56, 0.34)
 const BACK_Z := -1.15
+## A stem he climbs stands just behind him (so he is seen in front of it),
+## and is solid only from this high above its foot (he walks in under it).
+const CLIMB_Z := -0.5
+const CLIMB_CLEAR := 1.8
 
 var grove: BambooGrove
 var _deck: Node3D
@@ -97,22 +101,37 @@ func _ready() -> void:
 		solid.set_meta(&"no_climb", true)
 
 
-## Rope bindings wound round a stem every so often up its height: the mark
-## of a stem he can climb (wall slide and wall jump), as woodcutters bind
-## the stems they climb.
+## The marks of a stem he can climb (wall slide and wall jump), so it is
+## plain at a glance (Julian): the woodcutters' climbing stems are cut dry
+## and golden (every other stem is green: see `climb_stem`), bound with
+## thick rope every so often, the loose ends hanging. (White paper strips
+## tied to the ropes were removed: Julian.)
 static func climb_marks(b: PaperMesh, x: float, z: float, from: float, to: float, w: float) -> void:
-	b.color = BambooGrove.ROPE
-	var y := from + 0.9
+	var y := from + 0.7
 	while y < to:
-		for k in 3:
-			b.frustum(8, Vector2(w * 1.18, w * 1.18), Vector2(w * 1.18, w * 1.18), 0.03, Vector3(x, y + k * 0.05, z))
-		y += 1.4
+		b.color = BambooGrove.ROPE.darkened(0.12)
+		for r in 4:
+			b.frustum(8, Vector2(w * 1.24, w * 1.24), Vector2(w * 1.24, w * 1.24), 0.035, Vector3(x, y + r * 0.045, z))
+		# The loose end, hanging down the front.
+		b.color = BambooGrove.ROPE
+		b.box(Vector3(x + w * 0.5, y - 0.12, z + w * 1.1), Vector3(0.03, 0.3, 0.03))
+		y += 1.15
+
+
+## A stem he can climb: the dry golden colour of cut, seasoned bamboo.
+const CLIMB_STRAW := Color(0.72, 0.6, 0.3)
+
+
+static func climb_stem(b: PaperMesh, foot_at: Vector3, height: float, w: float, rng: RandomNumberGenerator) -> void:
+	stem(b, foot_at, height, w, rng, CLIMB_STRAW)
 
 
 ## A thick bamboo stem standing on the ground: sections with a dark ring and
 ## a pale band at each node (as the grove's own stems), into a builder.
-static func stem(b: PaperMesh, foot_at: Vector3, height: float, w: float, rng: RandomNumberGenerator) -> void:
+static func stem(b: PaperMesh, foot_at: Vector3, height: float, w: float, rng: RandomNumberGenerator, tint: Color = Color(0, 0, 0, 0)) -> void:
 	var green := BambooGrove.STEM.lerp(BambooGrove.STEM_YELLOW, rng.randf_range(0.1, 0.5))
+	if tint.a > 0.0:
+		green = tint.lerp(tint.lightened(0.1), rng.randf())
 	var y := 0.0
 	while y < height:
 		var seg := minf(rng.randf_range(0.85, 1.3), height - y)

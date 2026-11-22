@@ -44,9 +44,12 @@ func _ready() -> void:
 	b.shade_jitter = 0.08
 	var top := float(DECKS[0][2]) + 1.6
 	for x: float in CLIMB_STEMS:
-		LashedDeck.stem(b, Vector3(x, ground - 0.05, 0.0), top + 7.0 - ground, 0.25, _rng)
-		LashedDeck.climb_marks(b, x, 0.0, ground, top, 0.25)
-		grove._solid(Vector3(x, (ground + top) * 0.5, 0.0), Vector3(0.48, top - ground, 0.6)).set_meta(&"climbable", true)
+		# (Feet just behind him, solid only above his head: he walks in under
+		# them to the gap between and jumps up: Julian.)
+		LashedDeck.climb_stem(b, Vector3(x, ground - 0.05, LashedDeck.CLIMB_Z), top + 7.0 - ground, 0.25, _rng)
+		LashedDeck.climb_marks(b, x, LashedDeck.CLIMB_Z, ground, top, 0.25)
+		var low := ground + LashedDeck.CLIMB_CLEAR
+		grove._solid(Vector3(x, (low + top) * 0.5, 0.0), Vector3(0.48, top - low, 0.6)).set_meta(&"climbable", true)
 	add_child(b.build())
 	var bundle := CraneBundle.new()
 	bundle.id = "canopy_top"

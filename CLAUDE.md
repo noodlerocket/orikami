@@ -602,8 +602,16 @@ has its own script, built from `Village._ready`:
   up; lifts him only while gliding (`Ronin.updraft_lift` 7, `width` 3.2,
   fading near its top). `LashedDeck` (`lashed_deck.gd`): bamboo decks
   lashed to stems standing on the ground behind them (and ropes to the
-  front), dip and creak when landed on. Stems he can climb wear rope
-  bindings (`LashedDeck.climb_marks`); others cannot be climbed.
+  front), dip and creak when landed on. Stems he can climb are golden
+  (dry, `LashedDeck.CLIMB_STRAW`), rope-bound (`climb_marks`; white paper
+  strips on them were removed: Julian), stand just behind him (`CLIMB_Z`) and are solid only from
+  `CLIMB_CLEAR` (1.8 m) up, so he walks in under them to the gap and jumps
+  up between (Julian). No bamboo stands in front of the path any more (he
+  seemed to pass through it); the thick dark ones are just behind him.
+  The wings starting to tire rustle softly (`Ronin.tire_sound_db`, the
+  `paper_fold` sound). The paper grain is lighter in the bamboo
+  (`Main.day_grain` 0.45). Red pandas look as far ahead as they need to
+  stop and never spring toward an edge.
 - **The grove's creatures** (Julian: red pandas instead of dogs, a flying
   husk-like creature instead of birds; `BambooGrove.PANDAS`, `KITES`):
   `RedPanda` (`red_panda.gd`, Meshy `models/redpanda.glb`, picture

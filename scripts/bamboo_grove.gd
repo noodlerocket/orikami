@@ -651,11 +651,29 @@ func _bamboo() -> void:
 						tall += 6.0
 					_culm(cx, z, tall, row[1], row[2])
 		x += _rng.randf_range(1.2, 2.1)
-	# Framing stems in front, rising from below the screen, few and dark.
+	# Thick near stems, just behind the path (never in front of him: Julian
+	# saw him seem to pass through the stems that stood in front), clear of
+	# the decks, shrines, the altar and the mill.
 	x = GATE_X + 4.0
 	while x < EAST_END:
-		_culm(x + _rng.randf_range(-1.0, 1.0), _rng.randf_range(3.2, 3.9), 50.0, 1.5, -0.25, -14.0)
-		x += _rng.randf_range(9.0, 14.0)
+		var cx := x + _rng.randf_range(-1.0, 1.0)
+		if _standing(cx, 0.4) and _clear_for_near_stem(cx):
+			_culm(cx, _rng.randf_range(-1.75, -1.6), _rng.randf_range(16.0, 22.0) + maxf(1.5 - _foot(cx), 0.0) * 0.9, 1.4, -0.12)
+		x += _rng.randf_range(6.0, 10.0)
+
+
+## Is x clear of the things a near stem would pass through?
+func _clear_for_near_stem(x: float) -> bool:
+	var busy: Array = [Vector2(SHRINE_X - 1.5, SHRINE_X + 1.5), Vector2(ALTAR_X - 2.5, ALTAR_X + 2.5),
+		Vector2(MILL_SHRINE_X - 12.0, MILL_SHRINE_X + 16.0)]
+	for d: Array in WindfallGorge.DECKS + CanopyRoad.DECKS:
+		busy.append(Vector2(d[0] - 0.6, d[1] + 0.6))
+	for c: float in [WindfallGorge.CLIMB_STEM, BambooFalls.CLIMB_STEM] + CanopyRoad.CLIMB_STEMS:
+		busy.append(Vector2(c - 1.2, c + 1.2))
+	for b: Vector2 in busy:
+		if x > b.x and x < b.y:
+			return false
+	return true
 
 
 ## Is there ground under a stem at x (with room for its thickness)?

@@ -222,7 +222,12 @@ func _physics_process(delta: float) -> void:
 			if not _struck:
 				_strike(0.45)
 			var ahead := _distance_ahead()
-			if is_on_floor() and _mode_time > 0.12 and ahead > -0.2 and ahead < pounce_range and not _struck:
+			# (It looks as far ahead as it needs to stop: never off a ledge,
+			# into the pool or the gorge; Julian.)
+			var stopping := 0.6 + velocity.x * velocity.x / (2.0 * 22.0)
+			if is_on_floor() and _edge_ahead(stopping):
+				_set_mode(&"land")
+			elif is_on_floor() and _mode_time > 0.12 and ahead > -0.2 and ahead < pounce_range and not _struck and not _edge_ahead(pounce_range + 0.6):
 				_set_mode(&"pounce")
 				velocity = Vector3(_dir * pounce_speed, pounce_lift, 0.0)
 				Sound.play(self, &"panda_huff", -4.0)
@@ -237,11 +242,15 @@ func _physics_process(delta: float) -> void:
 				Sound.play(self, &"land", -6.0)
 		&"land":
 			velocity.x = move_toward(velocity.x, 0.0, 22.0 * delta)
+			if is_on_floor() and _edge_ahead(0.45):
+				velocity.x = 0.0  # (it digs its claws in at the very edge)
 			if _mode_time >= 0.4:
 				_set_mode(&"recover")
 				_cooldown = attack_cooldown
 		&"recover", &"stagger", &"hurt", &"look":
 			velocity.x = move_toward(velocity.x, 0.0, 20.0 * delta)
+			if is_on_floor() and signf(velocity.x) != 0.0 and _edge_ahead_toward(signf(velocity.x), 0.45):
+				velocity.x = 0.0
 			var wait := {&"recover": 0.8, &"stagger": stagger_time, &"hurt": 0.35, &"look": _look_length}[mode] as float
 			if mode == &"look" and _cooldown <= 0.0 and _player_ahead(sight, 2.5, sight_rise):
 				_start_tell()
@@ -568,3 +577,10 @@ func _plant_leg(leg: Array, prefer: float) -> void:
 func _stand() -> void:
 	for leg in 4:
 		_plant_leg(LEGS[leg], 1.0 if leg < 2 else -1.0)
+
+
+## Is there a drop just ahead in this direction (whichever way it faces)?
+func _edge_ahead_toward(side: float, reach: float) -> bool:
+	var from := global_position + Vector3(side * reach, 0.2, 0.0)
+	var query := PhysicsRayQueryParameters3D.create(from, from + Vector3.DOWN * 0.9, 1)
+	return get_world_3d().direct_space_state.intersect_ray(query).is_empty()

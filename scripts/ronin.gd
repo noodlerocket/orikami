@@ -148,6 +148,8 @@ signal dashed(at: Vector3, direction: float)
 @export var glide_time := 2.0
 ## The wings start to tire (droop and tremble) this long before they give out.
 @export var glide_tire_warning := 0.6
+## How loud the soft paper rustle is as the wings start to tire (dB).
+@export var tire_sound_db := -14.0
 ## How fast a rising gust lifts him while he glides (metres per second).
 @export var updraft_lift := 7.0
 ## How quickly he is caught up to that lift (metres per second, per second).
@@ -436,7 +438,11 @@ func _physics_process(delta: float) -> void:
 		_gliding = (has_glide and not grounded and (velocity.y < 0.5 or lift > 0.0) and Input.is_action_pressed("jump")
 				and not _sliding and _climbing == null and _hurt_lock <= 0.0 and _glide_left > 0.0)
 		if _gliding:
+			var was := _glide_left
 			_glide_left = maxf(_glide_left - delta, 0.0)
+			# The wings start to give: a soft rustle of paper (once per flight).
+			if was > glide_tire_warning and _glide_left <= glide_tire_warning:
+				Sound.play(self, &"paper_fold", tire_sound_db)
 			drift += Wind.direction.x * Wind.speed_at(global_position.x) * glide_wind
 			if lift > 0.0:
 				velocity.y = move_toward(velocity.y, updraft_lift * lift, updraft_catch * delta)
