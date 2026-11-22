@@ -53,6 +53,8 @@ jobs:
       - name: Make the web page (the download page in site/, not the game)
         run: |
           mkdir -p build/web
+          # build/ sits inside the project: keep Godot from packing it into the game.
+          touch build/.gdignore
           cp site/index.html site/title_loop.mp4 site/title_backdrop.jpg site/yuji_syuku_ui.ttf site/favicon.png build/web/
           test -f build/web/index.html
 
