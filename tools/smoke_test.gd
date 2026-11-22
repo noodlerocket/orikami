@@ -315,6 +315,10 @@ func _run(main: Node) -> void:
 	PaperMakerTale.force = true
 	SaveGame.papermaker_told = false
 	var maker: PaperMaker = main.get_node("Village").find_children("*", "PaperMaker", true, false)[0]
+	var a_husk: PaperHusk = null
+	for h: PaperHusk in main.find_children("*", "PaperHusk", true, false):
+		h.set_physics_process(true)
+		a_husk = h
 	ronin.position = Vector3(maker.global_position.x + 6.0, 0.05, 0.0)
 	ronin.velocity = Vector3.ZERO
 	await _frames(10)
@@ -328,11 +332,13 @@ func _run(main: Node) -> void:
 			break
 	Input.action_release("move_left")
 	_check("the Paper-Maker shows him her pictures when he comes to her", tale != null and not ronin.is_physics_processing())
+	_check("while she does, the enemies hold still and he cannot be hurt", a_husk != null and not a_husk.is_physics_processing()
+			and not ronin.take_damage(1, ronin.global_position + Vector3(1.0, 0.0, 0.0)))
 	Input.action_press("jump")
 	await _frames(70)
 	Input.action_release("jump")
 	await _frames(40)
-	_check("they can be skipped, and are remembered", SaveGame.papermaker_told and ronin.is_physics_processing()
+	_check("they can be skipped, and are remembered (the enemies move again)", a_husk.is_physics_processing() and SaveGame.papermaker_told and ronin.is_physics_processing()
 			and main.find_children("*", "PaperMakerTale", true, false).is_empty())
 	PaperMakerTale.force = false
 

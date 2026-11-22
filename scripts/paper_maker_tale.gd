@@ -36,6 +36,7 @@ var _pictures: Array = []   # each: Array of strokes {pts, w, fill, color}
 var _done := false
 var _skip: SkipPrompt
 var _rng := RandomNumberGenerator.new()
+var _held: Array[Node] = []   # enemies held still while she shows him
 
 
 static func allowed() -> bool:
@@ -47,9 +48,11 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_rng.seed = 2207
 	_pictures = [_castle(), _village(), _blank_one()]
+	_hold_enemies()
 	if ronin:
 		ronin.set_physics_process(false)
 		ronin.velocity = Vector3.ZERO
+		ronin.set("_draw_safe", 999.0)  # (nothing may hurt him while she shows him)
 		var puppet: RoninPuppet = ronin.get_node("Puppet")
 		puppet.state = &"idle"
 		if maker:
@@ -89,8 +92,10 @@ func _finish() -> void:
 		return
 	_done = true
 	SaveGame.papermaker_told = true
+	_release_enemies()
 	if ronin:
 		ronin.set_physics_process(true)
+		ronin.set("_draw_safe", 1.0)  # (a moment to get his bearings)
 	if maker:
 		maker.showing = false
 	if hud:
@@ -101,6 +106,25 @@ func _finish() -> void:
 	out.tween_callback(func() -> void:
 		finished.emit()
 		queue_free())
+
+
+## Every enemy (and anything they have thrown) holds still while she shows
+## him her pictures (Julian was attacked by a husk during them).
+func _hold_enemies() -> void:
+	var world := get_tree().current_scene if get_tree().current_scene else get_tree().root
+	if ronin:
+		world = ronin.get_parent()
+	for node: Node in world.find_children("*", "", true, false):
+		if (node is PaperHusk or node is PaperCritter or node is BurningPaper) and node.is_physics_processing():
+			node.set_physics_process(false)
+			_held.append(node)
+
+
+func _release_enemies() -> void:
+	for node: Node in _held:
+		if is_instance_valid(node):
+			node.set_physics_process(true)
+	_held.clear()
 
 
 # --- Drawing -----------------------------------------------------------------------
