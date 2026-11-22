@@ -9,6 +9,10 @@ extends Control
 ##  - key prompts in the bottom right (key caps, or gamepad buttons if a
 ##    gamepad was used).
 ## Opening: up from sumi black, the logo inked in, then the prompt.
+##
+## In the browser the game is not played: Begin opens a page asking which
+## download to take (Windows or Mac, the visitor's own computer first).
+## `--download` shows that page natively too, for screenshots.
 
 signal chosen(id: StringName)
 
@@ -24,7 +28,16 @@ signal chosen(id: StringName)
 ## Seconds for the logo to ink in.
 @export var logo_time := 1.4
 
+const DOWNLOADS := {
+	&"get_windows": "https://github.com/noodlerocket/orikami/releases/latest/download/Orikami-Windows.zip",
+	&"get_mac": "https://github.com/noodlerocket/orikami/releases/latest/download/Orikami-Mac.zip",
+}
+
 var menu: InkMenu
+## Begin asks for a download instead of starting (in the browser).
+var download_instead := OS.has_feature("web") or "--download" in OS.get_cmdline_user_args()
+## Which download was taken (shown as "started"), or empty.
+var downloaded: StringName = &""
 var _cover := 1.0      # sumi over everything, 1 = black
 var _logo := 0.0       # 0..1
 var _seal := 0.0       # 0..1, the seal stamped
@@ -41,7 +54,7 @@ func _ready() -> void:
 	menu.text_size = 0.034
 	add_child(menu)
 	var main_lines: Array = [
-		{"id": &"begin", "label": "Begin"},
+		{"label": "Begin", "page": &"download"} if download_instead else {"id": &"begin", "label": "Begin"},
 		{"label": "Settings", "page": &"settings"},
 		{"label": "Controls", "page": &"controls"},
 	]
@@ -50,6 +63,9 @@ func _ready() -> void:
 	menu.add_page(&"main", "", main_lines)
 	menu.add_page(&"settings", "Settings", TitleMenu.settings_lines())
 	menu.add_page(&"controls", "", [{"label": "Back", "back": true}])
+	var windows := {"id": &"get_windows", "label": "Windows"}
+	var mac := {"id": &"get_mac", "label": "Mac"}
+	menu.add_page(&"download", "Download", ([mac, windows] if _on_mac() else [windows, mac]) + [{"label": "Back", "back": true}])
 	menu.chosen.connect(func(id: StringName) -> void: chosen.emit(id))
 	var t := create_tween()
 	t.tween_property(self, "_cover", 0.0, open_time).set_trans(Tween.TRANS_SINE)
@@ -60,6 +76,24 @@ func _ready() -> void:
 		if menu.shown <= 0.0:
 			_waiting = true)
 	t.tween_property(self, "_prompt", 1.0, 0.6)
+
+
+## Is the visitor (or this computer) a Mac?
+static func _on_mac() -> bool:
+	if OS.has_feature("web"):
+		var agent: Variant = JavaScriptBridge.eval("navigator.userAgent", true)
+		return agent is String and (agent as String).contains("Mac")
+	return OS.get_name() == "macOS"
+
+
+## Starts the download (the page stays where it is).
+func start_download(id: StringName) -> void:
+	downloaded = id
+	var url: String = DOWNLOADS[id]
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("window.location.href = '%s';" % url)
+	elif not "--download" in OS.get_cmdline_user_args():
+		OS.shell_open(url)
 
 
 ## The Settings page, shared with the pause screen.
@@ -124,6 +158,8 @@ func _draw() -> void:
 		var spacing := font_size * 0.3
 		UiStyle.text(self, Vector2((view.x - UiStyle.width(words, font_size, spacing)) * 0.5, view.y * 0.88), words, font_size,
 				Color(UiStyle.WASHI.r, UiStyle.WASHI.g, UiStyle.WASHI.b, _prompt * breathe), spacing, 0.9)
+	if menu.shown > 0.0 and menu.current_page() == &"download":
+		_draw_download_words(view)
 	if menu.shown > 0.0 and menu.current_page() != &"controls":
 		var choose := [["W  S", "Stick", "Choose"], ["Enter", "A", "Select"], ["Esc", "B", "Back"]]
 		if menu.current_page() == &"settings":
@@ -131,6 +167,28 @@ func _draw() -> void:
 		UiStyle.prompts(self, Vector2(view.x * 0.965, view.y * 0.95), choose, int(view.y * 0.021), menu.shown * 0.85)
 	if _cover > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, view), Color(0.02, 0.02, 0.04, _cover))
+
+
+## Under the download choices (in the dark corner, clear of the Ronin in
+## the video): why; after one is picked, what next.
+func _draw_download_words(view: Vector2) -> void:
+	var alpha := menu.shown
+	var size_big := int(view.y * 0.03)
+	var size_small := int(view.y * 0.02)
+	var left := view.x * menu.origin.x
+	var top := view.y * 0.905
+	var lines: Array
+	if downloaded.is_empty():
+		lines = ["Orikami is played on your computer.", "Choose the download for it."]
+	else:
+		lines = ["Your download has started.",
+				"Unzip it and open Orikami." if downloaded == &"get_windows" else "Unzip it, then right-click Orikami and choose Open."]
+	UiStyle.text(self, Vector2(left, top - size_big * 0.6), lines[0], size_big, Color(UiStyle.WASHI.r, UiStyle.WASHI.g, UiStyle.WASHI.b, alpha))
+	UiStyle.text(self, Vector2(left, top + size_big * 0.6), lines[1], size_small, Color(UiStyle.WASHI_DIM.r, UiStyle.WASHI_DIM.g,
+			UiStyle.WASHI_DIM.b, 0.9 * alpha))
+	if downloaded == &"get_windows":
+		UiStyle.text(self, Vector2(left, top + size_big * 1.5), "If Windows says it protected your PC: More info, then Run anyway.", size_small,
+				Color(UiStyle.WASHI_DIM.r, UiStyle.WASHI_DIM.g, UiStyle.WASHI_DIM.b, 0.8 * alpha))
 
 
 ## Dark, soft shading: a band down from the top (behind the logo), a pool

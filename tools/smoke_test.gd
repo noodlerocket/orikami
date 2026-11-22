@@ -458,6 +458,18 @@ func _run(main: Node) -> void:
 	_check("...to the main list", title_menu.menu.current_page() == &"main")
 	title.queue_free()
 	await _frames(5)
+	# In the browser, Begin asks which download to take instead of starting.
+	var web_menu := TitleMenu.new()
+	web_menu.download_instead = true
+	root.add_child(web_menu)
+	await _frames(2)
+	web_menu.show_menu_now()
+	web_menu.menu.call("_pick")
+	var offered: Array = web_menu.menu.get("_pages")[&"download"]["lines"].map(func(l: Dictionary) -> String: return l["label"])
+	_check("in the browser, Begin opens the download page (%s)" % ", ".join(offered),
+			web_menu.menu.current_page() == &"download" and "Windows" in offered and "Mac" in offered)
+	web_menu.queue_free()
+	await _frames(5)
 
 	# The prologue plays and, at its end, hands over to the game.
 	var prologue: Prologue = load("res://scenes/prologue.tscn").instantiate()

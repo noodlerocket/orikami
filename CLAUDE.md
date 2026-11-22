@@ -2,14 +2,14 @@
 
 A 2.5D samurai metroidvania where everything is folded paper. It is Julian's
 first game. Built with Godot 4.7.2 (standard, GDScript, Compatibility
-renderer); played as Windows/Mac downloads (the web page only offers
-them; see "Builds, speed and downloads").
+renderer); played as Windows/Mac downloads. The web page shows the title
+screen, but Begin there offers the downloads instead of starting.
 
 - **This is the real game.** It began as a copy of the finished prototype
   (git tag `prototype-v1`). The prototype is kept, unchanged, in
   `noodlerocket/orikamiprototype` (folder `C:\Users\JulianUribe\Orikami`,
   https://noodlerocket.github.io/orikamiprototype/). Do not work there.
-- The web page (download Windows or Mac): https://noodlerocket.github.io/orikami/
+- The web page (title screen; Begin offers the downloads): https://noodlerocket.github.io/orikami/
 - Download it: https://github.com/noodlerocket/orikami/releases/latest
 - Code: https://github.com/noodlerocket/orikami (public). Every push to `main`
   runs the automated check, rebuilds the web page and the downloads, and
@@ -183,8 +183,6 @@ and always say plainly what was checked this way and what only he can judge.
 - **Music:** look at loudness second by second to check its shape matches the
   scene, and that a loop's two ends meet smoothly.
 - **Depth fights:** search for sheets built at the same `z` that overlap.
-- **The web page** (`site/`): preview it with `preview_start` "site"
-  (`.claude/launch.json`), at desktop and phone width.
 - **New Meshy models:** `tools/model_look.gd` photographs an unrigged model
   from three sides. Rigged models draw wrongly there; check them in game.
 
@@ -588,18 +586,19 @@ There is no controls line along the bottom of the game screen any more
   (Begin to the prologue) shows black, not a grey flash.
 
 ### Builds, speed and downloads
-- **No game in the browser** (Julian, 2026-11-21): the site is a download
-  page (`site/index.html`): his title video (`site/title_loop.mp4`, made
-  from `video/title_loop.ogv` with ffmpeg; decoding Theora is fine), the
-  logo, and "Windows / Mac", the one that suits the visitor's computer
-  marked; then the unzip-and-open steps. `site/` has a `.gdignore`. The
-  font and the still in it are copies of `fonts/yuji_syuku_ui.ttf` and
-  `textures/title_backdrop.jpg`. The Web export preset and the warm-up
-  below are kept but no longer published.
+- **No game in the browser** (Julian, 2026-11-21): the web build still
+  opens on the title screen ("Press any key", the menu), but Begin there
+  opens a Download page (`TitleMenu.download_instead`: Windows / Mac, the
+  visitor's own computer first, Back; a line saying why, and after a pick
+  "Your download has started" with the next step). The download starts in
+  the same tab (`JavaScriptBridge`). `--title --download --page=download`
+  shows it natively (`--downloaded` for the after-pick words). A separate
+  HTML download page was tried first and dropped for this.
 - **The icon** is Julian's picture (the Ronin before a red sun, 折神;
   he made it from a design of a brushed ensō), with its white surround cut
-  away: `icon.png` (1024, the window and the Mac app), `icon.ico` (16 to
-  256, the Windows .exe), `site/favicon.png` (the page). Sheet:
+  away: `icon.png` (1024, the window, the Mac app and the web page),
+  `icon.ico` (16 to 256, the Windows .exe; needs the Windows preset's
+  `application/modify_resources` on). Sheet:
   `docs/screenshots/icon.png`.
 - **Web freezes** (from when the game ran in the browser):** the browser prepares each new kind of material the first
   time it is drawn (up to 3.4 s). `Main._warm_up()` (web only; `--warmup`
@@ -611,7 +610,8 @@ There is no controls line along the bottom of the game screen any more
 - **Downloads:** export presets "Windows" (one .exe) and "Mac" (universal
   .app, ad-hoc signed, not notarized; needs the ETC2/ASTC texture setting,
   which is on). The workflow (`.github/workflows/deploy.yml`) runs the
-  automated check, exports Windows and Mac, copies `site/` as the page, replaces the GitHub Release
+  automated check, exports web, Windows and Mac (with `build/.gdignore`, so
+  the builds are not packed into each other), replaces the GitHub Release
   "latest" with `Orikami-Windows.zip` and `Orikami-Mac.zip`, and deploys the
   page. Unsigned: Windows says "protected your PC" (More
   info, Run anyway); a Mac needs right-click, Open the first time.
@@ -657,7 +657,6 @@ There is no controls line along the bottom of the game screen any more
 | `scripts/title_screen.gd`, `title_menu.gd`, `pause_menu.gd`, `ink_menu.gd`, `ui_style.gd` | Title screen, pause screen, the shared menu and UI style |
 | `fonts/` | The brush font, cut down for the UI (and its licence) |
 | `video/` | The title video |
-| `site/` | The web page: the title video and the Windows / Mac downloads |
 | `export_presets.cfg` | Web, Windows and Mac export settings (and the page's download link) |
 | `.github/workflows/deploy.yml` | Check, build, release and deploy on every push to `main` |
 

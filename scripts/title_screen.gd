@@ -64,7 +64,9 @@ func _ready() -> void:
 	add_child(_menu)
 	_menu.chosen.connect(_on_chosen)
 	for arg: String in args:
-		if arg == "--menu":
+		if arg == "--downloaded":
+			_menu.downloaded = &"get_windows"
+		elif arg == "--menu":
 			_menu.show_menu_now.call_deferred()
 		elif arg.begins_with("--page="):
 			var page := StringName(arg.trim_prefix("--page="))
@@ -110,6 +112,8 @@ func _on_chosen(item: StringName) -> void:
 			_menu.fade_to_black(func() -> void: get_tree().change_scene_to_file(PROLOGUE_SCENE))
 		&"quit":
 			_menu.fade_to_black(func() -> void: get_tree().quit())
+		&"get_windows", &"get_mac":
+			_menu.start_download(item)
 
 
 func _debug_screenshot() -> void:
