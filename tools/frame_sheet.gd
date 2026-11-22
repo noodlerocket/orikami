@@ -478,15 +478,15 @@ func _marks() -> Image:
 	return sheet
 
 
-func _cutscene() -> Image:
-	_ronin.position = Vector3(45.0, 1.6, 0.0)
+func _cutscene(times: Array = [1.0, 3.6, 6.4, 8.8, 12.0, 16.2, 18.6, 21.0, 23.4, 26.6, 28.25, 29.6, 31.4, 33.8, 35.2, 36.6,
+		38.2, 39.4]) -> Image:
+	_ronin.position = Vector3(Village.ARENA.x - 2.0, 1.6, 0.0)
 	await create_timer(0.3).timeout
 	_main.play_hannya_cutscene()
 	var scene: Node = null
 	for child: Node in _main.get_children():
 		if child is HannyaCutscene:
 			scene = child
-	var times := [1.0, 3.6, 6.4, 8.8, 12.0, 16.2, 18.6, 21.0, 23.4, 26.6, 28.25, 29.6, 31.4, 33.8, 35.2, 36.6, 38.2, 39.4]
 	var tile := Vector2i(427, 240)
 	var columns := 6
 	var sheet := Image.create(tile.x * columns, tile.y * 3, false, Image.FORMAT_RGB8)
@@ -514,7 +514,7 @@ func _sneak() -> Image:
 
 
 func _boss() -> Image:
-	_ronin.position = Vector3(45.0, 1.6, 0.0)
+	_ronin.position = Vector3(Village.ARENA.x - 2.0, 1.6, 0.0)
 	await create_timer(0.3).timeout
 	_main.play_hannya_cutscene()
 	await process_frame
@@ -590,7 +590,7 @@ func _death() -> Image:
 
 
 func _seal() -> Image:
-	_ronin.position = Vector3(45.0, 1.6, 0.0)
+	_ronin.position = Vector3(Village.ARENA.x - 2.0, 1.6, 0.0)
 	await create_timer(0.3).timeout
 	_main.play_hannya_cutscene()
 	await process_frame

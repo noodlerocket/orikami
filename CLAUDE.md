@@ -408,7 +408,12 @@ There is no controls line along the bottom of the game screen any more
   he creeps in, the lanterns die, her shadow weeps, turns, bleeds ink, the
   paper rips, the mask comes through, she towers, and the title is painted
   (`hannya_title.gd`: 般若 and her name in brush lettering, a vermilion
-  stamp). It plays the first time he enters the courtyard; hold Space to
+  stamp). Julian finds the mask close-up at 30 s odd ("just a levitating
+  head"), but rejected the first fix: her face pressed out through the
+  paper as a relief, then leaning through the tear ("so bad"), then a wide
+  shot of her stepping through, then hair and a robe under the mask. All
+  undone: he wants the ORIGINAL cutscene left alone. Do not change it.
+  It plays the first time he enters the courtyard; hold Space to
   skip; `--cutscene` plays it at once.
 - **The fight** (`hannya_boss.gd`, 30 health, 6 posture):
   - sleeve slash, sometimes double, leaving a dark ink arc (parry);
