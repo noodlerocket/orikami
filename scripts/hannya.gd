@@ -25,6 +25,7 @@ var _double: Node3D
 var _double_animator: SamuraiAnimator
 var _frame_clock := 0.0
 var _materials: Array[StandardMaterial3D] = []
+var _flash_meshes: Array[GeometryInstance3D] = []   # what turns white when she is hit
 
 
 func _ready() -> void:
@@ -61,12 +62,12 @@ func snap(new_pose: Dictionary) -> void:
 	_frame_clock = 1.0 / frames_per_second
 
 
-## Flashes her paper white (when she is hit).
+## Flashes her paper white (when she is hit): a white layer laid over her,
+## as on the husk (PaperHusk.flash_overlay). Switching on the paper's glow
+## instead made every soft glow in the sky draw as a white square.
 func flash(on: bool) -> void:
-	for mat in _materials:
-		mat.emission_enabled = on
-		mat.emission = Color.WHITE
-		mat.emission_energy_multiplier = 1.2
+	for mesh: GeometryInstance3D in _flash_meshes:
+		mesh.material_overlay = PaperHusk.flash_overlay() if on else null
 
 
 func _process(delta: float) -> void:
@@ -112,6 +113,7 @@ func _build(silhouette: bool) -> Array:
 			paper.roughness = 1.0
 			paper.metallic_specular = 0.15
 			_materials.append(paper)
+			_flash_meshes.append(node)
 		for i in node.mesh.get_surface_count():
 			node.set_surface_override_material(i, paper)
 		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

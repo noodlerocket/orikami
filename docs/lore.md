@@ -133,8 +133,9 @@ beyond, under a red sun. It is the whole journey in one picture: where he
 starts, and where he must go.
 
 ### Chapter 1: Awakening (Kamiyama Village)
-1. **The well.** He wakes at the bottom of the well, blank, in the dark,
-   with rain falling on him from the circle of sky above. He climbs out.
+1. **The well.** The prologue ends deep in the well, where he lies waiting.
+   Then, seen from the village street in the rain, his hat rises out of the
+   dark opening and he climbs out.
 2. **The Paper-Maker.** An old woman who makes fresh sheets by hand finds
    him. She tells him (in pictures, as he never speaks, and she barely does)
    that the Emperor has shut himself away, the land is dying, and his
@@ -191,17 +192,32 @@ paper cranes:
 
 ---
 
-## Open questions for Julian
+## Decided by Julian (2026-11-21)
 
-- **The red sun on the title.** In your picture a big red sun hangs over
-  the castle, but the village level has a pale crumpled moon at night. One
-  idea: the red disc is the Emperor's seal, pressed into the sky over Shiro,
-  and only seen from high places. Or the title is simply set at a red dusk.
-- **The red scarf.** In your picture the Ronin wears a red scarf and sash.
-  The design says he is all white until ink marks him. Is the red only for
-  the title picture, or should he wear it in the game too?
-- **Shizu, and what happens after the Hannya** (all proposed above): keep,
-  change, or replace?
-- **The opening.** Should the game start in the well (he climbs out, the
-  Paper-Maker finds him), as the design doc says? That would be the next
-  step after the title and pause screens.
+- **The red sun on the title** is simply a red dusk. No hidden meaning.
+- **The scarf:** the title video shows the Ronin all white (white scarf), so
+  he stays all white, as the design says.
+- **The opening** starts as the design doc says: the prologue cutscene
+  (below), then he wakes in the well and climbs out, and the Paper-Maker
+  finds him.
+
+## The prologue cutscene (between the title and the game)
+
+A pop-up book by candlelight: Kamiyo folds up off one blank sheet, warm and
+alive, then the Rain soaks it until every piece goes limp; the camera sinks
+into the well, where a small white figure is waiting. 45 s, scored to
+`audio/music_prologue.mp3`. It does not say why the Rain began, so the
+twist stays hidden; it only ends on the well. The brushed lines:
+
+1. *In the beginning there was one sheet of paper.*
+2. *From it were folded mountains and rivers, people, and an Emperor.*
+3. *A hundred years ago, the Rain began.*
+4. *Where it falls, ink bleeds, and paper forgets what it was.*
+5. *Deep in a well, something blank has been waiting.*
+
+## Still open
+
+- **The Hannya's story** (marked "proposed" in section 6 and chapter 1,
+  step 5): who she was before the mask took over (a shrine dancer called
+  Shizu, in this draft), and what happens when she is beaten. Keep, change
+  or replace.

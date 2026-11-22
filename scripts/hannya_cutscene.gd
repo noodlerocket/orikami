@@ -48,7 +48,6 @@ var _title: Control
 var _music: AudioStreamPlayer
 var _sob: AudioStreamPlayer
 var _mask: Node3D
-var _skip_held := 0.0
 var _hud: CanvasItem
 var _origin: Vector3             # the middle of the screen's foot, in the world
 var _scraps: CPUParticles3D
@@ -89,11 +88,6 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
-	# Hold jump to skip.
-	_skip_held = _skip_held + delta if Input.is_action_pressed("jump") else 0.0
-	if _skip_held > 0.6 and _time < LENGTH - 1.0:
-		_skip()
-		return
 	while _next_event < _events.size() and _time >= _events[_next_event][0]:
 		(_events[_next_event][1] as Callable).call()
 		_next_event += 1
@@ -331,6 +325,12 @@ func _build_overlay() -> void:
 	_title.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_overlay.add_child(_title)
+	var skip := SkipPrompt.new()
+	skip.hold_time = 0.6
+	skip.skipped.connect(func() -> void:
+		if _time < LENGTH - 1.0:
+			_skip())
+	_overlay.add_child(skip)
 
 
 func _set_bars(fraction: float) -> void:

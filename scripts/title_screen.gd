@@ -11,7 +11,8 @@ extends Control
 ## If the video is missing, a still from it (textures/title_backdrop.jpg) is
 ## shown instead.
 ##
-## "Begin" goes to the game (scenes/main.tscn).
+## "Begin" plays the prologue (scenes/prologue.tscn), which leads into the
+## game (scenes/main.tscn).
 ##
 ## Developer options, after a "--" on the command line. Any of the game's
 ## own options (--x=, --zoom=, --cutscene, --screenshot= ...) skip the title
@@ -21,8 +22,11 @@ extends Control
 ##   --title-at=3.0                  ...taken this many seconds in (default 6)
 ##   --menu                          skip "Press any key"
 ##   --page=settings                 open a page of the menu (settings, controls)
+##   --prologue                      play the prologue straight away
+##   --prologue-sheet=sheet.png      photograph the prologue at 16 moments
 
 const GAME_SCENE := "res://scenes/main.tscn"
+const PROLOGUE_SCENE := "res://scenes/prologue.tscn"
 const PICTURE := preload("res://textures/title_backdrop.jpg")
 const VIDEO := "res://video/title_loop.ogv"
 
@@ -32,6 +36,10 @@ var _menu: TitleMenu
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
+	for arg: String in args:
+		if arg == "--prologue" or arg.begins_with("--prologue-sheet="):
+			get_tree().change_scene_to_file.call_deferred(PROLOGUE_SCENE)
+			return
 	if not args.is_empty() and not "--title" in args:
 		get_tree().change_scene_to_file.call_deferred(GAME_SCENE)
 		return
@@ -99,7 +107,7 @@ func _on_chosen(item: StringName) -> void:
 	match item:
 		&"begin":
 			Sound.duck_music(true)
-			_menu.fade_to_black(func() -> void: get_tree().change_scene_to_file(GAME_SCENE))
+			_menu.fade_to_black(func() -> void: get_tree().change_scene_to_file(PROLOGUE_SCENE))
 		&"quit":
 			_menu.fade_to_black(func() -> void: get_tree().quit())
 

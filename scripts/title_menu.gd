@@ -73,10 +73,6 @@ static func settings_lines() -> Array:
 			if flip:
 				UiStyle.set_setting("fullscreen", not UiStyle.fullscreen)
 			return UiStyle.fullscreen})
-	lines.append({"label": "Control hints", "toggle": func(flip: bool) -> bool:
-		if flip:
-			UiStyle.set_setting("hints", not UiStyle.show_hints)
-		return UiStyle.show_hints})
 	lines.append({"label": "Back", "back": true})
 	return lines
 

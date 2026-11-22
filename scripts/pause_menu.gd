@@ -54,7 +54,6 @@ func open() -> void:
 		return
 	_open = true
 	get_tree().paused = true
-	get_tree().call_group(&"hud", &"queue_redraw")   # (hides its control hints)
 	menu.reset()
 	menu.mouse_filter = Control.MOUSE_FILTER_STOP
 	Sound.play(self, &"step", 1.0)

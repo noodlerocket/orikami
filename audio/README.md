@@ -35,6 +35,12 @@ To replace a sound, generate a new one and save it under the same file name.
 | `parry.mp3` | a parry catches a blow | Deflect, a stiff paper folding fan snapped shut hard against a blade, one sharp crisp papery crack with a brief bright rustle, close and dry, no metal ringing, no voice. *Trimmed: the first 0.26 s (a slow lead-in) cut off so the crack lands at once, and turned down (it clipped).* |
 | `stagger.mp3` | a husk's posture breaks | Crinkle, a sheet of thick paper being slowly crushed and folded in half by hand, loud close crackling paper creases, dry studio recording, no voice. *(A first take, "Slump...", was rejected: nearly silent and 92% low rumble.)* |
 
+- `paper_fold.mp3`: each pop-up folding up off the page in the prologue.
+  Words: "Folding paper pop-up: a sheet of thick washi paper quickly folding up
+  and standing, a soft crisp crease and flap, close and gentle, no click"
+  (0.8 s). Measured: energy spread over 417 ms, 7% below 300 Hz, starts at
+  0.17 of its loudest: not a pop.
+
 ## Music
 
 `music_village.ogg` loops all the time under the rain (`Sound.music_volume`).
@@ -64,6 +70,7 @@ should; its energy spreads over 0.7 s, so it is a boom, not a pop.
 | `mask_creak.mp3` | her head turns; the mask; she rises from ink; a mask dives | Creak, stiff folded paper and old lacquer slowly bending and creaking as a head turns, close, eerie, no voice |
 | `paper_rip.mp3` | the screen is slashed and torn | Rip, a large sheet of thick shoji paper torn violently apart in one long fast tear, with scraps fluttering, close and loud |
 | `taiko_hit.mp3` | the title; her death | Taiko, one single deep huge taiko drum hit in a large wooden temple hall, long dark reverberating tail, nothing else |
+| `music_prologue.mp3` | the prologue (45 s, its events are timed to it) | music_v2, 45 s, one prompt describing each section with its loudness spelled out: very quiet hum and koto (0-8 s), a warm koto melody building (8-21 s), a loud taiko-and-strings eruption, sorrowful (it landed at 25 s, not 21), drop to near silence with one shakuhachi note and a soft heartbeat drum, one koto chord fading. A first take without the loudness words came out at one flat level and was thrown away. Raised 5 dB through a limiter, then 2.2 dB down: peak 0.87. |
 | `music_hannya_intro.mp3` | the cutscene (40 s, the shots are timed to it) | music_v2: a 40-second cue described section by section: near silence and one shakuhachi note (0-9 s), mournful koto (9-19 s), draining to one thin dissonant string (19-27 s), a violent taiko and shakuhachi eruption (27-34 s), a dark ringing chord fading (34-40 s). A first take that only swelled and stopped was thrown away. |
 | `music_hannya_fight.ogg` | the fight (loops) | music_v2, 75 s: intense dark Japanese boss battle music, driving taiko, aggressive shamisen, wailing shakuhachi, low dissonant strings, steady energy so it loops. Its last 3 s were blended into its start. |
 

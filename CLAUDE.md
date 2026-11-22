@@ -239,7 +239,9 @@ iaijutsu draw (Y); L or Shift dash (right shoulder or trigger); I parry, hold
 I to block (left shoulder or trigger); hold U heal (B); Esc or P pause
 (Start); M mute. W is aim-up
 only. The table is in `tools/setup_input.gd`: edit it, re-run it, and update
-the controls line in `scripts/hud.gd`.
+the Controls page (`InkMenu.CONTROLS`) and the tutorial (`Tutorial.STEPS`).
+There is no controls line along the bottom of the game screen any more
+(Julian had it removed).
 
 ## How the game is built
 
@@ -439,6 +441,46 @@ the controls line in `scripts/hud.gd`.
   (left) side so it never swings through its support. Rain, petals, clouds,
   the wind sound and the cloak all follow it.
 
+### Light and wet (Julian: "make the lighting more realistic")
+- Lantern and window light falls off steeply (`Village.light_falloff`, 2.0;
+  was 1.3, "flat"), stronger (`lantern_energy` 5.2), less flat fill
+  (`ambient_energy` 0.45, was 0.55). Hung lanterns cast real shadows
+  (`lantern_shadows`): measured 52 fps before, 41-47 fps after on this
+  computer; switch off if the browser is too slow.
+- Every glow (`Scenery.halo`, `_spot_material`) fades softly near surfaces
+  (`proximity_fade`, 0.25 m): a glow cut off by a post looked like a flat
+  painted patch on the wood (Julian's screenshot).
+- Roof tiles are glossy, as if wet (`Scenery.tiled_roof`). The street was
+  made wetter too (glossier stones, wavering reflections, sheen, puddles,
+  ripples, a landing splash) and Julian had it all undone: "I liked the
+  ground before better". Leave the ground as it is.
+
+### Skipping cutscenes
+- `skip_prompt.gd` (`SkipPrompt`, drawn by `UiStyle.skip_prompt`) in all
+  three cutscenes: top right (clear of the lines at the bottom), a key cap
+  and "Hold to skip", a slim rounded bar under it filling from the left
+  while Space (A) is held, vermilion when full. Rejected: a thin ring
+  ("bugged and basic"), a tapering brush stroke ("a red 2d object being
+  distorted and stretched").
+
+### Hit flashes (a Godot pitfall)
+- The husk and the Hannya flash white when hit by laying a white overlay
+  over them (`material_overlay`, `PaperHusk.flash_overlay()`), NOT by
+  switching on emission: on these skinned Meshy models, emission made every
+  soft glow in the sky (the moon's halo) draw as a white square while the
+  flash lasted (Julian: "the sky flashes white when I slash a husk").
+  Measured with a probe: the sky brightened 0.07-0.08 on hits before, 0.01
+  (the rain's own flicker) after.
+
+### The tutorial
+- `tutorial.gd` (`Tutorial`), after the climb out of the well: one card at
+  a time at the top (move, jump, dash, cut, parry, block, iaijutsu draw,
+  duck, heal), key caps or gamepad buttons; each waits until he has done it,
+  then a vermilion 了 seal is stamped and the next comes. It starts him one
+  health point down with ink for one heal, so the last lesson is a real heal
+  (Julian asked). The game carries
+  on underneath. Backspace (Select) skips the rest. `--tutorial` starts it.
+
 ### Sound and music
 - `scripts/sound.gd` (the `Sound` node): `Sound.play(self, &"name")` from
   anywhere; `Sound.duck_music()` / `duck_rain()` for cutscenes and the
@@ -457,7 +499,7 @@ the controls line in `scripts/hud.gd`.
 - `scripts/hud.gd` draws it in code: a torn paper strip, one ink splat per
   health point (dried ring when lost; bursts when hurt, blooms when healed;
   the last one throbs), a brush stroke for ink with a tick per heal, a red
-  seal when a heal is ready, and the controls line at the bottom.
+  seal when a heal is ready.
 
 ### Title and pause
 - `scenes/title.tscn` is the main scene. `title_screen.gd` plays Julian's
@@ -489,13 +531,62 @@ the controls line in `scripts/hud.gd`.
   Controls / Return to the title (asks first). Not during the loading cover
   or the cutscene. The `Sound` node keeps running while paused.
 - Settings (both menus): Music and Sounds volume, Full screen (not in the
-  browser), Control hints (the HUD's hint line). Saved in
-  `user://settings.cfg` (`Sound.music_level` / `sounds_level`,
-  `UiStyle.show_hints` / `fullscreen`). Music made elsewhere follows the
+  browser). Saved in `user://settings.cfg` (`Sound.music_level` /
+  `sounds_level`, `UiStyle.fullscreen`). Music made elsewhere follows the
   volume through `Sound.follow_level()`.
 - Any command-line option skips the title and starts the game, so the usual
   screenshot commands still work; `--title` photographs the title, with
   `--menu` (skip "Press any key") or `--page=settings` / `--page=controls`.
+
+### The prologue
+- `scenes/prologue.tscn` / `prologue.gd` (`Prologue`): Begin on the title
+  plays it; at its end the game starts at the bottom of the well. 45 s,
+  scored to `audio/music_prologue.mp3` (its eruption at 25 s is the
+  thunder); the five brushed lines are in `docs/lore.md`.
+- **A pop-up book, in 3D, shot in 2.5D.** Fallen pieces lie flat on the
+  page (88 degrees); solid ones (houses) are crushed flat instead of tipped,
+  so nothing hangs in the air; the torii falls with its hill; the Emperor
+  stands on a stone terrace and unfolds UP out of it (a `rise` pop-up: he
+  seemed to appear from nowhere). The sun does not bleed (red streaks down
+  the sky were removed at Julian's request); it only sinks. One blank sheet stands in
+  candlelight (creases draw across it); the world folds up off the page in
+  front of it: mountains, hills, river, village with lanterns, cherry trees,
+  paper-doll villagers, cranes that fly, the castle, the red dusk sun, the
+  Emperor. The Rain: lightning, cold light, colour drains, everything soaks
+  (`WET`), the sun sinks, cranes fall, the Emperor bows,
+  the mother and child's prints wash off and they fold down, then every
+  pop-up goes limp. The camera cranes down past the page's front edge into
+  a cut-away of the ground: the well's shaft, a small white figure at the
+  bottom. The game opens on the same view.
+- **Julian: keep it 2.5D** ("hard to make 3D look professional"). Every
+  shot is from in front: pushes, pans, cranes; never from above or round
+  behind. A shadow-puppet version came first and looked too crude; a
+  top-down version was dropped for this rule.
+- Everything is drawn from `time` alone (`_apply`): pop-ups (`_pop`, a
+  spring up, a limp fall), soaking (`_soak`), lights, cranes, pools, the
+  sun's tears. `--prologue` plays it; `--prologue-sheet=path` photographs it
+  (`--prologue-moments=3,8.5,...` picks the moments); `--prologue-at=T`
+  starts it at T. Each pop-up plays `paper_fold`. Hold Space (A) to skip.
+
+### The well (the start of the game)
+- After the prologue (`Prologue.into_well`, or `--well`), `well_cutscene.gd`
+  (`WellCutscene`, about 7 s), seen from the street in the rain, close and
+  low: the screen comes up from black on the well; he springs up out of its
+  dark mouth in one quick jump FORWARD (toward us), clear over the front of
+  the rim and under its roof, and lands on the street in front of it
+  (`LAND_X`); then the camera arcs up and settles exactly where the game
+  camera will be, and hands over. Posed by hand (physics off). Hold Space
+  to skip. `--well-sheet=path` photographs it.
+- Rejected by Julian, do not bring back: a playable climb up a cut-away
+  shaft ("show it from the outside"); crouching on the well's mouth
+  ("weird"); jumping out sideways (it looked like he went through the rim).
+- The well stands in the BACKGROUND (`Village.WELL_Z`, behind the gameplay
+  plane), nothing to stand on, its roof directly over it (no rain inside).
+  Its mouth is open with depth (`Scenery.well`): a rim, an inner stone wall
+  darkening downward, black water with a faint glint (Julian: not "just a
+  black colour").
+- The default clear colour is black (`project.godot`), so changing scenes
+  (Begin to the prologue) shows black, not a grey flash.
 
 ### Builds, speed and downloads
 - **Web freezes:** the browser prepares each new kind of material the first
@@ -573,6 +664,9 @@ Godot_v4.7.2-stable_win64_console.exe --headless --path . --script tools/smoke_t
 Godot_v4.7.2-stable_win64_console.exe --headless --path . --import
 # Screenshot (flags: --x=, --zoom=, --face=-1, --hold=, --marks=, --cutscene, --warmup)
 Godot_v4.7.2-stable_win64_console.exe --path . -- --x=21 --screenshot=C:\full\path\shot.png
+# The prologue as a frame sheet; the climb out of the well (play, or photograph with --well-sheet=)
+Godot_v4.7.2-stable_win64_console.exe --path . -- --well
+Godot_v4.7.2-stable_win64_console.exe --path . -- --prologue-sheet=C:\full\path\prologue.png
 # The title screen (--menu, --page=settings, --page=controls), or the pause screen
 Godot_v4.7.2-stable_win64_console.exe --path . -- --title --screenshot=C:\full\path\title.png
 Godot_v4.7.2-stable_win64_console.exe --path . -- --title --page=controls --screenshot=C:\full\path\controls.png
@@ -600,8 +694,12 @@ frame sheet when the change can be seen.
       polish, the Smudge on death, shrines.
 - [x] **Title and pause:** title screen on Julian's looping video, pause
       menu, settings and controls, all in one UI style (2026-11-21)
-- [ ] **Finish the slice:** the opening in the well, an ending after the
-      Hannya, saving at shrines.
+- [x] **Prologue:** a 2.5D pop-up-book cutscene with brushed lines and its
+      own music, ending in the well (2026-11-21; not yet watched by Julian)
+- [x] **The well:** a cutscene of him jumping out of it, seen from the
+      street, the camera gliding into the game view
+- [ ] **Finish the slice:** the Paper-Maker, an ending after the Hannya,
+      saving at shrines.
 - [ ] **M5:** the Bamboo of Folded Wind region and the Crane Glide.
 - [ ] **M6:** vertical slice polish: audio balance, map.
 

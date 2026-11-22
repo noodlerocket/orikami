@@ -42,7 +42,10 @@ func _ready() -> void:
 	# The browser version prepares every material and effect once, behind a
 	# loading cover, so the game does not freeze the first time each appears.
 	if OS.has_feature("web") or "--warmup" in OS.get_cmdline_user_args():
-		_warm_up()
+		await _warm_up()
+	if Prologue.into_well or "--well" in OS.get_cmdline_user_args():
+		Prologue.into_well = false
+		_start_in_well()
 
 
 func _process(_delta: float) -> void:
@@ -62,6 +65,28 @@ func _process(_delta: float) -> void:
 	if _boss and is_instance_valid(_boss) and _boss.health > 0:
 		if not _boss.active and in_arena and _ronin.global_position.x > Village.ARENA.x + 2.0:
 			_begin_fight()
+
+
+## After the prologue: he climbs out of the village well, seen from the
+## street (well_cutscene.gd); then the camera glides into place, the game is
+## his, and the tutorial cards begin.
+func _start_in_well() -> void:
+	var scene := WellCutscene.new()
+	scene.main = self
+	scene.ronin = _ronin
+	scene.game_camera = _camera
+	scene.fade = _fade
+	scene.hud = _hud
+	scene.finished.connect(_start_tutorial)
+	add_child(scene)
+
+
+## The tutorial cards, once he is out of the well (tutorial.gd).
+func _start_tutorial() -> void:
+	var lessons := Tutorial.new()
+	lessons.ronin = _ronin
+	lessons.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	$Overlay.add_child(lessons)
 
 
 ## The cutscene before the Weeping Hannya fight.
@@ -223,7 +248,7 @@ func _build_pause() -> void:
 	_pause.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_pause.can_pause = func() -> bool:
 		for child: Node in get_children():
-			if child is HannyaCutscene:
+			if child is HannyaCutscene or child is WellCutscene:
 				return false
 		return not _warming
 	layer.add_child(_pause)
@@ -285,6 +310,8 @@ func _on_fell_in_pit() -> void:
 #   --marks=0.5            start this inked (0 = blank, 1 = covered)
 #   --cutscene             play the Hannya cutscene straight away
 #   --pause                open the pause screen straight away
+#   --well                 play the climb out of the well, as after the prologue
+#   --tutorial             start the tutorial cards straight away
 
 func _apply_debug_start() -> void:
 	for arg: String in OS.get_cmdline_user_args():
@@ -310,6 +337,8 @@ func _apply_debug_start() -> void:
 		elif arg == "--cutscene":
 			_ronin.position = Vector3(43.2, 1.6, 0.0)
 			play_hannya_cutscene.call_deferred()
+		elif arg == "--tutorial":
+			_start_tutorial.call_deferred()
 		elif arg == "--pause":
 			(func() -> void:
 				await get_tree().create_timer(0.5).timeout

@@ -22,8 +22,6 @@ const GOLD := Color(0.92, 0.74, 0.42)
 
 ## True after the player touched a gamepad, false after a key or the mouse.
 static var using_pad := false
-## The on-screen control hints in the game (Settings > Control hints).
-static var show_hints := true
 static var fullscreen := false
 static var _loaded := false
 
@@ -46,15 +44,12 @@ static func load_settings() -> void:
 	_loaded = true
 	var file := ConfigFile.new()
 	if file.load(SETTINGS_FILE) == OK:
-		show_hints = bool(file.get_value("display", "hints", true))
 		fullscreen = bool(file.get_value("display", "fullscreen", false))
 	_apply_fullscreen()
 
 
 static func set_setting(key: String, value: bool) -> void:
 	match key:
-		"hints":
-			show_hints = value
 		"fullscreen":
 			fullscreen = value
 			_apply_fullscreen()
@@ -78,7 +73,8 @@ static var _shades := {}
 
 ## A smooth dark shading texture (sumi, see-through at its far end):
 ## "down" is darkest at the top, "up" at the bottom, "right" at the left,
-## "corner" is a round pool darkest in the bottom-left corner.
+## "corner" is a round pool darkest in the bottom-left corner, "spot" an
+## oval darkest in the middle (stretch it over a rectangle).
 ## Stretch it over a rectangle with draw_texture_rect.
 static func shade(kind: String) -> GradientTexture2D:
 	if _shades.has(kind):
@@ -106,6 +102,10 @@ static func shade(kind: String) -> GradientTexture2D:
 			texture.fill = GradientTexture2D.FILL_RADIAL
 			texture.fill_from = Vector2(0.0, 1.0)
 			texture.fill_to = Vector2(1.0, 1.0)
+		"spot":
+			texture.fill = GradientTexture2D.FILL_RADIAL
+			texture.fill_from = Vector2(0.5, 0.5)
+			texture.fill_to = Vector2(1.0, 0.5)
 	_shades[kind] = texture
 	return texture
 
@@ -202,3 +202,51 @@ static func prompts(canvas: CanvasItem, right: Vector2, items: Array, font_size:
 		var used := keycap(canvas, Vector2(x, right.y), cap, font_size, alpha, using_pad and cap.length() == 1)
 		text(canvas, Vector2(x + used + font_size * 0.45, right.y), item[2], font_size, Color(WASHI.r, WASHI.g, WASHI.b, 0.8 * alpha), 0.0, 0.8)
 		x += widths[i] + gap
+
+
+## "Hold to skip" for cutscenes: a key cap (or gamepad button) and the words,
+## right-aligned to `right` (its baseline), with a slim bar underneath that
+## fills from the left as the button is held: `progress` 0..1; vermilion when
+## full. `alpha` fades the whole thing.
+static func skip_prompt(canvas: CanvasItem, right: Vector2, font_size: int, alpha: float, progress: float) -> void:
+	if alpha <= 0.0:
+		return
+	var words := "Hold to skip"
+	var cap := "A" if using_pad else "Space"
+	var cap_wide := font_size * 1.45 if using_pad else width(cap, font_size) + font_size * 0.9
+	var total := cap_wide + font_size * 0.5 + width(words, font_size, font_size * 0.08)
+	var left := right.x - total
+	keycap(canvas, Vector2(left, right.y), cap, font_size, alpha, using_pad)
+	text(canvas, Vector2(left + cap_wide + font_size * 0.5, right.y), words, font_size, Color(WASHI.r, WASHI.g, WASHI.b, 0.85 * alpha),
+			font_size * 0.08, 0.8)
+	# The bar under it all: a slim rounded track that fills smoothly from the
+	# left as the button is held, and turns vermilion when it is full.
+	var tall := maxf(font_size * 0.36, 6.0)
+	var y := right.y + font_size * 0.65
+	_capsule(canvas, Vector2(left, y), total, tall, Color(0.0, 0.0, 0.02, 0.45 * alpha))
+	_capsule(canvas, Vector2(left, y), total, tall, Color(WASHI.r, WASHI.g, WASHI.b, 0.35 * alpha), false)
+	if progress <= 0.0:
+		return
+	var full := clampf(progress, 0.0, 1.0)
+	var colour := WASHI.lerp(VERMILION, smoothstep(0.92, 1.0, full))
+	var inner := tall - 2.0
+	var length := maxf((total - 2.0) * full, inner)
+	_capsule(canvas, Vector2(left + 1.0, y), length, inner, Color(colour.r, colour.g, colour.b, 0.95 * alpha))
+	# A brighter sliver at its leading edge while it is filling.
+	if full < 1.0:
+		canvas.draw_circle(Vector2(left + 1.0 + length - inner * 0.5, y), inner * 0.5, Color(1.0, 1.0, 1.0, 0.6 * alpha))
+
+
+## A rounded bar (a capsule) `length` long and `tall` high, its left end at
+## `start` (its middle height). Filled, or just its outline.
+static func _capsule(canvas: CanvasItem, start: Vector2, length: float, tall: float, colour: Color, filled: bool = true) -> void:
+	var r := tall * 0.5
+	if filled:
+		canvas.draw_rect(Rect2(Vector2(start.x + r, start.y - r), Vector2(maxf(length - tall, 0.0), tall)), colour)
+		canvas.draw_circle(Vector2(start.x + r, start.y), r, colour)
+		canvas.draw_circle(Vector2(start.x + maxf(length - r, r), start.y), r, colour)
+	else:
+		canvas.draw_line(Vector2(start.x + r, start.y - r), Vector2(start.x + length - r, start.y - r), colour, 1.0)
+		canvas.draw_line(Vector2(start.x + r, start.y + r), Vector2(start.x + length - r, start.y + r), colour, 1.0)
+		canvas.draw_arc(Vector2(start.x + r, start.y), r, PI * 0.5, PI * 1.5, 8, colour, 1.0)
+		canvas.draw_arc(Vector2(start.x + length - r, start.y), r, -PI * 0.5, PI * 0.5, 8, colour, 1.0)

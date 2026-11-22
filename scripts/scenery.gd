@@ -59,6 +59,11 @@ static func _spot_material(tint: Color) -> StandardMaterial3D:
 	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	mat.disable_fog = true
+	# Fade the glow out softly where it nears a surface, instead of the
+	# surface cutting it off in a hard straight line (it looked like a flat
+	# patch of paint on the wood next to a lantern).
+	mat.proximity_fade_enabled = true
+	mat.proximity_fade_distance = 0.25
 	return mat
 
 
@@ -196,7 +201,12 @@ static func tiled_roof(rng: RandomNumberGenerator, left: float, right: float, ea
 		under.color = Color(0.36, 0.4, 0.54)
 		under.box(start + slope + Vector3((left + right) * 0.5, 0.2, 0.0), Vector3(right - left + 0.36, 0.05, 0.4))
 	root.add_child(under.build())
-	root.add_child(tiles.build())
+	# Wet from the rain: the tiles catch the lanterns and the moon.
+	var tile_mesh := tiles.build()
+	var wet := tile_mesh.material_override as StandardMaterial3D
+	wet.roughness = 0.32
+	wet.metallic_specular = 0.7
+	root.add_child(tile_mesh)
 	var lip_mesh := lips.build(Color.WHITE, 0.0, true)
 	lip_mesh.cast_shadow = OFF
 	root.add_child(lip_mesh)
@@ -503,26 +513,56 @@ static func banner(rng: RandomNumberGenerator, height: float) -> Node3D:
 
 # --- Street props ---------------------------------------------------------------------
 
-## The well the Ronin climbs out of, with a small tiled roof on posts.
-static func well(rng: RandomNumberGenerator) -> Node3D:
+## The well the Ronin climbs out of, with a small tiled roof on posts. Its
+## mouth is open: a rim, then a stone wall inside going down and getting
+## darker, to black water with a faint glint, so it has depth.
+## `posts_back`: stands the two posts (and the beam and pulley) this far
+## back; the roof stays directly over the well.
+static func well(rng: RandomNumberGenerator, posts_back: float = 0.0) -> Node3D:
 	var root := Node3D.new()
 	var b := PaperMesh.new(rng.randi())
 	b.shade_jitter = 0.22
 	b.color = Color(0.36, 0.38, 0.5)
-	b.frustum(8, Vector2(1.05, 1.05), Vector2(0.95, 0.95), 0.75)
+	b.loft([PaperMesh.oval(Vector3.ZERO, Vector2(1.05, 1.05), 10), PaperMesh.oval(Vector3(0.0, 0.74, 0.0), Vector2(0.97, 0.97), 10)], false, false)
 	b.color = Color(0.46, 0.48, 0.6)
-	b.frustum(8, Vector2(1.02, 1.02), Vector2(1.02, 1.02), 0.1, Vector3(0.0, 0.72, 0.0))
-	b.color = Color(0.02, 0.02, 0.05)  # The dark water he climbed out of.
-	b.frustum(8, Vector2(0.78, 0.78), Vector2(0.78, 0.78), 0.02, Vector3(0.0, 0.82, 0.0))
-	b.color = TIMBER
-	b.shade_jitter = 0.25
-	for side: float in [-1.0, 1.0]:
-		b.box(Vector3(side * 1.15, 1.5, 0.0), Vector3(0.17, 3.0, 0.17))
-	b.box(Vector3(0.0, 2.8, 0.0), Vector3(2.7, 0.13, 0.13))
-	b.box(Vector3(0.3, 2.25, 0.0), Vector3(0.025, 1.1, 0.025))
-	b.color = WOOD
-	b.frustum(6, Vector2(0.16, 0.16), Vector2(0.22, 0.22), 0.3, Vector3(0.3, 1.42, 0.0))
+	b.loft([PaperMesh.oval(Vector3(0.0, 0.72, 0.0), Vector2(1.03, 1.03), 10), PaperMesh.oval(Vector3(0.0, 0.84, 0.0), Vector2(1.03, 1.03), 10)], false, false)
+	# The rim's top: a ring of stone round the mouth.
+	var outer := PaperMesh.oval(Vector3(0.0, 0.84, 0.0), Vector2(1.03, 1.03), 10)
+	var inner := PaperMesh.oval(Vector3(0.0, 0.84, 0.0), Vector2(0.8, 0.8), 10)
+	b.color = Color(0.52, 0.54, 0.66)
+	for i in 10:
+		b.quad(outer[i], outer[(i + 1) % 10], inner[(i + 1) % 10], inner[i], Vector3.UP)
 	root.add_child(b.build())
+	# Inside: the stone wall going down, darker and darker (its own colours,
+	# unlit: no light reaches down there), and black water at the bottom.
+	var depth := PaperMesh.new(rng.randi())
+	depth.shade_jitter = 0.08
+	depth.texture_scale = 0.0
+	var steps := 5
+	for k in steps:
+		var y_top := 0.84 - k * 0.16
+		depth.color = Color(0.13, 0.14, 0.2).lerp(Color(0.01, 0.01, 0.02), pow(float(k + 1) / steps, 0.6))
+		depth.loft([PaperMesh.oval(Vector3(0.0, y_top - 0.16, 0.0), Vector2(0.8, 0.8), 10),
+				PaperMesh.oval(Vector3(0.0, y_top, 0.0), Vector2(0.8, 0.8), 10)], false, false)
+	depth.color = Color(0.01, 0.01, 0.02)
+	depth.frustum(10, Vector2(0.8, 0.8), Vector2(0.8, 0.8), 0.01, Vector3(0.0, 0.03, 0.0))
+	depth.color = Color(0.2, 0.23, 0.34)   # a faint glint on the water, far down
+	depth.quad(Vector3(-0.1, 0.045, -0.32), Vector3(0.38, 0.045, -0.32), Vector3(0.38, 0.045, -0.24), Vector3(-0.1, 0.045, -0.24), Vector3.UP)
+	var water := depth.build(Color.WHITE, 0.0, true)
+	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(water)
+	var frame := PaperMesh.new(rng.randi())
+	frame.color = TIMBER
+	frame.shade_jitter = 0.25
+	for side: float in [-1.0, 1.0]:
+		frame.box(Vector3(side * 1.15, 1.5, 0.0), Vector3(0.17, 3.0, 0.17))
+	frame.box(Vector3(0.0, 2.8, 0.0), Vector3(2.7, 0.13, 0.13))
+	frame.box(Vector3(0.3, 2.25, 0.0), Vector3(0.025, 1.1, 0.025))
+	frame.color = WOOD
+	frame.frustum(6, Vector2(0.16, 0.16), Vector2(0.22, 0.22), 0.3, Vector3(0.3, 1.42, 0.0))
+	var frame_mesh := frame.build()
+	frame_mesh.position.z = posts_back
+	root.add_child(frame_mesh)
 	var roof := tiled_roof(rng, -1.9, 1.9, Vector2(2.95, 1.1), Vector2(3.65, -0.1), 3)
 	root.add_child(roof)
 	var back := tiled_roof(rng, -1.9, 1.9, Vector2(2.95, -1.3), Vector2(3.65, -0.1), 3, false)

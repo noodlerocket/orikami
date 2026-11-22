@@ -25,6 +25,9 @@ const STREET_BACK := -8.0
 const HOUSE_Z := -4.3
 ## The pit: a hole in the street between these two x positions, reaching
 ## back from the front edge to PIT_BACK. Behind it the street carries on.
+## The well he climbs out of after the prologue (main.gd, well_cutscene.gd).
+const WELL_X := -8.0
+const WELL_Z := -1.5
 const PIT_LEFT := 10.0
 const PIT_RIGHT := 13.0
 const PIT_BACK := -3.2
@@ -42,9 +45,16 @@ const MOSS := Color(0.3, 0.34, 0.18)
 
 @export_group("Light")
 @export var moon_energy := 0.55
-@export var ambient_energy := 0.55
-@export var lantern_energy := 4.2
+@export var ambient_energy := 0.45
+@export var lantern_energy := 5.2
 @export var lantern_range := 7.5
+## How quickly lantern and window light fades with distance: higher makes a
+## bright pool near the lantern that dies away into the night (realistic);
+## lower lights everything around evenly (it looked flat). Was 1.3.
+@export var light_falloff := 2.0
+## Hung lanterns cast real shadows (posts, eaves and the Ronin shadow the
+## walls behind them). Costs speed; off makes them shadowless again.
+@export var lantern_shadows := true
 @export var lantern_glow := 2.2
 @export var window_glow := 1.6
 ## How strongly lantern light smears across the wet street (0 = dry).
@@ -222,6 +232,11 @@ func _hang_lantern(hook: Vector3, string_length: float, size: float, shine: bool
 	add_child(lantern)
 	_lanterns.append(lantern)
 	var light := _add_light(Vector3.ZERO, lantern_energy * size, lantern_range * size)
+	if lantern_shadows:
+		light.shadow_enabled = true
+		light.shadow_bias = 0.08
+		light.shadow_normal_bias = 1.5
+		light.shadow_blur = 1.5
 	light.reparent(lantern)
 	light.position = (lantern.get_meta("light_at") as Vector3) + Vector3(0.0, 0.0, 0.7)
 	if shine:
@@ -768,10 +783,12 @@ func _build_stone_lantern(at: Vector3) -> void:
 # --- Props: the well, lanterns, a shoji screen, the torii --------------------
 
 func _build_props() -> void:
+	# The well, in the background behind where he walks (nothing to stand
+	# on): he climbs out of it after the prologue (well_cutscene.gd).
 	var well := Scenery.well(_rng)
-	well.position = Vector3(-8.0, 0.0, -1.5)
+	well.position = Vector3(WELL_X, 0.0, WELL_Z)
 	add_child(well)
-	_hang_lantern(Vector3(-9.45, 2.75, -1.35), 0.25, 0.8)
+	_hang_lantern(Vector3(-9.45, 2.75, WELL_Z + 0.15), 0.25, 0.8)
 
 	_build_shoji_screen(Vector3(27.4, 0.0, -2.2))  # clear of the step up at x 30
 
@@ -915,6 +932,7 @@ func _build_foreground() -> void:
 	(dark.material_override as StandardMaterial3D).disable_fog = true
 	dark.cast_shadow = OFF
 	add_child(dark)
+
 
 	# Cherry trees. One stands in the foreground at the start, its trunk at
 	# the left of the view; the others stand on the street behind the Ronin.
@@ -1063,7 +1081,7 @@ func _add_light(at: Vector3, energy: float, reach: float) -> OmniLight3D:
 	light.light_color = PaperMesh.LANTERN
 	light.light_energy = energy
 	light.omni_range = reach
-	light.omni_attenuation = 1.3
+	light.omni_attenuation = light_falloff
 	light.position = at
 	add_child(light)
 	return light

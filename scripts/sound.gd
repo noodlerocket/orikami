@@ -37,7 +37,13 @@ const SOUNDS := {
 	&"hannya_wail": {"files": ["hannya_wail.mp3"], "volume": -5.0, "vary": 0.05},
 	&"draw_ready": {"files": ["draw_ready.mp3"], "volume": -9.0, "vary": 0.0},
 	&"hannya_sob_short": {"files": ["hannya_sob.mp3"], "volume": -6.0, "vary": 0.06},
+	# The prologue: each pop-up folding up off the page.
+	&"paper_fold": {"files": ["paper_fold.mp3"], "volume": -6.0, "vary": 0.12},
 }
+
+## The rain, wind and village music loops (off for the prologue, which has
+## its own music).
+@export var ambience := true
 
 @export_group("Volume (decibels)")
 ## Everything at once.
@@ -93,6 +99,8 @@ func _ready() -> void:
 		var voice := AudioStreamPlayer.new()
 		add_child(voice)
 		_voices.append(voice)
+	if not ambience:
+		return
 	# Two rain layers at slightly different speeds, so the pattern of drops
 	# takes a long time to repeat.
 	_rain_near = _start_loop("rain_close.mp3", rain_volume + _sounds_db(), 1.0)

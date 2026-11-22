@@ -87,6 +87,7 @@ var _rig: Node3D
 var _head: Node3D
 var _arms: Array[Node3D] = []
 var _materials: Array[StandardMaterial3D] = []
+var _flash_meshes: Array[GeometryInstance3D] = []   # what turns white when it is hit
 var _touch: Area3D
 ## &"patrol", &"windup", &"strike", &"recover" or &"stagger"
 var mode: StringName = &"patrol"
@@ -383,16 +384,34 @@ func _too_far() -> bool:
 	return (global_position.x - _home_x) * _dir > patrol_distance
 
 
+## The hit flash: a white layer laid over the paper for a moment (a
+## material overlay). Not by switching on the paper's glow ("emission"):
+## on the skinned Meshy model that made every soft glow in the sky (the
+## moon's) draw as a white square for as long as the flash lasted.
 func _set_flash(on: bool) -> void:
-	for mat: StandardMaterial3D in _materials:
-		mat.emission_enabled = on
-		mat.emission = Color.WHITE
-		mat.emission_energy_multiplier = 1.4
+	for mesh: GeometryInstance3D in _flash_meshes:
+		mesh.material_overlay = PaperHusk.flash_overlay() if on else null
+
+
+static var _flash_look: StandardMaterial3D
+
+
+static func flash_overlay() -> StandardMaterial3D:
+	if _flash_look == null:
+		_flash_look = StandardMaterial3D.new()
+		_flash_look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_flash_look.albedo_color = Color(1.0, 1.0, 1.0, 0.8)
+		_flash_look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_flash_look.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		_flash_look.cull_mode = BaseMaterial3D.CULL_DISABLED
+		_flash_look.disable_fog = true
+	return _flash_look
 
 
 func _add(parent: Node3D, mesh: MeshInstance3D) -> void:
 	parent.add_child(mesh)
 	_materials.append(mesh.material_override as StandardMaterial3D)
+	_flash_meshes.append(mesh)
 
 
 func _build() -> void:
@@ -439,6 +458,7 @@ func _build_model() -> void:
 			node.set_surface_override_material(i, paper)
 		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_materials.append(paper)
+		_flash_meshes.append(node)
 	var skeleton: Skeleton3D = figure.find_children("*", "Skeleton3D", true, false)[0]
 	# Skeleton units per metre (Meshy rigs are in centimetres), allowing for
 	# the scale above. Worked out from the scales, as it is not in the tree yet.

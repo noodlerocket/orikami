@@ -392,6 +392,35 @@ func _run(main: Node) -> void:
 	_check("then he is back at the start, whole, at full health",
 			puppet_rig.visible and ronin.health == ronin.max_health and ronin.global_position.distance_to(ronin.get("_spawn_position")) < 1.0)
 
+	# After the prologue, he climbs out of the well in a cutscene; at its end
+	# he stands on the street, the game camera is back, and he is playable.
+	main.call("_start_in_well")
+	await _frames(5)
+	var climb: WellCutscene = null
+	for child: Node in main.get_children():
+		if child is WellCutscene:
+			climb = child
+	_check("the climb out of the well plays", climb != null and not ronin.is_physics_processing())
+	climb.set("_time", climb.glide_at + climb.glide_time - 0.05)
+	await _frames(20)
+	_check("and ends with him on the street, playable (x %.1f)" % ronin.global_position.x,
+			ronin.is_physics_processing() and main.get_node("Camera").current and absf(ronin.global_position.x - WellCutscene.LAND_X) < 0.5)
+	# Then the tutorial cards: walking ticks off the first one.
+	await _frames(5)
+	var lessons: Array[Node] = main.find_children("*", "Tutorial", true, false)
+	_check("the tutorial starts after the climb", not lessons.is_empty())
+	_check("and starts him one point down, with ink for a heal (%d/%d, %d ink)" % [ronin.health, ronin.max_health, ronin.ink],
+			ronin.health == ronin.max_health - 1 and ronin.ink >= ronin.heal_cost)
+	if not lessons.is_empty():
+		var tutorial: Tutorial = lessons[0]
+		await _frames(40)
+		Input.action_press("move_right")
+		await _frames(70)
+		Input.action_release("move_right")
+		await _frames(120)
+		_check("walking completes its first lesson (now on lesson %d)" % (int(tutorial.get("_step")) + 1), int(tutorial.get("_step")) >= 1)
+		tutorial.queue_free()
+
 	# The pause screen: Esc stops the game, Esc again starts it.
 	var pause := InputEventAction.new()
 	pause.action = &"pause"
@@ -428,6 +457,20 @@ func _run(main: Node) -> void:
 	title_menu.menu.go_back()
 	_check("...to the main list", title_menu.menu.current_page() == &"main")
 	title.queue_free()
+	await _frames(5)
+
+	# The prologue plays and, at its end, hands over to the game.
+	var prologue: Prologue = load("res://scenes/prologue.tscn").instantiate()
+	root.add_child(prologue)
+	var started := prologue.time
+	await _frames(30)
+	_check("the prologue plays (%.2f s in)" % prologue.time, prologue.time > started)
+	var ended := [false]
+	prologue.finished.connect(func() -> void: ended[0] = true)
+	prologue.time = Prologue.LENGTH - 0.01
+	await _frames(5)
+	_check("and ends after %d s, handing over to the game" % int(Prologue.LENGTH), ended[0])
+	prologue.queue_free()
 	await _frames(5)
 
 	print("SMOKE TEST: ", "ALL PASSED" if _failures == 0 else "%d FAILED" % _failures)
