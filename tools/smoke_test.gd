@@ -481,6 +481,21 @@ func _run(main: Node) -> void:
 		await _frames(20)
 		_check("gliding carries him over the bamboo ravine (x %.1f)" % ronin.global_position.x,
 				glided and ronin.global_position.x > BambooGrove.GROUND[1][0] and ronin.global_position.y > 1.0)
+		# ...and over the Rooftop Road's gap above the river (the first Crane
+		# Glide gate), even against the gusts.
+		ronin.position = Vector3(RooftopRoad.GLIDE_GAP.x - 0.3, 6.7, 0.0)
+		ronin.velocity = Vector3.ZERO
+		await _frames(20)
+		Input.action_press("move_right")
+		Input.action_press("jump")
+		for f in 150:
+			await physics_frame
+			if ronin.is_on_floor() and ronin.global_position.x > RooftopRoad.GLIDE_GAP.y - 0.5:
+				break
+		Input.action_release("jump")
+		Input.action_release("move_right")
+		_check("gliding crosses the rooftop gap over the river (x %.1f, y %.1f)" % [ronin.global_position.x, ronin.global_position.y],
+				ronin.global_position.x > RooftopRoad.GLIDE_GAP.y and ronin.global_position.y > 6.0)
 		ronin.has_glide = false
 
 	# Dying: he shreds, the screen fades, he is whole again at the start.
