@@ -18,6 +18,9 @@ extends Camera3D
 ## Lower = gentler. (Before this existed, the view lurched across the
 ## moment he changed direction.)
 @export var look_ahead_ease := 1.6
+## Running, the view leads further, by up to this much more (metres), so he
+## sees what he runs toward. It eases in and out as gently as the turn.
+@export var run_lead := 0.9
 
 ## How much the camera rises and falls with him. 0 = it stays at one height
 ## (street level) however high he jumps or climbs; 1 = it follows him all the
@@ -116,7 +119,12 @@ func _lowest_y_keeping_center(at: Vector3) -> float:
 
 
 func _wanted_lead() -> float:
-	return target.facing * look_ahead if "facing" in target else 0.0
+	if not "facing" in target:
+		return 0.0
+	var running := 0.0
+	if target is CharacterBody3D:
+		running = clampf((target as CharacterBody3D).velocity.x / 7.5, -1.0, 1.0) * run_lead
+	return target.facing * look_ahead + running
 
 
 func _goal() -> Vector3:

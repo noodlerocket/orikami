@@ -125,6 +125,19 @@ signal died
 ## through a crawlspace. Under a low ceiling he stays ducked until he is out.
 @export var crawl_speed := 2.0
 
+@export_group("Forgiveness")
+## Jumping up into the corner of a ledge: if he would have cleared it with
+## his head this far to one side, he is nudged round it.
+@export var corner_nudge := 0.32
+## Coming up just short of a ledge's top (by up to this much), moving
+## toward it, he is lifted onto it.
+@export var ledge_hop := 0.42
+## A sharp turn at a run: he skids for this long (seconds).
+@export var skid_time := 0.2
+## After getting wet (canal water, a sluice), standing still this long he
+## shakes the water off.
+@export var shake_after := 0.35
+
 @export_group("Ladder")
 ## Climbing a ladder (W up, S down), in metres per second.
 @export var climb_speed := 3.2
@@ -244,6 +257,9 @@ var _climbing: Ladder
 ## Counts every time he is put back at a shrine (a fall, a death), so a
 ## shrine can tell being put there from walking up to it.
 var respawns := 0
+var _skid := 0.0
+var _wet := 0.0       # > 0: he is still wet from the water (seconds left)
+var _still := 0.0     # how long he has stood still on dry ground
 
 @onready var _puppet: RoninPuppet = $Puppet
 
@@ -333,6 +349,11 @@ func _physics_process(delta: float) -> void:
 			and not busy and not _iai and _drawing <= 0.0 and _parrying <= 0.0):
 		_start_slash(grounded)
 
+	# A sharp turn at a run: a skid.
+	_skid = maxf(_skid - delta, 0.0)
+	if grounded and move != 0.0 and signf(move) != signf(velocity.x) and absf(velocity.x) > run_speed * 0.75 			and _dash_time <= 0.0 and not _ducking:
+		_skid = skid_time
+		_puppet.play_skid(wading)
 	# --- Work out the velocity ---
 	if _update_ladder(delta, grounded):
 		pass
@@ -388,9 +409,13 @@ func _physics_process(delta: float) -> void:
 
 	push = Vector3.ZERO
 	drift = 0.0
+	var rising := velocity.y
+	var heading := velocity.x
 	move_and_slide()
 	position.z = 0.0  # Gameplay stays on a single plane.
+	_forgive(rising, heading, move)
 	_find_wall()
+	_update_wet(delta)
 
 	_update_slash()
 	if global_position.y < fall_limit_y:
@@ -701,6 +726,54 @@ func _fell_out_of_world() -> void:
 	_drawing = 0.0
 	_dash_time = 0.0
 	fell_in_pit.emit()
+
+
+## Quality of life (Hollow Knight standard): a jump that clips a ledge's
+## corner with his head slips round it; a jump that comes up just short of
+## a ledge's top, moving toward it, is lifted onto it.
+func _forgive(rising: float, heading: float, move: float) -> void:
+	if _climbing or _drawing > 0.0:
+		return
+	if rising > 2.0 and is_on_ceiling():
+		var step := 0.08
+		while step <= corner_nudge + 0.001:
+			for side: float in [-1.0, 1.0]:
+				var nudged := global_transform.translated(Vector3(side * step, 0.0, 0.0))
+				if not test_move(global_transform, Vector3(side * step, 0.0, 0.0)) and not test_move(nudged, Vector3(0.0, 0.2, 0.0)):
+					position.x += side * step
+					velocity.y = rising
+					return
+			step += 0.08
+	if not is_on_floor() and move != 0.0 and is_on_wall() and signf(heading) == move and velocity.y > -9.0:
+		for i in get_slide_collision_count():
+			var wall := get_slide_collision(i).get_collider() as Node
+			if wall and wall.has_meta(&"climbable"):
+				return  # (that is for clinging to)
+		var lift := 0.1
+		while lift <= ledge_hop + 0.001:
+			var raised := global_transform.translated(Vector3(0.0, lift, 0.0))
+			if not test_move(global_transform, Vector3(0.0, lift, 0.0)) and not test_move(raised, Vector3(move * 0.2, 0.0, 0.0)):
+				position.y += lift
+				position.x += move * 0.08
+				velocity.y = maxf(velocity.y, 0.0)
+				return
+			lift += 0.08
+
+
+## Wet from the water: once he stands still on dry ground he shakes it off.
+func _update_wet(delta: float) -> void:
+	if wading:
+		_wet = 6.0
+	_wet = maxf(_wet - delta, 0.0)
+	if _wet > 0.0 and not wading and is_on_floor() and absf(velocity.x) < 0.3 and not _ducking and _slash_time <= 0.0:
+		_still += delta
+		if _still >= shake_after:
+			_wet = 0.0
+			_still = 0.0
+			_puppet.play_shake()
+			Sound.play(self, &"shake_off")
+	else:
+		_still = 0.0
 
 
 ## Ladders: W at the foot of one (or S at its top) and he takes hold; W/S

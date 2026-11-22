@@ -55,6 +55,10 @@ const SOUNDS := {
 	&"bird_shriek": {"files": ["bird_shriek.mp3"], "volume": -11.0, "vary": 0.1},
 	&"fire_whoosh": {"files": ["fire_whoosh.mp3"], "volume": -8.0, "vary": 0.08},
 	&"fire_burst": {"files": ["fire_burst.mp3"], "volume": -8.0, "vary": 0.08},
+	# Moving: a skid, shaking off water; cranes found.
+	&"skid": {"files": ["skid.mp3"], "volume": -10.0, "vary": 0.1},
+	&"shake_off": {"files": ["shake_off.mp3"], "volume": -8.0, "vary": 0.06},
+	&"cranes_rise": {"files": ["cranes_rise.mp3"], "volume": -6.0, "vary": 0.03},
 }
 
 ## The rain, wind and village music loops (off for the prologue, which has

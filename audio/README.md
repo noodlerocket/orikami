@@ -111,5 +111,9 @@ energy below 300 Hz (a pop).
 | `river_flow.ogg` | the river (looped, three places along it) | River flowing steadily past stone banks in the rain, gentle continuous water ambience |
 | `sluice_pour.ogg` | each sluice (looped) | Pouring water: a steady stream of water falling from a grate onto stone and splashing, continuous |
 
+| `skid.mp3` | a sharp turn at a run | Skidding sandals scraping to a sudden stop on wet stone paving, a short gritty slide. *(High-pass at 150 Hz; starts quietly.)* |
+| `shake_off.mp3` | shaking the water off after the canals | Shaking water off a wet paper cloak and straw hat, a quick rustle and a spray of droplets |
+| `cranes_rise.mp3` | a bundle of paper cranes found | Fluttering of many small paper cranes taking flight, soft paper wings rustling upward with a faint airy shimmer, gentle and magical. *(Quiet: raised 5.4x; starts from silence.)* |
+
 Measuring tip: decode each channel separately (or `-ac 1` overstates the
 peak of a stereo file: ffmpeg's down-mix sums the channels).

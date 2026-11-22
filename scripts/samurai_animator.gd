@@ -624,3 +624,16 @@ static func climb(phase: float) -> Dictionary:
 		"reach_l": Vector3(0.16, 0.38 + 0.2 * maxf(-a, 0.0), 0.3), "aim_l": 1.0,
 		"reach_r": Vector3(-0.16, 0.38 + 0.2 * maxf(a, 0.0), 0.3), "aim_r": 1.0,
 	})
+
+
+
+## A skid on a sharp turn: dropped low, the front foot braced out ahead in
+## the new direction, the back foot sliding, body leaning into the turn.
+static func skid() -> Dictionary:
+	return stance({
+		"hips": Vector3(0.0, -0.22, -0.08), "hips_rot": Vector3(14.0, 10.0, 0.0),
+		"spine": Vector3(12.0, -8.0, 0.0), "head": Vector3(-8.0, 0.0, 0.0),
+		"foot_l": Vector3(0.14, 0.0, 0.42), "toe_l": -14.0,
+		"foot_r": Vector3(-0.15, 0.03, -0.36), "toe_r": 40.0,
+		"hand_r": HILT,
+	})

@@ -177,6 +177,8 @@ var _run_phase := 0.0             # 0 to 1 through the current stride
 var _cut_clock := -1.0            # seconds into the current cut, or -1
 var _sheathed := false            # true once the sword is back in during this cut
 var _land_clock := -1.0           # seconds since he touched down, or -1
+var _skid_clock := -1.0           # seconds into a skid, or -1
+var _shake_clock := -1.0          # seconds into shaking the water off, or -1
 var _was_airborne := false
 var _run_blend := 0.0             # 0 = standing, 1 = fully into his run
 var _cloth: ShaderMaterial        # the model's paper, which blows in the wind
@@ -232,6 +234,14 @@ func _process(delta: float) -> void:
 	if _climb_turn > 0.0:
 		_rig.rotation.y = lerp_angle(_rig.rotation.y, PI * 0.5, smoothstep(0.0, 1.0, _climb_turn))
 	_clock += delta
+	if _shake_clock >= 0.0:
+		_shake_clock += delta
+		var left := maxf(0.0, 1.0 - _shake_clock / 0.55)
+		_rig.rotation.y += sin(_shake_clock * 52.0) * 0.16 * left
+		_rig.rotation.z = sin(_shake_clock * 41.0) * 0.05 * left
+		if _shake_clock > 0.55:
+			_shake_clock = -1.0
+			_rig.rotation.z = 0.0
 	if _slash_clock >= 0.0:
 		_slash_clock += delta
 		if _slash_clock > slash_show_time:
@@ -295,6 +305,60 @@ func play_slash(direction: Vector2) -> void:
 	_cut_clock = 0.0
 	_sheathed = false
 	_pose()
+
+
+## Called by ronin.gd on a sharp turn at a run: he skids, kicking up grit
+## (or water, when he is wading).
+func play_skid(wet: bool) -> void:
+	_skid_clock = 0.0
+	_frame_clock = 1.0
+	Sound.play(self, &"wade" if wet else &"skid", -6.0)
+	var dust := CPUParticles3D.new()
+	dust.emitting = false
+	dust.one_shot = true
+	dust.explosiveness = 0.8
+	dust.amount = 14
+	dust.lifetime = 0.5
+	dust.direction = Vector3(-facing, 1.0, 0.0)
+	dust.spread = 30.0
+	dust.gravity = Vector3(0.0, -8.0, 0.0)
+	dust.initial_velocity_min = 1.0
+	dust.initial_velocity_max = 2.4
+	var grit := QuadMesh.new()
+	grit.size = Vector2(0.05, 0.05)
+	grit.material = WaterFx.bead_material(Color(0.7, 0.78, 0.95, 0.7) if wet else Color(0.42, 0.44, 0.55, 0.7))
+	dust.mesh = grit
+	get_parent().get_parent().add_child(dust)
+	dust.global_position = global_position + Vector3(0.0, 0.05, 0.1)
+	dust.emitting = true
+	dust.finished.connect(dust.queue_free)
+
+
+## Called by ronin.gd when he shakes the water off: a quick shiver through
+## his paper, drops flung from his hat and cloak.
+func play_shake() -> void:
+	_shake_clock = 0.0
+	var drops := CPUParticles3D.new()
+	drops.emitting = false
+	drops.one_shot = true
+	drops.explosiveness = 0.6
+	drops.amount = 26
+	drops.lifetime = 0.7
+	drops.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	drops.emission_box_extents = Vector3(0.35, 0.6, 0.2)
+	drops.direction = Vector3(0.0, 0.6, 0.0)
+	drops.spread = 90.0
+	drops.gravity = Vector3(0.0, -10.0, 0.0)
+	drops.initial_velocity_min = 1.2
+	drops.initial_velocity_max = 2.8
+	var bead := QuadMesh.new()
+	bead.size = Vector2(0.04, 0.04)
+	bead.material = WaterFx.bead_material(Color(0.75, 0.82, 0.98, 0.75))
+	drops.mesh = bead
+	get_parent().get_parent().add_child(drops)
+	drops.global_position = global_position + Vector3(0.0, 1.0, 0.0)
+	drops.emitting = true
+	drops.finished.connect(drops.queue_free)
 
 
 ## Called by ronin.gd when he springs off a wall.
@@ -659,6 +723,14 @@ func _pose_model() -> void:
 				if state == &"run" and (_run_phase < before or (before < 0.5 and _run_phase >= 0.5)):
 					Sound.play(self, &"step")
 				pose = SamuraiAnimator.mix(pose, SamuraiAnimator.run(_run_phase), smoothstep(0.0, 1.0, _run_blend))
+
+	# A skid: braced low against the slide, leaning into the new way.
+	if _skid_clock >= 0.0:
+		_skid_clock += _step
+		if _skid_clock > 0.25 or airborne:
+			_skid_clock = -1.0
+		else:
+			pose = SamuraiAnimator.mix(SamuraiAnimator.skid(), pose, smoothstep(0.12, 0.25, _skid_clock))
 
 	# Just touched down: crouch, then rise into whatever he is doing.
 	if _land_clock >= 0.0:

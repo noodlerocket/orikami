@@ -401,6 +401,17 @@ func _apply_debug_start() -> void:
 			(func() -> void:
 				await get_tree().create_timer(0.5).timeout
 				_pause.open()).call_deferred()
+		elif arg == "--map":
+			# The pause screen's map, with the whole village explored and two
+			# shrines rested at (to see what a full map looks like).
+			for layer: String in ["under", "street", "roofs"]:
+				for cell in range(-5, 50):
+					SaveGame.explored["%s:%d" % [layer, cell]] = true
+			SaveGame.rested.assign(["paper_maker", "warehouse"])
+			(func() -> void:
+				await get_tree().create_timer(0.5).timeout
+				_pause.open()
+				_pause.menu.open_page(&"map")).call_deferred()
 		elif arg.begins_with("--hold="):
 			Input.action_press(arg.trim_prefix("--hold="))
 

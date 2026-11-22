@@ -696,6 +696,13 @@ func _expanded_village(main: Node, ronin: Ronin) -> void:
 	await _frames(30)
 	_check("then he climbs it from the street up onto the deck (y %.1f)" % ronin.global_position.y,
 			climbed and ronin.global_position.y > steps_up.top - 0.3 and ronin.is_on_floor())
+	# Jumping up into the corner of a gallery's floor, his head slips round it.
+	var gallery: Array = MarketStreet.GALLERIES[0]
+	ronin.position = Vector3(gallery[0] - 0.2, 0.05, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(10)
+	var corner_jump := await _jump_height(ronin, 40)
+	_check("a jump that clips a corner slips round it (%.2f m up)" % corner_jump, corner_jump > 2.0)
 	await _new_enemies(village, ronin)
 	await _cranes_and_saving(main, village, ronin)
 	# Three shrines to rest at.
