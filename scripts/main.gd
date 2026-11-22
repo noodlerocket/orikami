@@ -77,6 +77,7 @@ func _process(delta: float) -> void:
 	_set_camera_limits()
 	# Day in the grove, night in the town; no rain in the grove.
 	var grove := BambooGrove.in_grove(_ronin.global_position.x)
+	village.bamboo.set_awake(grove)
 	if grove != village.daylight:
 		village.set_daylight(grove)
 		($Rain as Rain).ease_off(0.0 if grove else 1.0, 0.05)

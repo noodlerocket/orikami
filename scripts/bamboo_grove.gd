@@ -94,6 +94,10 @@ var _petals: CPUParticles3D
 var duel: AkaneDuel
 ## Where each stem stands (local x, foot height), for the automated check.
 var stem_feet: Array[Vector2] = []
+## The grown grove's areas and creatures: they rest (no processing) while he
+## is in the town, where none of it can be seen or heard (set_awake).
+var _far: Array[Node] = []
+var _awake := true
 var _town_gate: Node3D   # the gate in the courtyard (in the town's place)
 
 
@@ -124,14 +128,17 @@ func _ready() -> void:
 	for area: Node3D in [WindfallGorge.new(), CanopyRoad.new(), PaperMill.new(), BambooFalls.new()]:
 		area.set(&"grove", self)
 		add_child(area)
+		_far.append(area)
 	for spot: Vector2 in PANDAS:
 		var panda := RedPanda.new()
 		panda.position = Vector3(spot.x, spot.y, 0.0)
 		add_child(panda)
+		_far.append(panda)
 	for spot: Vector2 in KITES:
 		var kite := KiteHusk.new()
 		kite.position = Vector3(spot.x, spot.y, 0.0)
 		add_child(kite)
+		_far.append(kite)
 	# Akane's clearing, at the end (akane_duel.gd).
 	duel = AkaneDuel.new()
 	duel.grove = self
@@ -146,6 +153,17 @@ func _ready() -> void:
 	# Behind the gate at the west end (he is taken back to the town as he
 	# walks through it): nothing to walk into.
 	_solid(Vector3(GATE_X - 2.6, 10.0, 0.0), Vector3(1.0, 40.0, 4.0)).set_meta(&"no_climb", true)
+
+
+## Wakes the grown grove's areas and creatures (he is in the grove) or lets
+## them rest (he is in the town).
+func set_awake(on: bool) -> void:
+	if on == _awake:
+		return
+	_awake = on
+	for n: Node in _far:
+		if is_instance_valid(n):
+			n.process_mode = Node.PROCESS_MODE_INHERIT if on else Node.PROCESS_MODE_DISABLED
 
 
 ## A solid in the grove (its x shifted to where the grove really is).
