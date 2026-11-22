@@ -282,83 +282,152 @@ func _far_end(left: float, right: float, top: float) -> void:
 	village._hang_lantern(Vector3(right - 0.85, top + 1.92, -0.9), 0.2, 0.7, false)
 
 
-## The burnt-out house over the Fallen Street: blackened posts and beams,
-## the roof's skeleton with a few tiles hanging on, scorched plaster, and
-## what is left of its floors: a top floor at the left, a middle floor at
-## the right, a low floor just over the hole. You drop down through it.
+## The burnt-out house over the Fallen Street: what is left of a two-storey
+## house after a fire, every piece still holding on to something (Julian: the
+## first version's pieces hung apart in the air). Charred posts stand on the
+## canal boardwalk below; beams run between them along the back wall at each
+## floor; each floor's boards lie on joists running out from those beams,
+## their front ends burnt off (the front of the house has fallen); scorched
+## plaster still fills parts of the back wall's bays, on its laths, torn where
+## it burned; one rafter still climbs to the ridge with a few tiles on it, the
+## other is burnt short; a fallen beam lies from the middle floor up against a
+## post. He drops down through it, floor to floor.
 func _ruin() -> void:
 	var left := RUIN.x
 	var right := RUIN.y
 	var char_wood := Color(0.06, 0.05, 0.06)
+	var burnt := Color(0.1, 0.08, 0.08)
+	var back := -1.2
 	# Floors he can stand on: [left, right, height].
 	var floors := [[left, left + 2.9, 8.6], [right - 4.0, right, 4.6], [left, left + 2.4, 0.9]]
+	# The posts along the back wall: [x, top].
+	var posts := [[left + 0.1, 9.4], [left + 2.95, 8.75], [right - 4.05, 5.7], [right - 0.1, 9.4]]
 	var b := PaperMesh.new(_rng.randi())
 	b.shade_jitter = 0.25
+	b.color = char_wood
+	for post: Array in posts:
+		var px: float = post[0]
+		var top: float = post[1]
+		var stand := _foot(px)  # (on the canal walkway under it)
+		b.box(Vector3(px, (stand + top) * 0.5, back), Vector3(0.2, top - stand, 0.2))
+		# A burnt, splintered top where it stops short of the roof.
+		if top < 9.3:
+			b.extrude(PackedVector2Array([Vector2(px - 0.1, top), Vector2(px + 0.1, top), Vector2(px + 0.03, top + 0.28),
+					Vector2(px - 0.04, top + 0.12)]), back - 0.1, back + 0.1)
+	# Two stubs of the fallen front: posts burnt off low.
+	for stub: Array in [[left + 0.1, 1.9], [right - 0.1, 3.0]]:
+		var px: float = stub[0]
+		var top: float = stub[1]
+		var stand := _foot(px)
+		b.box(Vector3(px, (stand + top) * 0.5, 1.05), Vector3(0.18, top - stand, 0.18))
+		b.extrude(PackedVector2Array([Vector2(px - 0.09, top), Vector2(px + 0.09, top), Vector2(px, top + 0.3)]), 0.96, 1.14)
+	# Beams along the back wall, post to post: at each floor, and a rail
+	# half-way up each storey, and the top plate under the roof.
+	var beams := [
+		[left + 0.1, left + 2.95, 0.9], [left + 0.1, left + 2.95, 4.6], [left + 0.1, left + 2.95, 8.6],
+		[right - 4.05, right - 0.1, 0.9], [right - 4.05, right - 0.1, 4.6],
+		[left + 0.1, left + 2.95, 2.75], [right - 4.05, right - 0.1, 2.75],
+		[left + 0.1, left + 2.95, 6.6], [left - 0.3, left + 3.4, 9.4], [right - 2.2, right + 0.3, 9.4],
+	]
+	for beam: Array in beams:
+		b.box(Vector3((beam[0] + beam[1]) * 0.5, beam[2] - 0.08, back), Vector3(beam[1] - beam[0] + 0.1, 0.16, 0.18))
+	# Each floor's joists, from the back beam out under the boards, burnt off
+	# at the front.
+	for f: Array in floors:
+		var x: float = f[0] + 0.12
+		while x < f[1] - 0.05:
+			var reach := _rng.randf_range(1.6, 2.15)
+			b.box(Vector3(x, f[2] - 0.2, back + reach * 0.5), Vector3(0.12, 0.14, reach))
+			b.color = burnt
+			b.box(Vector3(x, f[2] - 0.2, back + reach + 0.06), Vector3(0.1, 0.1, 0.12))
+			b.color = char_wood
+			x += 0.62
+	# The boards on them, their front ends uneven and charred.
 	for f: Array in floors:
 		village._add_solid(Vector3((f[0] + f[1]) * 0.5, f[2] - 0.12, 0.0), Vector3(f[1] - f[0], 0.24, 2.2))
 		var x: float = f[0]
 		while x < f[1] - 0.01:
 			var x1 := minf(x + _rng.randf_range(0.22, 0.34), f[1])
+			var front := 1.0 - _rng.randf_range(0.0, 0.45)
 			b.color = Scenery.WOOD.darkened(_rng.randf_range(0.35, 0.6))
-			b.box(Vector3((x + x1) * 0.5, f[2] - 0.06, 0.0), Vector3(x1 - x - 0.02, 0.1, 2.2 - _rng.randf_range(0.0, 0.4)))
+			b.box(Vector3((x + x1) * 0.5, f[2] - 0.06, (back + front) * 0.5), Vector3(x1 - x - 0.02, 0.1, front - back))
+			b.color = burnt
+			b.box(Vector3((x + x1) * 0.5, f[2] - 0.06, front + 0.03), Vector3(x1 - x - 0.02, 0.09, 0.07))
 			x = x1
-		# Its broken edge: charred board ends sticking out.
-		var edge: float = f[1] if f[0] == left else f[0]
-		var out := 1.0 if f[0] == left else -1.0
 		b.color = char_wood
-		for k in 3:
-			var z := _rng.randf_range(-0.8, 0.8)
-			b.box(Vector3(edge + out * _rng.randf_range(0.1, 0.35), f[2] - 0.06 - _rng.randf_range(0.0, 0.1), z), Vector3(0.4, 0.08, 0.22))
-		b.color = char_wood
-		b.box(Vector3((f[0] + f[1]) * 0.5, f[2] - 0.24, 1.05), Vector3(f[1] - f[0], 0.18, 0.15))
-	# Corner posts, charred, from the canal floor to the roof, at front and back.
-	b.color = char_wood
-	for px: float in [left + 0.1, right - 0.1, (left + right) * 0.5]:
-		for pz: float in [-1.2]:  # (the front of the house has fallen)
-			var top := 9.4 if px != (left + right) * 0.5 else 6.2  # the middle one has burnt through
-			var stand := _foot(px)  # (on the canal walkway under it, not through it)
-			b.box(Vector3(px, (stand + top) * 0.5, pz), Vector3(0.18, top - stand, 0.18))
-	# The roof's skeleton: rafters from the walls up to a ridge, a few tiles.
-	var ridge := Vector2((left + right) * 0.5 - 1.2, 11.0)
-	for k in 6:
-		var rx := lerpf(left - 0.3, right + 0.3, k / 5.0)
-		if k == 3:
-			continue  # fallen in
-		b.extrude(PackedVector2Array([Vector2(rx - 0.06, 9.4), Vector2(rx + 0.06, 9.4), Vector2(ridge.x + 0.05, ridge.y), Vector2(ridge.x - 0.05, ridge.y)]), -1.3, -1.1)
-	b.box(Vector3((left + ridge.x) * 0.5, 9.45, -1.2), Vector3(ridge.x - left + 0.4, 0.14, 0.16))
+	# Laths across the burnt-open bays, top beam to bottom beam.
+	for bay: Array in [[left + 0.1, left + 2.95, 4.6, 8.6], [right - 4.05, right - 0.1, 0.9, 4.6], [left + 0.1, left + 2.95, 0.9, 4.6]]:
+		var lx: float = bay[0] + 0.45
+		while lx < bay[1] - 0.3:
+			b.box(Vector3(lx, (bay[2] + bay[3]) * 0.5, back - 0.06), Vector3(0.05, bay[3] - bay[2] - 0.16, 0.04))
+			lx += _rng.randf_range(0.55, 0.8)
+	# The roof: the left rafter whole, from the top plate to the ridge; the
+	# right one burnt short; a stub of ridge.
+	var ridge := Vector2((left + right) * 0.5 - 0.6, 11.0)
+	b.extrude(PackedVector2Array([Vector2(left - 0.25, 9.3), Vector2(left - 0.1, 9.42), Vector2(ridge.x + 0.06, ridge.y + 0.06),
+			Vector2(ridge.x - 0.06, ridge.y - 0.1)]), back - 0.1, back + 0.1)
+	var stub_end := Vector2(right - 2.2, lerpf(9.4, ridge.y, 2.0 / (right + 0.25 - ridge.x)))
+	b.extrude(PackedVector2Array([Vector2(right + 0.25, 9.3), Vector2(right + 0.1, 9.42), stub_end + Vector2(0.0, 0.1), stub_end + Vector2(0.05, -0.06)]),
+			back - 0.1, back + 0.1)
+	b.box(Vector3(ridge.x, ridge.y + 0.02, back + 0.2), Vector3(0.18, 0.18, 0.8))
+	# A few tiles still on the left rafter, lying along its slope.
 	b.color = Scenery.ROOF.darkened(0.2)
-	for k in 7:
-		var t := _rng.randf_range(0.1, 0.6)
-		var at := Vector2(lerpf(left, ridge.x, t), lerpf(9.4, ridge.y, t))
-		b.extrude(PackedVector2Array([at + Vector2(-0.22, -0.02), at + Vector2(0.22, 0.1), at + Vector2(0.2, 0.2), at + Vector2(-0.24, 0.08)]),
-				-1.6 + _rng.randf_range(0.0, 0.6), -0.9 + _rng.randf_range(0.0, 0.6))
-	# What is left of the back wall's frame: charred rails between the posts,
-	# a few laths, for the scorched plaster to cling to.
+	for k in 6:
+		var t := 0.15 + k * 0.13 + _rng.randf_range(-0.03, 0.03)
+		var at := Vector2(lerpf(left - 0.1, ridge.x, t), lerpf(9.42, ridge.y, t))
+		var slope := Vector2(ridge.x - left, ridge.y - 9.42).normalized()
+		var up := slope.orthogonal() * -1.0
+		if up.y < 0.0:
+			up = -up
+		b.extrude(PackedVector2Array([at - slope * 0.22, at + slope * 0.22, at + slope * 0.22 + up * 0.07, at - slope * 0.22 + up * 0.07]),
+				back - 0.05 - _rng.randf_range(0.0, 0.4), back + 0.35 + _rng.randf_range(0.0, 0.3))
+	# The fallen beam: its foot on the middle floor, its head against the
+	# post that held the top floor.
 	b.color = char_wood
-	for rail: Array in [[left + 0.1, (left + right) * 0.5, 5.2], [left + 0.1, (left + right) * 0.5, 7.9],
-			[(left + right) * 0.5, right - 0.1, 1.7], [(left + right) * 0.5, right - 0.1, 4.3]]:
-		b.box(Vector3((rail[0] + rail[1]) * 0.5, rail[2], -1.3), Vector3(rail[1] - rail[0], 0.14, 0.1))
-	for lath: float in [left + 1.0, left + 2.1, right - 2.4, right - 1.2]:
-		var low := 5.2 if lath < (left + right) * 0.5 else 1.7
-		b.box(Vector3(lath, low + 1.3, -1.32), Vector3(0.06, 2.6, 0.05))
-	# Scorched plaster still on the back wall, torn, black at the edges.
-	b.color = Color(0.32, 0.3, 0.3)
-	b.torn_sheet(PaperMesh.tear(PackedVector2Array([Vector2(left + 0.3, 7.6), Vector2(left + 2.6, 8.1), Vector2(left + 3.3, 6.0),
-			Vector2(left + 2.0, 5.1), Vector2(left + 0.4, 5.6)]), 0.3, 0.12, _rng), -1.25, Color(0.08, 0.07, 0.08), 0.06)
-	b.torn_sheet(PaperMesh.tear(PackedVector2Array([Vector2(right - 3.2, 3.9), Vector2(right - 0.3, 4.2), Vector2(right - 0.4, 1.6),
-			Vector2(right - 2.6, 2.2)]), 0.3, 0.12, _rng), -1.25, Color(0.08, 0.07, 0.08), 0.06)
-	# A fallen beam leaning across, inside.
-	b.color = char_wood
-	b.extrude(PackedVector2Array([Vector2(left + 3.1, 4.8), Vector2(left + 3.3, 4.7), Vector2(right - 1.0, 8.7), Vector2(right - 1.2, 8.8)]), -0.95, -0.75)
+	var foot := Vector2(right - 2.6, 4.6)
+	var head := Vector2(left + 3.07, 7.2)
+	var along := (head - foot).normalized()
+	var side := along.orthogonal() * 0.09
+	b.extrude(PackedVector2Array([foot - side, foot + side, head + side, head - side]), back + 0.1, back + 0.28)
 	add_child(b.build())
-	# A torn shoji panel still standing on the top floor, faintly lit from a
-	# lantern someone left up here.
+	# Scorched plaster still on the wall: each piece fills part of a bay,
+	# held along the bay's frame (posts and beams) and torn where it burned.
+	var plaster := PaperMesh.new(_rng.randi())
+	plaster.shade_jitter = 0.08
+	plaster.color = Color(0.32, 0.3, 0.3)
+	var patches := [
+		# [bay left, bay right, bay bottom, bay top, which corner it clings to]
+		[left + 0.2, left + 2.85, 4.68, 6.52, "low_left"],
+		[right - 3.95, right - 0.2, 0.98, 2.67, "low_right"],
+		[right - 3.95, right - 0.2, 2.83, 4.52, "high_right"],
+	]
+	for patch: Array in patches:
+		var l: float = patch[0]
+		var r: float = patch[1]
+		var lo: float = patch[2]
+		var hi: float = patch[3]
+		var outline := PackedVector2Array()
+		match patch[4]:
+			"low_left":
+				outline = PackedVector2Array([Vector2(l, lo), Vector2(r, lo), Vector2(r, lo + 0.5), Vector2(l + 1.6, lo + 0.9),
+						Vector2(l + 0.7, hi - 0.2), Vector2(l, hi)])
+			"low_right":
+				outline = PackedVector2Array([Vector2(l, lo), Vector2(r, lo), Vector2(r, hi), Vector2(r - 1.2, hi),
+						Vector2(r - 2.0, lo + 0.9), Vector2(l + 0.6, lo + 0.6), Vector2(l, lo + 0.5)])
+			_:
+				outline = PackedVector2Array([Vector2(r - 1.6, lo), Vector2(r, lo), Vector2(r, hi), Vector2(r - 2.4, hi),
+						Vector2(r - 1.9, hi - 0.6)])
+		# (Torn only along its free edges: the edges on the frame stay straight.)
+		plaster.torn_sheet(PaperMesh.tear(outline, 0.18, 0.06, _rng), back - 0.1, Color(0.08, 0.07, 0.08), 0.05)
+	add_child(plaster.build())
+	# A torn shoji panel still standing on the top floor against the back
+	# wall, faintly lit by a lantern someone left hung from the rafter.
 	var shoji := PaperMesh.new(_rng.randi())
 	shoji.color = PaperMesh.WASHI.darkened(0.35)
-	shoji.torn_sheet(PaperMesh.tear(PackedVector2Array([Vector2(left + 0.5, 8.6), Vector2(left + 1.6, 8.6), Vector2(left + 1.6, 9.9),
-			Vector2(left + 1.1, 10.2), Vector2(left + 0.5, 9.7)]), 0.2, 0.06, _rng), -0.95, Color(0.12, 0.1, 0.1), 0.04)
+	shoji.torn_sheet(PaperMesh.tear(PackedVector2Array([Vector2(left + 0.5, 8.6), Vector2(left + 1.6, 8.6), Vector2(left + 1.6, 9.35),
+			Vector2(left + 1.1, 9.38), Vector2(left + 0.5, 9.3)]), 0.2, 0.06, _rng), back + 0.2, Color(0.12, 0.1, 0.1), 0.04)
 	add_child(shoji.build(Color(1.0, 0.85, 0.7), 0.4))
-	village._hang_lantern(Vector3(left + 2.2, 10.2, -0.5), 0.3, 0.55, false)
+	village._hang_lantern(Vector3(left + 2.2, lerpf(9.42, ridge.y, (left + 2.2 - left + 0.1) / (ridge.x - left + 0.1)) - 0.05, back + 0.05), 0.3, 0.55, false)
 
 
 func _process(delta: float) -> void:

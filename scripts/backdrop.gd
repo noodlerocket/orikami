@@ -63,6 +63,29 @@ func _process(delta: float) -> void:
 
 # --- Sky ---------------------------------------------------------------------------
 
+## A soft round glow in the backdrop (the moon's, the castle's, far lamps):
+## a disc of vertex colour, brightest in the middle and fading to nothing at
+## its rim, added onto what is behind. No texture, no square, no depth
+## reading: unlike Scenery.halo (a textured square with proximity fade), it
+## cannot flash up as a pale rectangle (Julian saw the moon's do that).
+func _soft_disc(at: Vector3, radius: float, tint: Color) -> void:
+	var b := PaperMesh.new(1)
+	var steps := 40
+	var inner := Color(tint.r, tint.g, tint.b, tint.a)
+	var middle := Color(tint.r, tint.g, tint.b, tint.a * 0.45)
+	var outer := Color(tint.r, tint.g, tint.b, 0.0)
+	for i in steps:
+		var a0 := TAU * i / steps
+		var a1 := TAU * (i + 1) / steps
+		var d0 := Vector3(cos(a0), sin(a0), 0.0)
+		var d1 := Vector3(cos(a1), sin(a1), 0.0)
+		b.fade_quad(at + d0 * radius * 0.02, at + d1 * radius * 0.02, at + d1 * radius * 0.4, at + d0 * radius * 0.4, inner, middle)
+		b.fade_quad(at + d0 * radius * 0.4, at + d1 * radius * 0.4, at + d1 * radius, at + d0 * radius, middle, outer)
+	var disc := b.build_veil(true)
+	disc.cast_shadow = OFF
+	add_child(disc)
+
+
 func _build_sky() -> void:
 	# The night itself: darkest overhead, paler toward the horizon.
 	var sky := _sheet()
@@ -77,9 +100,7 @@ func _build_sky() -> void:
 	# The moon: a wide soft glow, a tighter one, a torn pale rim, and the disc
 	# itself, crumpled into many small folds.
 	for glow: Array in [[17.0, 0.13], [8.5, 0.3]]:
-		var halo := Scenery.halo(glow[0], Color(0.62, 0.7, 1.0, glow[1]))
-		halo.position = MOON_AT + Vector3(0.0, 0.0, -0.6)
-		add_child(halo)
+		_soft_disc(MOON_AT + Vector3(0.0, 0.0, -0.6), glow[0], Color(0.62, 0.7, 1.0, glow[1]))
 	var moon := PaperMesh.new(_rng.randi())
 	moon.texture_scale = 0.12
 	moon.shade_jitter = 0.0
@@ -193,9 +214,7 @@ func _build_mountains() -> void:
 		var t := i / 6.0
 		var spot := Vector2(lerpf(24.0, 37.0, t), _height_at(mound_line, lerpf(24.0, 37.0, t)) - 0.5 - 0.5 * sin(t * 9.0))
 		path.ellipse(spot, Vector2(0.14, 0.2), 6, -35.6)
-		var shine := Scenery.halo(0.9, Color(1.0, 0.62, 0.3, 0.36))
-		shine.position = Vector3(spot.x, spot.y, -35.55)
-		add_child(shine)
+		_soft_disc(Vector3(spot.x, spot.y, -35.55), 0.9, Color(1.0, 0.62, 0.3, 0.36))
 	_glow(path, 1.5)
 	_mist(-34.0, 6.2, 0.6)
 
@@ -360,9 +379,7 @@ func _build_castle(at: Vector3, size: float) -> void:
 	windows.position = at
 	windows.scale = Vector3.ONE * size
 	# A soft glow behind it, so the castle stands out from the hills.
-	var aura := Scenery.halo(11.0 * size, Color(0.55, 0.63, 1.0, 0.18))
-	aura.position = at + Vector3(0.0, 9.0 * size, -0.4)
-	add_child(aura)
+	_soft_disc(at + Vector3(0.0, 9.0 * size, -0.4), 11.0 * size, Color(0.55, 0.63, 1.0, 0.18))
 
 
 ## A torii on a hilltop, with a rope across it and torn paper hanging from the rope.
@@ -458,9 +475,7 @@ func _build_far_village() -> void:
 	var lamp := _sheet()
 	lamp.ellipse(Vector2(10.0, 4.35), Vector2(0.22, 0.3), 8, -10.95)
 	_glow(lamp, 1.5)
-	var shine := Scenery.halo(1.6, Color(1.0, 0.6, 0.3, 0.4))
-	shine.position = Vector3(10.0, 4.35, -10.9)
-	add_child(shine)
+	_soft_disc(Vector3(10.0, 4.35, -10.9), 1.6, Color(1.0, 0.6, 0.3, 0.4))
 	_mist(-9.6, 3.2, 0.45)
 
 	# A middle row of houses close behind the street. Their roofs peek over
@@ -510,9 +525,7 @@ func _far_house(b: PaperMesh, lights: PaperMesh, at: Vector2, width: float, heig
 				height * 0.44 + (height * 0.56 - 0.3) * 0.5)
 		if w == lit:
 			lights.rect(spot, pane, z + 0.04)
-			var shine := Scenery.halo(1.5, Color(1.0, 0.6, 0.3, 0.3))
-			shine.position = Vector3(spot.x, spot.y, z + 0.12)
-			add_child(shine)
+			_soft_disc(Vector3(spot.x, spot.y, z + 0.12), 1.5, Color(1.0, 0.6, 0.3, 0.3))
 		else:
 			b.color = Color(0.08, 0.095, 0.21) * tone
 			b.rect(spot, pane, z + 0.04)

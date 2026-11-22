@@ -10,6 +10,11 @@ const LINES := [
 	["title_hannya_kanji", "般若", 220],
 	["title_hannya_name", "The Weeping Hannya", 84],
 	["title_hannya_subtitle", "she who wept until her face became a mask", 40],
+	["title_akane_kanji", "朱狐", 220],
+	["title_akane_name", "Akane, the Vermilion Fox", 84],
+	["title_akane_subtitle", "folded from the Emperor's own sleeve", 40],
+	["akane_warning", "You do not know what you are.", 56],
+	["akane_parting", "Not yet. Learn what you are, little blank one.", 52],
 ]
 
 

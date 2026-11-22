@@ -3,15 +3,15 @@ extends Node
 ## After the Weeping Hannya falls (docs/lore.md, "After her": proposed, not
 ## yet approved by Julian). About 16 seconds, 2.5D shots only (the camera
 ## stays in front of the diorama: pushes, pans, a crane up):
-##  - close on her: a crack is drawn across her mask; the mask falls away and
-##    breaks into paper on the stones; under it Shizu's own face, washed
-##    blank: she is at peace;
+##  - close on her: a crack is drawn across her mask; black ink runs out of
+##    it in drips, and the mask she wears is washed blank white (Shizu, at
+##    peace). (A copy of the mask used to fall off her, which looked like her
+##    head falling, and a flat oval stood in for her face: Julian chose this
+##    instead.)
 ##  - she comes apart into pale paper scraps that rise into the rain;
 ##  - the courtyard's lanterns light again, one by one;
 ##  - the Rain eases for a breath, and the far gate swings open on the road
 ##    to the bamboo, light beyond it;
-##  - on the shoji, the last shadow: a small figure climbing out of a well
-##    (the first hint of what he is), which fades;
 ##  - the camera glides back to the game. Hold Space to skip.
 ## Her intro cutscene (hannya_cutscene.gd) is not touched.
 
@@ -36,9 +36,7 @@ var _crack: MeshInstance3D
 var _crack_mesh: ImmediateMesh
 var _crack_points := PackedVector3Array()
 var _crack_grow := 0.0
-var _mask: Node3D
-var _face: MeshInstance3D
-var _hint: MeshInstance3D
+var _wash: ShaderMaterial
 var _head := Vector3.ZERO
 var _her := Vector3.ZERO
 var _done := false
@@ -60,11 +58,10 @@ func _ready() -> void:
 	_hud = main.get_node("Overlay/HUD")
 	_hud.visible = false
 	_her = boss.global_position
+	village.stage.show_torn()
 	_head = boss.puppet.head_position()
 	_build_overlay()
 	_build_crack()
-	_build_face()
-	_build_hint()
 	_plan()
 
 
@@ -72,7 +69,6 @@ func _plan() -> void:
 	var g := _her.y
 	var m := (Village.ARENA.x + Village.ARENA.y) * 0.5
 	var side := -1.0 if ronin.global_position.x < _her.x else 1.0
-	var stage := village.stage.global_position
 	_keys = [
 		# Close on her face, pushing in slowly.
 		[0.0, _head + Vector3(side * 0.7, 0.15, 3.6), _head, false],
@@ -83,23 +79,20 @@ func _plan() -> void:
 		[8.6, Vector3(m, g + 3.0, 12.0), Vector3(m, g + 1.8, -2.0), false],
 		# Pan right to the far gate as the rain eases and it opens.
 		[11.0, Vector3(Village.ARENA.y - 3.5, g + 2.4, 8.5), Vector3(Village.ARENA.y + 1.5, g + 1.6, -1.0), false],
-		# Back to the shoji, for the last shadow on it.
-		[11.05, Vector3(stage.x, g + 2.6, 7.2), Vector3(stage.x, g + 2.2, stage.z), true],
-		[14.2, Vector3(stage.x + 0.4, g + 2.5, 6.4), Vector3(stage.x, g + 2.2, stage.z), false],
+		# Held on the open gate, pushing in a little toward the light beyond.
+		[14.2, Vector3(Village.ARENA.y - 2.8, g + 2.2, 7.4), Vector3(Village.ARENA.y + 1.5, g + 1.6, -1.0), false],
 	]
 	_events = [
 		[0.0, _bars_in],
 		[0.7, func() -> void:
 			_crack_grow = 0.001
 			Sound.play(self, &"mask_creak", 2.0)],
-		[2.0, _drop_mask],
+		[1.4, _bleed_white],
 		[3.6, _dissolve],
 		[6.1, func() -> void: _relight(0)],
 		[6.8, func() -> void: _relight(1)],
 		[8.0, _ease_rain],
 		[9.2, func() -> void: village.bamboo.open_gate()],
-		[11.6, func() -> void: _fade(_hint, 0.55, 1.2)],
-		[13.6, func() -> void: _fade(_hint, 0.0, 1.0)],
 		[14.3, _bars_out],
 		[14.3, _glide_home],
 	]
@@ -155,6 +148,7 @@ func _build_crack() -> void:
 	look.cull_mode = BaseMaterial3D.CULL_DISABLED
 	look.no_depth_test = true
 	look.render_priority = 2
+	look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_crack.material_override = look
 	add_child(_crack)
 	_crack.global_position = _head + Vector3(0.0, 0.0, 0.32)
@@ -181,46 +175,45 @@ func _draw_crack() -> void:
 	_crack_mesh.surface_end()
 
 
-## The mask comes away: a copy of it falls, turning, and breaks into paper
-## on the stones; under it her own face shows, washed blank.
-func _drop_mask() -> void:
-	Sound.play(self, &"taiko_hit", -4.0)
-	_mask = Node3D.new()
-	add_child(_mask)
-	var model: Node3D = load("res://models/hannya_mask.glb").instantiate()
-	var meshes := model.find_children("*", "MeshInstance3D", true, false)
-	var low := Vector3.INF
-	var high := -Vector3.INF
-	for m: MeshInstance3D in meshes:
-		low = low.min(m.get_aabb().position)
-		high = high.max(m.get_aabb().end)
-		m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var grow := 0.42 / maxf(high.y - low.y, 0.001)
-	model.scale = Vector3.ONE * grow
-	model.position = -(low + high) * 0.5 * grow
-	_mask.add_child(model)
-	_mask.global_position = _head + Vector3(0.0, 0.0, 0.3)
-	_crack.visible = false
-	_fade(_face, 0.6, 0.6)
-	var fall := create_tween()
-	fall.tween_property(_mask, "global_position", Vector3(_head.x + 0.35, _her.y + 0.12, _head.z + 0.6), 0.75).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	fall.parallel().tween_property(_mask, "rotation", Vector3(-1.3, 0.5, 0.8), 0.75)
-	fall.tween_callback(func() -> void:
-		Sound.play(self, &"paper_rip", -2.0)
-		Confetti.burst(village, _mask.global_position + Vector3(0.0, 0.1, 0.0), 40)
-		_mask.visible = false)
-
-
-## Her face under the mask: a pale oval of paper, featureless, softly shaded.
-func _build_face() -> void:
-	var b := PaperMesh.new(5)
-	b.shade_jitter = 0.03
-	b.color = Color(0.78, 0.8, 0.86)
-	b.ellipse(Vector2.ZERO, Vector2(0.1, 0.135), 16, 0.0, 0.03)
-	_face = b.build(Color(1, 1, 1, 0), 0.0, true)
-	(_face.material_override as StandardMaterial3D).transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	add_child(_face)
-	_face.global_position = _head + Vector3(0.0, 0.0, 0.28)
+## The crack runs; ink bleeds out of the mask in drips, and the mask is
+## washed blank white, spreading from the middle of her face (laid over her
+## own paper: shaders/wash_white.gdshader).
+func _bleed_white() -> void:
+	Sound.play(self, &"ink_bleed", -2.0)
+	var puppet := boss.puppet
+	var centre := _head + Vector3(signf(ronin.global_position.x - _her.x) * 0.1, 0.06, 0.08)
+	_wash = ShaderMaterial.new()
+	_wash.shader = preload("res://shaders/wash_white.gdshader")
+	_wash.set_shader_parameter(&"centre", centre)
+	for mesh: GeometryInstance3D in puppet.get("_flash_meshes"):
+		mesh.material_overlay = _wash
+	var spread := create_tween()
+	spread.tween_method(func(v: float) -> void: _wash.set_shader_parameter(&"amount", v), 0.0, 1.0, 1.9).set_trans(Tween.TRANS_SINE)
+	# The crack is soaked away with the rest.
+	spread.parallel().tween_property(_crack.material_override, "albedo_color:a", 0.0, 1.6).set_delay(0.3)
+	# Ink running out of it: dark drops falling from the mask.
+	var drips := CPUParticles3D.new()
+	drips.amount = 26
+	drips.lifetime = 0.9
+	drips.explosiveness = 0.0
+	drips.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	drips.emission_sphere_radius = 0.1
+	drips.direction = Vector3.DOWN
+	drips.spread = 10.0
+	drips.gravity = Vector3(0.0, -6.0, 0.0)
+	drips.initial_velocity_min = 0.1
+	drips.initial_velocity_max = 0.4
+	drips.scale_amount_min = 0.5
+	drips.scale_amount_max = 1.2
+	var drop := QuadMesh.new()
+	drop.size = Vector2(0.035, 0.05)
+	drop.material = PaperMesh.soft_ink(Color(0.03, 0.03, 0.06, 0.95))
+	drips.mesh = drop
+	village.add_child(drips)
+	drips.global_position = centre + Vector3(0.0, -0.08, 0.05)
+	drips.emitting = true
+	get_tree().create_timer(1.8).timeout.connect(func() -> void: drips.emitting = false)
+	get_tree().create_timer(3.0).timeout.connect(drips.queue_free)
 
 
 ## She comes apart: pale scraps lift off her and rise into the rain while
@@ -265,9 +258,11 @@ func _dissolve() -> void:
 	scraps.finished.connect(scraps.queue_free)
 	var puppet := boss.puppet
 	var sink := create_tween()
-	sink.tween_method(func(v: float) -> void: puppet.set_fade(v), 0.0, 1.0, 2.2).set_trans(Tween.TRANS_SINE)
+	sink.tween_method(func(v: float) -> void:
+		puppet.set_fade(v)
+		if _wash:
+			_wash.set_shader_parameter(&"paper", Color(0.92, 0.91, 0.88, 1.0 - v)), 0.0, 1.0, 2.2).set_trans(Tween.TRANS_SINE)
 	sink.tween_callback(func() -> void: puppet.visible = false)
-	_fade(_face, 0.0, 2.6)
 
 
 ## A courtyard lantern lights again: a flare, then it settles.
@@ -298,28 +293,6 @@ func _ease_rain() -> void:
 	back.tween_callback(func() -> void:
 		rain.ease_off(1.0, 2.0)
 		Sound.duck_rain(false))
-
-
-## The last shadow on the shoji: a well, and a small figure in a wide hat
-## climbing out of it.
-func _build_hint() -> void:
-	var b := PaperMesh.new(9)
-	b.shade_jitter = 0.0
-	b.texture_scale = 0.0
-	b.color = Color(0.05, 0.04, 0.06)
-	# The well: its rim, two posts, a little roof.
-	b.polygon(PackedVector2Array([Vector2(-0.55, 0.0), Vector2(0.55, 0.0), Vector2(0.5, 0.55), Vector2(-0.5, 0.55)]))
-	for px: float in [-0.45, 0.45]:
-		b.rect(Vector2(px, 1.0), Vector2(0.05, 0.9))
-	b.polygon(PackedVector2Array([Vector2(-0.7, 1.4), Vector2(0.7, 1.4), Vector2(0.0, 1.75)]))
-	# The figure: hat, shoulders, an arm on the rim, pulling himself up.
-	b.polygon(PackedVector2Array([Vector2(-0.3, 0.98), Vector2(0.3, 0.98), Vector2(0.0, 1.12)]))
-	b.polygon(PackedVector2Array([Vector2(-0.1, 0.55), Vector2(0.12, 0.55), Vector2(0.12, 0.92), Vector2(-0.1, 0.92)]))
-	b.polygon(PackedVector2Array([Vector2(0.1, 0.82), Vector2(0.36, 0.6), Vector2(0.4, 0.56), Vector2(0.14, 0.76)]))
-	_hint = b.build(Color(1, 1, 1, 0), 0.0, true)
-	(_hint.material_override as StandardMaterial3D).transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	village.add_child(_hint)
-	_hint.global_position = village.stage.global_position + Vector3(0.35, 0.9, 0.06)
 
 
 func _fade(mesh: MeshInstance3D, to: float, time: float) -> void:
@@ -380,10 +353,6 @@ func _skip() -> void:
 	village.relight_arena_lanterns()
 	village.bamboo.open_gate(true)
 	boss.puppet.visible = false
-	if _mask:
-		_mask.visible = false
-	_face.visible = false
-	_hint.visible = false
 	_crack.visible = false
 	(main.get_node("Rain") as Rain).ease_off(1.0, 0.1)
 	Sound.duck_rain(false)
@@ -400,7 +369,5 @@ func _finish() -> void:
 	_hud.visible = true
 	game_camera.current = true
 	(game_camera as FollowCamera).snap_to_target()
-	if is_instance_valid(_hint):
-		_hint.queue_free()
 	finished.emit()
 	queue_free()

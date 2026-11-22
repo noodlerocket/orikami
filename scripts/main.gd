@@ -320,6 +320,7 @@ func _two_frames() -> void:
 ## begins.
 func _start_boss_fight() -> void:
 	var stage: HannyaStage = $Village.stage
+	stage.show_torn()
 	_boss = HannyaBoss.new()
 	_boss.ronin = _ronin
 	_boss.arena = Vector2(Village.ARENA.x, Village.ARENA.y)
@@ -556,6 +557,7 @@ func _continue_from_save() -> void:
 	if SaveGame.hannya_fallen:
 		# She is gone: the courtyard is quiet, its far gate open.
 		village.bamboo.open_gate(true)
+		village.stage.show_torn()
 		village.stage.stop_shadow()
 		village.stage.hannya.visible = false
 	if SaveGame.smudge_at != Vector3.INF and SaveGame.smudge_ink > 0:

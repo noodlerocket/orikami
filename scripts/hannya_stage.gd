@@ -75,6 +75,15 @@ func set_tear(amount: float) -> void:
 	screen_material.set_shader_parameter(&"tear", amount)
 
 
+## The screen as she left it in her entrance: both slashes open and the
+## great rip she came through. (Julian: it must stay torn afterwards, also
+## when the fight starts again without the cutscene, and in her ending.)
+func show_torn() -> void:
+	open_slash(0, 1.0)
+	open_slash(1, 1.0)
+	set_tear(0.95)
+
+
 ## Where on the screen (UV, 0 to 1, y downward) a point in the world falls.
 func screen_uv(world: Vector3) -> Vector2:
 	var local := to_local(world)

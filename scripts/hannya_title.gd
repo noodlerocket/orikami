@@ -9,9 +9,10 @@ extends Control
 ## The lettering is in the Yuji Syuku brush font, rendered into images by
 ## tools/render_lettering.gd (so the game does not have to carry the font).
 
-const KANJI := preload("res://textures/title_hannya_kanji.png")
-const NAME := preload("res://textures/title_hannya_name.png")
-const SUBTITLE := preload("res://textures/title_hannya_subtitle.png")
+## (The Hannya's, unless set otherwise: Akane's title uses this too.)
+var KANJI: Texture2D = preload("res://textures/title_hannya_kanji.png")
+var NAME: Texture2D = preload("res://textures/title_hannya_name.png")
+var SUBTITLE: Texture2D = preload("res://textures/title_hannya_subtitle.png")
 
 var _stroke := 0.0     # 0 to 1: how much of the brush stroke is drawn
 var _words := 0.0      # 0 to 1: the name fading in

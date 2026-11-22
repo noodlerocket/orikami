@@ -434,8 +434,8 @@ func _build_water() -> void:
 	trickle.shade_jitter = 0.0
 	trickle.texture_scale = 0.0
 	trickle.color = Color(0.05, 0.06, 0.1)
-	trickle.quad(Vector3(Village.CHAMBER.y, Village.PIPE_FLOOR + 0.012, -0.9), Vector3(Village.CANAL.x, Village.PIPE_FLOOR + 0.012, -0.9),
-			Vector3(Village.CANAL.x, Village.PIPE_FLOOR + 0.012, 0.3), Vector3(Village.CHAMBER.y, Village.PIPE_FLOOR + 0.012, 0.3), Vector3.UP)
+	trickle.quad(Vector3(Village.CHAMBER.y, Village.PIPE_FLOOR - 0.01, -0.9), Vector3(Village.CANAL.x, Village.PIPE_FLOOR - 0.01, -0.9),
+			Vector3(Village.CANAL.x, Village.PIPE_FLOOR - 0.01, 0.3), Vector3(Village.CHAMBER.y, Village.PIPE_FLOOR - 0.01, 0.3), Vector3.UP)
 	var line := trickle.build()
 	(line.material_override as StandardMaterial3D).roughness = 0.1
 	(line.material_override as StandardMaterial3D).metallic_specular = 0.9
@@ -514,10 +514,44 @@ func _build_deep_shaft() -> void:
 	add_child(water)
 
 
+## The pipe's floor: worn flagstones across its whole depth, from the back
+## wall to the cut front, laid in rows, a low lip of kerb along the front,
+## with the trickle running in a shallow channel down the middle. (It used to
+## be only the trickle, with darkness either side: Julian, "too thin".)
+func _build_pipe_floor() -> void:
+	var b := PaperMesh.new(_rng.randi())
+	b.shade_jitter = 0.12
+	var y := Village.PIPE_FLOOR
+	var x := Village.CHAMBER.y
+	var row_z := [BACK_Z, -1.6, -0.95, 0.35, 1.0, FRONT_Z + 0.02]
+	while x < Village.CANAL.x - 0.01:
+		var x1 := minf(x + _rng.randf_range(0.5, 0.8), Village.CANAL.x)
+		for r in row_z.size() - 1:
+			var z0: float = row_z[r]
+			var z1: float = row_z[r + 1]
+			if r == 2:
+				# The channel: a little lower, darker, under the trickle.
+				b.color = STONE.darkened(0.35)
+				b.box(Vector3((x + x1) * 0.5, y - 0.04, (z0 + z1) * 0.5), Vector3(x1 - x, 0.04, z1 - z0))
+				continue
+			b.color = STONE.lightened(0.08).darkened(_rng.randf_range(0.0, 0.18))
+			var off := _rng.randf_range(-0.1, 0.1) if r % 2 == 1 else 0.0
+			b.box(Vector3((x + x1) * 0.5 + off * 0.0, y - 0.06, (z0 + z1) * 0.5), Vector3(x1 - x - 0.03, 0.12, z1 - z0 - 0.03))
+		x = x1
+	# The kerb along the front edge, and the joints showing dark between.
+	b.color = STONE.lightened(0.14)
+	b.box(Vector3((Village.CHAMBER.y + Village.CANAL.x) * 0.5, y - 0.1, FRONT_Z - 0.1), Vector3(Village.CANAL.x - Village.CHAMBER.y, 0.2, 0.2))
+	b.color = STONE_JOINT
+	b.box(Vector3((Village.CHAMBER.y + Village.CANAL.x) * 0.5, y - 0.2, (BACK_Z + FRONT_Z) * 0.5), Vector3(Village.CANAL.x - Village.CHAMBER.y, 0.14, FRONT_Z - BACK_Z))
+	var floor := b.build()
+	add_child(floor)
+
+
 ## The drain pipe: a low brick-lined culvert, with the collapsed stretch
 ## (the crawlspace) where the roof has slumped in a heap of stones and a
 ## broken beam.
 func _build_pipe_details() -> void:
+	_build_pipe_floor()
 	var b := PaperMesh.new(_rng.randi())
 	b.shade_jitter = 0.18
 	# The slumped roof of the crawlspace: the vault's stones have dropped

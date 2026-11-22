@@ -47,9 +47,10 @@ Pause, settings and controls pages share one UI style. Downloads for
 Windows and Mac carry Julian's icon.
 
 **Next:** Julian plays the overnight work and judges it (the report lists
-what only he can judge). Then: the rest of the Bamboo of Folded Wind with Akane (needs Julian's
-story decision); the endings (the ink marks are saved; nothing reads them
-yet).
+what only he can judge). Then: Julian judges Akane's duel (built: proposed lore, she yields
+rather than dies); music for the duel; the road on past the bamboo (the
+open middle of the game); the endings (the ink marks are saved; nothing
+reads them yet).
 
 ## Working with Julian
 
@@ -564,6 +565,37 @@ has its own script, built from `Village._ready`:
   courtyard's gate there was "a weird scene arrangement"). Shrine 4, the altar where he learns the
   Crane Glide (`Ronin.has_glide`, `glide_*` settings; paper wings on the
   puppet, `_build_wings`).
+- **Akane** (`akane.gd`, `akane_duel.gd`): the grove's last ground (past the
+  rope bridge, `AkaneDuel.CLEARING`) is her clearing. Her look is Julian's
+  picture of her (white kitsune mask with red markings, long black hair,
+  white robes painted in ink over red hakama, gold-crested bow, geta; a
+  first fox-warrior model was rejected); Meshy model `models/akane.glb`
+  posed with `SamuraiAnimator` and many of the Ronin's own sword stances.
+  The model's sculpted sword is cut away at load (`_cut_away_handle`: the
+  long straight slanting piece); a folded scabbard sits on that line and a
+  folded katana (red-wrapped, gold guard) rests in it or is drawn: one
+  sword. First time in: she drops from the bamboo, her warning is brushed
+  (`BrushLine`, lettering `akane_warning`), she draws, her title is painted
+  (`HannyaTitle` with her textures), a wall of whirling leaves seals the
+  clearing, `BossBar.watch(akane, …)`. Moves: cut combos (2-3, parry:
+  posture), turning his cuts aside on guard (`deflect_chance`) and
+  answering, an iai lunge from afar, fox-fires (`BurningPaper.fox`; parried
+  back, they burn her). She yields at `yield_at` health or two finishing
+  cuts: sheathes, her parting line, leaps away (`SaveGame.akane_met`,
+  `akane_dueled`). Dying resets her (no warning again). A scripted
+  near-perfect player beats her in about 36 s, taking 3 hits. Her slash
+  effect is the Ronin's kind (slash_sweep shader) in vermilion
+  (`swoosh_tint`): a swoosh round her per cut reaching `cut_reach`, and a
+  streak along her draw (`streak_time`); sheet `akane_cut`. No duel
+  music yet (the village music is hushed). Sheets: `akane`, `akane_poses`.
+- Backdrop glows (the moon's, the castle's, far lamps) are vertex-colour
+  discs (`Backdrop._soft_disc`), not `Scenery.halo`: a halo square once
+  flashed up as a pale rectangle round the moon on the rooftops (rare, not
+  reproducible on demand). Keep `Scenery.halo` for glows near surfaces.
+- The drain pipe has a flagstone floor across its depth (`_build_pipe_floor`).
+- The burnt-out house (`RooftopRoad._ruin`) is built so every piece holds on
+  to something: posts on the walkway, beams at each floor, joists under the
+  boards, plaster only inside the wall's bays (Julian: pieces hung apart).
 - Life: `villager_shadow.gd` (shadows behind lit shoji that sink away as he
   passes; at `Village.SHUTTERS` a bamboo blind unrolls instead: a sliding
   shutter "looked glitched"), `perched_birds.gd`
@@ -578,7 +610,14 @@ has its own script, built from `Village._ready`:
   (`Village.CRANE_BUNDLES` + the back room; HUD tag), `smudge.gd` (death
   leaves his ink; cut it back), the Map page in the pause menu, corner
   nudge / ledge hop / skid / shaking off water (`Ronin` "Forgiveness"),
-  `FollowCamera.run_lead`, `hannya_ending.gd` (after the fight; proposed lore).
+  `FollowCamera.run_lead`, `hannya_ending.gd` (after the fight; proposed lore:
+  a crack, ink drips out and her own mask washes blank white, a shader laid
+  over her paper, `shaders/wash_white.gdshader`; a second mask falling off
+  "looked like her head falling off" and the well shadow on the shoji were
+  removed at Julian's request; the shoji stays torn from her entrance,
+  `HannyaStage.show_torn`, also when the fight restarts). The courtyard's far
+  gate: two leaves across the passage swinging open into the far side,
+  where the town street runs on into fog (`_build_beyond_gate`).
 
 The original plan, kept for reference:
 Drawn by `tools/village_map.py` (Python + Pillow: edit its lists, re-run).
@@ -620,7 +659,9 @@ through:
   8-lights-per-mesh limit still applies).
 
 **Areas 1 and 2 (2026-11-21):**
-- **The Paper-Maker** (`paper_maker.gd`): a Meshy model
+- **The Paper-Maker** (`paper_maker.gd`; on the river's east bank by the
+  warehouse since Julian moved her, facing the river, with her own vat and
+  drying line; the warehouse shrine is on the door's other side): a Meshy model
   (`models/papermaker.glb`, 1.38 m; picture `docs/reference/papermaker_front.png`
   made image-to-image from the Ronin's and husk's references; ids in the
   script), posed by hand with `SamuraiAnimator` (stances at the bottom of
@@ -897,6 +938,7 @@ through:
 | `docs/design.md`, `docs/reference/`, `docs/screenshots/` | Design doc, art references, frame sheets |
 | `scripts/canals.gd`, `fallen_street.gd`, `soggy_plank.gd`, `river_bridge.gd`, `gatehouse.gd`, `shrine_steps.gd`, `rooftop_road.gd`, `ladder.gd`, `bamboo_grove.gd` | The expanded village's areas (see "The expanded village") |
 | `scripts/paper_critter.gd`, `paper_dog.gd`, `paper_bird.gd`, `lantern_husk.gd`, `burning_paper.gd` | The new enemies |
+| `scripts/akane.gd`, `akane_duel.gd`, `brush_line.gd` | Akane and her duel at the end of the bamboo; a brushed spoken line |
 | `scripts/paper_maker.gd` | The Paper-Maker at her vat (Meshy model `models/papermaker.glb`, posed by hand) |
 | `scripts/save_game.gd`, `crane_bundle.gd`, `smudge.gd`, `ability_card.gd`, `hannya_ending.gd` | Saving, cranes, the Smudge, ability card, the ending after the Hannya |
 | `scripts/water_fx.gd`, `villager_shadow.gd`, `perched_birds.gd` | Splashes and water, shadows behind shoji, perched birds |

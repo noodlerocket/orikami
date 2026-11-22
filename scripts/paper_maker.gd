@@ -5,7 +5,9 @@ extends Node3D
 ## Ronin's and the husk's references so it shares their folded-paper look;
 ## docs/reference/papermaker_front.png), posed by hand like them.
 ##
-## She stands at her vat in Well Square, stooped, rocking the mould (sugeta)
+## She works on the river bank by the warehouse (washi is made with running
+## river water; Julian moved her there from Well Square), facing the river,
+## at her own vat. Stooped, rocking the mould (sugeta)
 ## through the milky water, and every so often lifts it, tips it to let the
 ## water run off, and dips it again. When the Ronin comes near she stops,
 ## straightens a little, turns her head to him and gives a small nod; once
@@ -43,6 +45,53 @@ var _show := 0.0
 func _ready() -> void:
 	_build_model()
 	_build_mould()
+	_build_vat()
+	_build_drying()
+
+
+## Her vat, in front of her: a wooden tub of milky water, hooped.
+func _build_vat() -> void:
+	var b := PaperMesh.new(32)
+	b.shade_jitter = 0.18
+	b.color = Scenery.WOOD.darkened(0.2)
+	b.frustum(10, Vector2(0.62, 0.42), Vector2(0.68, 0.46), 0.7, Vector3(0.95, 0.0, 0.0))
+	b.color = PaperMesh.TIMBER
+	b.frustum(10, Vector2(0.7, 0.48), Vector2(0.7, 0.48), 0.06, Vector3(0.95, 0.32, 0.0))
+	b.frustum(10, Vector2(0.7, 0.48), Vector2(0.7, 0.48), 0.06, Vector3(0.95, 0.6, 0.0))
+	add_child(b.build())
+	var water := PaperMesh.new(33)
+	water.shade_jitter = 0.0
+	water.color = Color(0.62, 0.64, 0.68)
+	water.quad(Vector3(0.35, 0.66, 0.4), Vector3(1.55, 0.66, 0.4), Vector3(1.55, 0.66, -0.4), Vector3(0.35, 0.66, -0.4), Vector3.UP)
+	var milk := water.build()
+	(milk.material_override as StandardMaterial3D).roughness = 0.25
+	add_child(milk)
+
+
+## Fresh sheets drying behind her on a line between two posts, each
+## stirring in the wind on its own.
+func _build_drying() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 51
+	var b := PaperMesh.new(34)
+	b.color = PaperMesh.TIMBER
+	for px: float in [-1.6, 0.6]:
+		b.box(Vector3(px, 1.15, -0.9), Vector3(0.08, 2.3, 0.08))
+	b.color = Color(0.4, 0.36, 0.3)
+	b.box(Vector3(-0.5, 2.22, -0.9), Vector3(2.2, 0.025, 0.025))
+	add_child(b.build())
+	var x := -1.35
+	while x < 0.4:
+		var hang := Node3D.new()
+		hang.position = Vector3(x, 2.2, -0.88)
+		add_child(hang)
+		var sheet := PaperMesh.new(rng.randi())
+		sheet.texture_world = false
+		sheet.color = PaperMesh.WASHI.darkened(rng.randf_range(0.0, 0.1))
+		sheet.rect(Vector2(0.0, -0.32), Vector2(0.42, 0.62), 0.0)
+		hang.add_child(sheet.build())
+		Scenery.windswept(hang, 0.05, rng)
+		x += rng.randf_range(0.5, 0.6)
 
 
 func _build_model() -> void:
@@ -119,10 +168,12 @@ func _process(delta: float) -> void:
 	var since := _clock - _nod_at
 	if since > 0.0 and since < 1.1:
 		nod = sin(since / 1.1 * PI)
-	var pose := SamuraiAnimator.mix(work(_clock, _rock_phase()), attend(_clock, nod), smoothstep(0.0, 1.0, _attend))
+	# (Her glances go toward the street, whichever way she faces.)
+	var side := 1.0 if global_transform.basis.x.x > 0.0 else -1.0
+	var pose := SamuraiAnimator.mix(work(_clock, _rock_phase()), attend(_clock, nod, side), smoothstep(0.0, 1.0, _attend))
 	_show = move_toward(_show, 1.0 if showing else 0.0, delta / 0.6)
 	if _show > 0.0:
-		pose = SamuraiAnimator.mix(pose, hold_up(_clock), smoothstep(0.0, 1.0, _show))
+		pose = SamuraiAnimator.mix(pose, hold_up(_clock, side), smoothstep(0.0, 1.0, _show))
 	_animator.apply(pose)
 	_place_mould()
 	# A soft slosh each time the mould dips into the water.
@@ -216,13 +267,13 @@ static func work(time: float, lift: float) -> Dictionary:
 
 ## Holding a fresh sheet up for him to see: both hands raised before her,
 ## straight-backed, head turned to him.
-static func hold_up(time: float) -> Dictionary:
+static func hold_up(time: float, side: float = 1.0) -> Dictionary:
 	var breath := sin(time * 1.6)
 	return _pose({
 		"hips": Vector3(0.0, -0.03 + breath * 0.004, -0.02),
-		"hips_rot": Vector3(4.0, -18.0, 0.0),
-		"spine": Vector3(2.0, -14.0, 0.0),
-		"head": Vector3(-4.0, -24.0, 0.0),
+		"hips_rot": Vector3(4.0, -18.0 * side, 0.0),
+		"spine": Vector3(2.0, -14.0 * side, 0.0),
+		"head": Vector3(-4.0, -24.0 * side, 0.0),
 		"hand_l": Vector3(0.24, 0.42, 0.26),
 		"hand_r": Vector3(-0.24, 0.42, 0.26),
 		"foot_l": Vector3(0.1, 0.0, 0.04), "foot_r": Vector3(-0.1, 0.0, -0.08),
@@ -231,13 +282,13 @@ static func hold_up(time: float) -> Dictionary:
 
 ## Turned to him: straighter, hands resting on the vat's rim, head turned
 ## toward him (to her right, toward the street), with a small nod.
-static func attend(time: float, nod: float) -> Dictionary:
+static func attend(time: float, nod: float, side: float = 1.0) -> Dictionary:
 	var breath := sin(time * 1.6)
 	return _pose({
 		"hips": Vector3(0.0, -0.04 + breath * 0.004, -0.03),
-		"hips_rot": Vector3(8.0, -12.0, 0.0),
-		"spine": Vector3(8.0 + breath, -10.0, 0.0),
-		"head": Vector3(4.0 + nod * 22.0, -32.0, 0.0),
+		"hips_rot": Vector3(8.0, -12.0 * side, 0.0),
+		"spine": Vector3(8.0 + breath, -10.0 * side, 0.0),
+		"head": Vector3(4.0 + nod * 22.0, -32.0 * side, 0.0),
 		"hand_l": Vector3(0.18, -0.02, 0.3),
 		"hand_r": Vector3(-0.2, -0.02, 0.3),
 		"foot_l": Vector3(0.1, 0.0, 0.04), "foot_r": Vector3(-0.1, 0.0, -0.08),

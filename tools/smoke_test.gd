@@ -315,10 +315,10 @@ func _run(main: Node) -> void:
 	PaperMakerTale.force = true
 	SaveGame.papermaker_told = false
 	var maker: PaperMaker = main.get_node("Village").find_children("*", "PaperMaker", true, false)[0]
-	ronin.position = Vector3(maker.global_position.x - 6.0, 0.05, 0.0)
+	ronin.position = Vector3(maker.global_position.x + 6.0, 0.05, 0.0)
 	ronin.velocity = Vector3.ZERO
 	await _frames(10)
-	Input.action_press("move_right")
+	Input.action_press("move_left")
 	var tale: PaperMakerTale = null
 	for f in 120:
 		await physics_frame
@@ -326,7 +326,7 @@ func _run(main: Node) -> void:
 		if not found.is_empty():
 			tale = found[0]
 			break
-	Input.action_release("move_right")
+	Input.action_release("move_left")
 	_check("the Paper-Maker shows him her pictures when he comes to her", tale != null and not ronin.is_physics_processing())
 	Input.action_press("jump")
 	await _frames(70)
@@ -591,6 +591,53 @@ func _run(main: Node) -> void:
 		await _frames(20)
 		_check("gliding carries him over the bamboo ravine (x %.1f)" % ronin.global_position.x,
 				glided and ronin.global_position.x > BambooGrove.SHIFT + BambooGrove.GROUND[1][0] and ronin.global_position.y > 1.0)
+		# Akane: the first time he steps into her clearing, she meets him (play
+		# stops); skipped, the duel begins behind a wall of wind; a parried cut
+		# costs her posture; broken far enough, she yields and is gone.
+		var duel: AkaneDuel = grove.duel
+		SaveGame.akane_met = false
+		SaveGame.akane_dueled = false
+		ronin.global_position = Vector3(BambooGrove.SHIFT + AkaneDuel.CLEARING.x - 1.0, BambooGrove.GROUND[2][2] + 0.05, 0.0)
+		ronin.velocity = Vector3.ZERO
+		ronin.set("_draw_safe", 0.0)
+		await _frames(10)
+		Input.action_press("move_right")
+		var met := false
+		for f in 120:
+			await physics_frame
+			if not ronin.is_physics_processing():
+				met = true
+				break
+		Input.action_release("move_right")
+		_check("stepping into the clearing, Akane meets him", met and duel.akane.visible)
+		Input.action_press("jump")
+		await _frames(70)
+		Input.action_release("jump")
+		await _frames(30)
+		_check("skipped, the duel begins behind a wall of wind", duel.akane.active and ronin.is_physics_processing()
+				and duel.get("_wall") != null)
+		var akane := duel.akane
+		akane.set_physics_process(false)
+		akane.global_position = ronin.global_position + Vector3(1.6, 0.0, 0.0)
+		akane.facing = -1.0
+		ronin.facing = 1.0
+		await _frames(2)
+		ronin.set("_parry_time", 0.2)
+		var before_posture := akane.posture
+		akane.call("_swing", akane.cut_reach, akane.cut_height, 1)
+		_check("a parried cut costs her posture (%d -> %d)" % [before_posture, akane.posture], akane.posture == before_posture + 1)
+		akane.set_physics_process(true)
+		akane.health = akane.yield_at + 1
+		akane.set(&"_mode", &"recover")
+		ronin.facing = -signf(akane.global_position.x - ronin.global_position.x)  # (looking away)
+		akane.take_hit(2, Vector2(1.0, 0.0))
+		await _frames(150)
+		var toward := signf(akane.global_position.x - ronin.global_position.x)
+		_check("while she speaks he stands still, facing her", not ronin.is_physics_processing()
+				and (ronin.get_node("Puppet") as RoninPuppet).facing == toward)
+		await _frames(270)
+		_check("broken far enough, she yields and is gone (and the wind wall falls); he can move again", akane.mode() == &"gone"
+				and SaveGame.akane_dueled and duel.get("_wall") == null and ronin.is_physics_processing())
 		# ...and over the Rooftop Road's gap above the river (the first Crane
 		# Glide gate), even against the gusts.
 		ronin.position = Vector3(RooftopRoad.GLIDE_GAP.x - 0.3, 6.7, 0.0)

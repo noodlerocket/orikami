@@ -57,6 +57,7 @@ extends SceneTree
 ##             walks up, down, and rolling up again once he has gone
 ##   papermaker the Paper-Maker at her vat, close up: working, then turning to him
 ##   tale      the Paper-Maker's pictures for him, 8 moments
+##   akane     Akane: the meeting, her title, then the duel running, 12 moments
 ##   gates     the gate between the town and the bamboo grove, from both sides
 ##   iai       close-up of the stance: settling, half-way, ready, and the
 ##             pose he ends the draw in (use --zoom=4.6)
@@ -151,6 +152,12 @@ func _initialize() -> void:
 			sheet = await _papermaker()
 		"tale":
 			sheet = await _tale()
+		"akane":
+			sheet = await _akane()
+		"akane_poses":
+			sheet = await _akane_poses()
+		"akane_cut":
+			sheet = await _akane_cut()
 		_:
 			push_error("Unknown sheet: " + args[0])
 			quit(1)
@@ -934,11 +941,11 @@ func _gates() -> Image:
 func _papermaker() -> Image:
 	var maker: PaperMaker = _main.get_node("Village").find_children("*", "PaperMaker", true, false)[0]
 	_ronin.set("_draw_safe", 60.0)
-	_ronin.position = Vector3(maker.global_position.x + 9.0, 0.05, 0.0)
+	_ronin.position = Vector3(maker.global_position.x + 12.0, 0.05, 0.0)
 	var cam: Camera3D = _main.get_node("Camera")
 	cam.set_process(false)
 	cam.set_physics_process(false)
-	cam.global_position = maker.global_position + Vector3(0.6, 1.0, 5.2)
+	cam.global_position = maker.global_position + Vector3(-0.6, 1.0, 5.2)
 	cam.rotation = Vector3(-0.05, 0.0, 0.0)
 	var tile := Vector2i(480, 360)
 	var sheet := Image.create(tile.x * 4, tile.y * 2, false, Image.FORMAT_RGB8)
@@ -962,16 +969,116 @@ func _papermaker() -> Image:
 func _tale() -> Image:
 	PaperMakerTale.force = true
 	var maker: PaperMaker = _main.get_node("Village").find_children("*", "PaperMaker", true, false)[0]
-	_ronin.position = Vector3(maker.global_position.x - 5.0, 0.05, 0.0)
+	_ronin.position = Vector3(maker.global_position.x + 5.0, 0.05, 0.0)
 	_main.get_node("Camera").snap_to_target()
 	await create_timer(0.5).timeout
-	Input.action_press("move_right")
+	Input.action_press("move_left")
 	await create_timer(0.45).timeout
-	Input.action_release("move_right")
+	Input.action_release("move_left")
 	var tile := Vector2i(480, 270)
 	var sheet := Image.create(tile.x * 4, tile.y * 2, false, Image.FORMAT_RGB8)
 	var shot := 0
 	for t: float in [0.5, 1.6, 2.6, 2.3, 2.7, 2.6, 1.6, 2.2]:
+		await create_timer(t).timeout
+		sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((shot % 4) * tile.x, (shot / 4) * tile.y))
+		shot += 1
+	return sheet
+
+
+## Akane: the meeting (she drops in, the warning, her title), then the duel
+## running for real (the Ronin stands his ground, parrying), 12 moments.
+func _akane() -> Image:
+	var duel: AkaneDuel = _main.get_node("Village").bamboo.duel
+	_ronin.global_position = Vector3(BambooGrove.SHIFT + AkaneDuel.CLEARING.x + 1.0, 2.15, 0.0)
+	_main.call("_set_camera_limits")
+	_main.get_node("Camera").snap_to_target()
+	await create_timer(0.4).timeout
+	Input.action_press("move_right")
+	await create_timer(0.35).timeout
+	Input.action_release("move_right")
+	var tile := Vector2i(480, 270)
+	var sheet := Image.create(tile.x * 4, tile.y * 3, false, Image.FORMAT_RGB8)
+	var shot := 0
+	for t: float in [0.5, 0.6, 1.6, 1.5, 1.4, 1.8, 1.6]:
+		await create_timer(t).timeout
+		sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((shot % 4) * tile.x, (shot / 4) * tile.y))
+		shot += 1
+	# The duel: he parries whenever she is in reach and cutting.
+	_ronin.set("_draw_safe", 30.0)
+	while shot < 12:
+		for f in 24:
+			await process_frame
+			if duel.akane.mode() in [&"cut", &"draw"]:
+				Input.action_press("parry")
+			else:
+				Input.action_release("parry")
+		sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((shot % 4) * tile.x, (shot / 4) * tile.y))
+		print("akane shot %d: %s health %d posture %d" % [shot, duel.akane.mode(), duel.akane.health, duel.akane.posture])
+		shot += 1
+	Input.action_release("parry")
+	return sheet
+
+
+## Akane close up, her stances held one by one: on guard, lifting the blade,
+## two moments of a cut, the iai crouch, the draw, the fox-fire, broken,
+## yielding (sheathed).
+func _akane_poses() -> Image:
+	var akane: Akane = _main.get_node("Village").bamboo.duel.akane
+	akane.visible = true
+	akane.set_physics_process(false)
+	akane.global_position = Vector3(BambooGrove.SHIFT + AkaneDuel.HER_X, 2.15, 0.0)
+	akane.facing = 1.0
+	_ronin.global_position = Vector3(BambooGrove.SHIFT + AkaneDuel.CLEARING.x - 1.5, 2.2, 0.0)
+	var cam: Camera3D = _main.get_node("Camera")
+	cam.set_process(false)
+	cam.set_physics_process(false)
+	cam.global_position = akane.global_position + Vector3(0.2, 1.05, 3.3)
+	cam.rotation = Vector3(-0.04, 0.0, 0.0)
+	var shots := [[&"guard", 0.0], [&"windup", 0.45], [&"cut", 0.05], [&"cut", 0.13], [&"draw_tell", 0.6],
+			[&"draw", 0.2], [&"fire_tell", 0.5], [&"stagger", 0.5], [&"yield", 1.4], [&"wait", 0.0]]
+	var tile := Vector2i(384, 432)
+	var sheet := Image.create(tile.x * 5, tile.y * 2, false, Image.FORMAT_RGB8)
+	for i in shots.size():
+		akane.set(&"_mode", shots[i][0])
+		akane.set(&"_mode_time", shots[i][1])
+		await create_timer(0.12).timeout
+		akane.set(&"_mode_time", shots[i][1])
+		await process_frame
+		sheet.blit_rect(await _snap(Rect2i(320, 0, 640, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((i % 5) * tile.x, (i / 5) * tile.y))
+	return sheet
+
+
+## Akane's slash effect, close up: a cut (the swoosh drawn on and wiped
+## away), then her draw (the streak along her path), 12 moments.
+func _akane_cut() -> Image:
+	var akane: Akane = _main.get_node("Village").bamboo.duel.akane
+	_ronin.global_position = Vector3(BambooGrove.SHIFT + AkaneDuel.CLEARING.x - 1.5, 2.2, 0.0)
+	_ronin.set("_draw_safe", 60.0)
+	akane.visible = true
+	akane.global_position = Vector3(BambooGrove.SHIFT + AkaneDuel.HER_X - 3.0, 2.15, 0.0)
+	akane.facing = 1.0
+	akane.active = true
+	var cam: Camera3D = _main.get_node("Camera")
+	cam.set_process(false)
+	cam.set_physics_process(false)
+	cam.global_position = akane.global_position + Vector3(1.4, 1.1, 5.5)
+	cam.rotation = Vector3(-0.04, 0.0, 0.0)
+	akane.set_physics_process(true)
+	akane.call("_set_mode", &"windup")
+	akane.set(&"_cuts_left", 1)
+	akane.set(&"_mode_time", akane.cut_windup - 0.05)
+	var tile := Vector2i(480, 270)
+	var sheet := Image.create(tile.x * 4, tile.y * 3, false, Image.FORMAT_RGB8)
+	var shot := 0
+	for k in 7:
+		await create_timer(0.045).timeout
+		sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((shot % 4) * tile.x, (shot / 4) * tile.y))
+		shot += 1
+	akane.global_position = Vector3(BambooGrove.SHIFT + AkaneDuel.HER_X - 3.0, 2.15, 0.0)
+	cam.global_position = akane.global_position + Vector3(3.0, 1.1, 8.0)
+	akane.call("_set_mode", &"draw_tell")
+	akane.set(&"_mode_time", akane.draw_tell - 0.02)
+	for t: float in [0.08, 0.12, 0.15, 0.2, 0.25]:
 		await create_timer(t).timeout
 		sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((shot % 4) * tile.x, (shot / 4) * tile.y))
 		shot += 1

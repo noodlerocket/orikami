@@ -321,13 +321,19 @@ func _build_warehouse() -> void:
 	# The roof: a heavy tiled roof, both slopes, the ridge with raised ends.
 	add_child(Scenery.tiled_roof(_rng, left - 0.4, right + 0.4, Vector2(height - 0.05, z + 0.6), Vector2(height + 1.3, z - 1.4), 5))
 	add_child(Scenery.tiled_roof(_rng, left - 0.4, right + 0.4, Vector2(height - 0.05, z - 3.4), Vector2(height + 1.3, z - 1.4), 5, false))
-	# A lantern by the door, and the shrine in front of it.
+	# A lantern by the door, and the shrine on the door's other side (the
+	# river side is the Paper-Maker's: she stood hidden behind it).
 	village._hang_lantern(Vector3(door.x - 1.65, 2.9, z + 0.7), 0.25, 0.8)
 	shrine = RestShrine.new()
 	shrine.shrine_id = "warehouse"
-	shrine.position = Vector3(door.x - 2.4, 0.0, -0.9)
+	shrine.position = Vector3(door.x + 2.3, 0.0, -0.9)
 	shrine.scale = Vector3.ONE * 1.45
 	add_child(shrine)
+	# The Paper-Maker, at her vat on the bank, facing the river.
+	var maker := PaperMaker.new()
+	maker.position = Vector3(Village.RIVER.y + 1.75, 0.0, -2.2)
+	maker.rotation.y = PI
+	add_child(maker)
 
 
 # --- The river and the wind at work ------------------------------------------------

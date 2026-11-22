@@ -53,22 +53,22 @@ const ROPE := Color(0.66, 0.56, 0.4)
 const FLOOR_BACK := -8.0
 ## The red sun in the sky (grove x, height).
 const SUN_AT := Vector2(236.0, 15.0)
-## The gate's door, open: swung back away from us so it is seen edge-on
-## (swung toward us it stuck out at the camera like a slab: Julian, "looks bad").
-const OPEN_ANGLE := 88.0
+## How far the gate's leaves swing open (degrees).
+const OPEN_ANGLE := 90.0
 
 var village: Village
 var gate_open := false
 var shrine: RestShrine
 var _rng := RandomNumberGenerator.new()
 var _gate_solid: StaticBody3D
-var _door: Node3D
+var _gate_leaves: Array[Node3D] = []   # the courtyard gate's two leaves (front, back)
 var _beyond_light: OmniLight3D
 var _crane: Node3D
 var _crane_taken := false
 var _ronin: Ronin
 var _leaves: CPUParticles3D
 var _petals: CPUParticles3D
+var duel: AkaneDuel
 ## Where each stem stands (local x, foot height), for the automated check.
 var stem_feet: Array[Vector2] = []
 var _town_gate: Node3D   # the gate in the courtyard (in the town's place)
@@ -86,6 +86,7 @@ func _ready() -> void:
 	_town_gate.position.x = -SHIFT
 	add_child(_town_gate)
 	_build_gate()
+	_build_beyond_gate()
 	_build_mist_way()
 	_build_sky()
 	for g: Array in GROUND:
@@ -96,6 +97,10 @@ func _ready() -> void:
 	_air()
 	for x: float in [200.0, 218.0, 238.0, 252.0]:
 		Sound.place_loop(self, "bamboo_wind.ogg", Vector3(x, 4.0, -1.0), -6.0, 9.0)
+	# Akane's clearing, at the end (akane_duel.gd).
+	duel = AkaneDuel.new()
+	duel.grove = self
+	add_child(duel)
 	shrine = RestShrine.new()
 	shrine.shrine_id = "bamboo"
 	shrine.position = Vector3(SHRINE_X, 1.5, -0.9)
@@ -122,11 +127,11 @@ func _gate_frame(parent: Node3D, g: float) -> void:
 	# The wall: plaster over a stone base, behind and in front of the path.
 	# (It runs far back, so it reads as the courtyard's boundary wall going
 	# off into the dark, not a lone block.) A timber coping along its top.
-	for span: Vector2 in [Vector2(-12.0, -1.25), Vector2(1.25, 1.5)]:
+	for span: Vector2 in [Vector2(-12.0, -1.25), Vector2(1.25, 1.42)]:
 		b.color = Color(0.5, 0.49, 0.5)
 		b.box(Vector3(GATE_X, g + 1.4, (span.x + span.y) * 0.5), Vector3(0.5, 2.8, span.y - span.x))
 		b.color = Canals.STONE.lightened(0.1)
-		b.box(Vector3(GATE_X, g + 0.3, (span.x + span.y) * 0.5), Vector3(0.56, 0.6, span.y - span.x))
+		b.box(Vector3(GATE_X, g + 0.304, (span.x + span.y) * 0.5), Vector3(0.56, 0.6, span.y - span.x - 0.02))
 		b.color = PaperMesh.TIMBER
 		b.box(Vector3(GATE_X, g + 2.86, (span.x + span.y) * 0.5), Vector3(0.7, 0.13, span.y - span.x + 0.1))
 		b.color = Scenery.ROOF.darkened(0.15)
@@ -146,30 +151,65 @@ func _gate_frame(parent: Node3D, g: float) -> void:
 func _build_gate() -> void:
 	var g := 1.5
 	_gate_frame(_town_gate, g)
-	# The door (seen from its edge: shown facing us, hinged on the near post).
-	_door = Node3D.new()
-	_door.position = Vector3(GATE_X - 0.55, g, 1.12)
-	_town_gate.add_child(_door)
-	var d := PaperMesh.new(_rng.randi())
-	d.shade_jitter = 0.16
-	var x := 0.0
-	while x < 1.1:
-		var x1 := minf(x + 0.27, 1.1)
-		d.color = Scenery.WOOD.darkened(_rng.randf_range(0.05, 0.25))
-		d.box(Vector3((x + x1) * 0.5, 1.3, 0.0), Vector3(x1 - x - 0.02, 2.6, 0.08))
-		x = x1
-	d.color = Color(0.12, 0.12, 0.15)
-	for band: float in [0.4, 2.2]:
-		d.box(Vector3(0.55, band, 0.05), Vector3(1.1, 0.07, 0.02))
-	_door.add_child(d.build())
+	# Two leaves across the passage, in line with the wall, hung on the posts
+	# at the front and back of the path; they meet in the middle and swing
+	# open away from the courtyard, into the bamboo side. (A single door
+	# drawn facing us looked wrong whichever way it swung: Julian.)
+	for side: float in [1.0, -1.0]:
+		var leaf := Node3D.new()
+		leaf.position = Vector3(GATE_X, g, side * 1.16)
+		_town_gate.add_child(leaf)
+		var d := PaperMesh.new(_rng.randi())
+		d.shade_jitter = 0.16
+		var z := 0.0
+		while z < 1.14:
+			var z1 := minf(z + 0.28, 1.14)
+			d.color = Scenery.WOOD.darkened(_rng.randf_range(0.05, 0.25))
+			d.box(Vector3(0.0, 1.3, -side * (z + z1) * 0.5), Vector3(0.08, 2.6, z1 - z - 0.02))
+			z = z1
+		d.color = Color(0.12, 0.12, 0.15)
+		for band: float in [0.4, 2.2]:
+			d.box(Vector3(0.0, band, -side * 0.57), Vector3(0.1, 0.07, 1.14))
+			for k in 4:
+				d.box(Vector3(0.0, band, -side * (0.12 + k * 0.3)), Vector3(0.12, 0.035, 0.035))
+		leaf.add_child(d.build())
+		_gate_leaves.append(leaf)
 	_gate_solid = village._add_solid(Vector3(GATE_X, g + 1.5, 0.0), Vector3(0.5, 3.0, 2.2))
-	# Light beyond it, unseen until it opens: the grove's cold moonlight.
+	# Light beyond it, unseen until it opens: the grove's warm daylight.
 	_beyond_light = OmniLight3D.new()
-	_beyond_light.light_color = Color(0.6, 0.78, 0.7)
+	_beyond_light.light_color = Color(1.0, 0.86, 0.62)
 	_beyond_light.light_energy = 0.0
 	_beyond_light.omni_range = 6.0
 	_beyond_light.position = Vector3(GATE_X + 1.5, g + 2.0, 0.5)
 	_town_gate.add_child(_beyond_light)
+
+
+## Beyond the courtyard's far gate, in the town: the street goes on a few
+## metres and runs off into fog (lit warm from deep inside, where the grove
+## is), so the open gate does not give onto nothing (Julian). Built with
+## the village's own street (its random draws put back afterwards, so
+## nothing else in the town changes).
+func _build_beyond_gate() -> void:
+	var left := Village.ARENA.y + 0.5
+	var right := left + 9.0
+	var saved: int = village._rng.state
+	village._build_ground_block(left, right, Village.STEPS_TOP, 8.0, false, false)
+	village._rng.state = saved
+	var mist := PaperMesh.new(1)
+	var fog := Color(0.42, 0.46, 0.64)
+	var warm := Color(0.95, 0.82, 0.6)
+	for k in 6:
+		var z := 3.0 - k * 2.4
+		var from := GATE_X + 0.8 + k * 0.3
+		var full := from + 3.2
+		mist.fade_quad(Vector3(from, -8.0, z), Vector3(from, 26.0, z), Vector3(full, 26.0, z), Vector3(full, -8.0, z),
+				Color(fog, 0.0), Color(fog, 0.38))
+		mist.fade_quad(Vector3(full, -8.0, z), Vector3(full, 26.0, z), Vector3(full + 30.0, 26.0, z), Vector3(full + 30.0, -8.0, z),
+				Color(fog, 0.38), Color(fog, 0.38))
+	# A warm glow deep in the fog, low down: the grove's daylight.
+	mist.fade_quad(Vector3(GATE_X + 4.0, 0.5, -2.0), Vector3(GATE_X + 4.0, 6.0, -2.0), Vector3(GATE_X + 14.0, 6.0, -2.0), Vector3(GATE_X + 14.0, 0.5, -2.0),
+			Color(warm, 0.0), Color(warm, 0.18))
+	_town_gate.add_child(mist.build_veil())
 
 
 ## The grove's west end: the path runs off into deep bright mist (the way
@@ -226,15 +266,21 @@ func open_gate(at_once: bool = false) -> void:
 		village.east_wall = null
 		# Just past the gateway (he is taken to the grove as he walks through).
 		village._add_solid(Vector3(GATE_X + 2.6, 10.0, 0.0), Vector3(1.0, 40.0, 4.0)).set_meta(&"no_climb", true)
+	# Each leaf swings a quarter turn on its post, away from the courtyard.
 	if at_once:
-		_door.rotation.y = deg_to_rad(OPEN_ANGLE)
+		_gate_leaves[0].rotation.y = -deg_to_rad(OPEN_ANGLE)
+		_gate_leaves[1].rotation.y = deg_to_rad(OPEN_ANGLE)
 		_beyond_light.light_energy = 1.4
 		return
 	Sound.play(self, &"plank_creak", -1.0)
-	var t := create_tween()
-	t.tween_property(_door, "rotation:y", deg_to_rad(OPEN_ANGLE + 7.0), 1.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	t.tween_property(_door, "rotation:y", deg_to_rad(OPEN_ANGLE), 0.6).set_trans(Tween.TRANS_SINE)
-	t.parallel().tween_property(_beyond_light, "light_energy", 1.4, 1.4)
+	for k in 2:
+		var turn := -1.0 if k == 0 else 1.0
+		var t := create_tween()
+		t.tween_interval(0.12 * k)
+		t.tween_property(_gate_leaves[k], "rotation:y", turn * deg_to_rad(OPEN_ANGLE + 6.0), 1.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		t.tween_property(_gate_leaves[k], "rotation:y", turn * deg_to_rad(OPEN_ANGLE), 0.6).set_trans(Tween.TRANS_SINE)
+	var glow := create_tween()
+	glow.tween_property(_beyond_light, "light_energy", 1.4, 1.4)
 
 
 # --- The ground ------------------------------------------------------------------

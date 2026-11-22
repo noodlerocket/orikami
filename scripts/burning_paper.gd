@@ -11,6 +11,8 @@ var thrower: Node3D
 var velocity := Vector3.ZERO
 @export var gravity := 14.0
 @export var damage := 1
+## A fox-fire (Akane's): folded vermilion paper burning with a redder flame.
+var fox := false
 
 var _returned := false
 var _burning_out := -1.0
@@ -28,7 +30,7 @@ func _ready() -> void:
 	var b := PaperMesh.new(randi())
 	b.texture_world = false
 	b.shade_jitter = 0.3
-	b.color = Color(0.55, 0.45, 0.33)
+	b.color = Color(0.62, 0.2, 0.16) if fox else Color(0.55, 0.45, 0.33)
 	b.frustum(5, Vector2(0.11, 0.1), Vector2(0.07, 0.08), 0.18, Vector3(0.0, -0.09, 0.0), 0.4)
 	b.color = Color(0.12, 0.09, 0.08)  # charred
 	b.frustum(5, Vector2(0.07, 0.08), Vector2(0.02, 0.02), 0.06, Vector3(0.0, 0.09, 0.0), 1.1)
@@ -36,7 +38,7 @@ func _ready() -> void:
 	var f := PaperMesh.new(1)
 	f.texture_scale = 0.0
 	f.shade_jitter = 0.0
-	f.color = Color(1.0, 0.62, 0.25)
+	f.color = Color(1.0, 0.4, 0.3) if fox else Color(1.0, 0.62, 0.25)
 	f.ellipse(Vector2(0.0, 0.08), Vector2(0.11, 0.16), 9, 0.0, 0.25)
 	f.color = Color(1.0, 0.86, 0.55)
 	f.ellipse(Vector2(0.0, 0.05), Vector2(0.05, 0.08), 7, 0.01, 0.2)
@@ -44,7 +46,7 @@ func _ready() -> void:
 	_flame.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_flame)
 	_light = OmniLight3D.new()
-	_light.light_color = Color(1.0, 0.6, 0.3)
+	_light.light_color = Color(1.0, 0.42, 0.32) if fox else Color(1.0, 0.6, 0.3)
 	_light.light_energy = 1.6
 	_light.omni_range = 3.0
 	_light.omni_attenuation = 2.0

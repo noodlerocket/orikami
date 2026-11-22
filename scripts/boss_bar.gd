@@ -6,8 +6,8 @@ extends Control
 ## above it a thin vermilion line for her posture that grows out from the
 ## middle with every parry (when it meets the ends, she is broken).
 
-const KANJI := preload("res://textures/title_hannya_kanji.png")
-const NAME := preload("res://textures/title_hannya_name.png")
+var KANJI: Texture2D = preload("res://textures/title_hannya_kanji.png")
+var NAME: Texture2D = preload("res://textures/title_hannya_name.png")
 
 var _health := 1.0      # 0 to 1, as shown (eases toward the real value)
 var _health_goal := 1.0
@@ -26,7 +26,13 @@ func _ready() -> void:
 		_rough.append(_rng.randf_range(-1.0, 1.0))
 
 
-func watch(boss: HannyaBoss) -> void:
+## (Any boss with health_changed, posture_changed and defeated; its name's
+## images, if not the Hannya's.)
+func watch(boss: Node, kanji: Texture2D = null, name_image: Texture2D = null) -> void:
+	if kanji:
+		KANJI = kanji
+	if name_image:
+		NAME = name_image
 	boss.health_changed.connect(func(current: int, maximum: int) -> void:
 		_health_goal = float(current) / maxf(maximum, 1.0)
 		_show_goal = 1.0 if current > 0 else 0.0)

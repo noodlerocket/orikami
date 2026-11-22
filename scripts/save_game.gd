@@ -31,6 +31,9 @@ static var abilities: Array[String] = []
 static var smudge_at := Vector3.INF
 ## Whether the Paper-Maker has told him, in pictures (paper_maker_tale.gd).
 static var papermaker_told := false
+## Akane: met (her warning seen), and her first duel won.
+static var akane_met := false
+static var akane_dueled := false
 static var smudge_ink := 0
 ## Explored map cells: "layer:x" keys (layers "under", "street", "roofs").
 static var explored := {}
@@ -57,6 +60,8 @@ static func reset() -> void:
 	explored = {}
 	continuing = false
 	papermaker_told = false
+	akane_met = false
+	akane_dueled = false
 
 
 static func write() -> void:
@@ -72,6 +77,8 @@ static func write() -> void:
 	cfg.set_value("game", "smudge_at", smudge_at if smudge_at != Vector3.INF else Vector3(0, -999, 0))
 	cfg.set_value("game", "smudge_ink", smudge_ink)
 	cfg.set_value("game", "papermaker_told", papermaker_told)
+	cfg.set_value("game", "akane_met", akane_met)
+	cfg.set_value("game", "akane_dueled", akane_dueled)
 	cfg.set_value("game", "explored", explored.keys())
 	cfg.save(file)
 
@@ -92,6 +99,8 @@ static func read() -> bool:
 	smudge_at = at if at.y > -900.0 else Vector3.INF
 	smudge_ink = cfg.get_value("game", "smudge_ink", 0)
 	papermaker_told = cfg.get_value("game", "papermaker_told", false)
+	akane_met = cfg.get_value("game", "akane_met", false)
+	akane_dueled = cfg.get_value("game", "akane_dueled", false)
 	explored = {}
 	for key: String in cfg.get_value("game", "explored", []):
 		explored[key] = true
