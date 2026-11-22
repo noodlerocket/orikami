@@ -215,6 +215,8 @@ var _clash_clock := -1.0          # seconds into the current clash, or -1
 var _clash: Node3D                # the burst of rays when a parry lands
 var _clash_rays: Array[MeshInstance3D] = []
 var _flecks: CPUParticles3D       # white paper chips knocked off by the clash
+var _climb_turn := 0.0            # 1 = turned to face a ladder
+var _climb_phase := 0.0
 
 
 func _ready() -> void:
@@ -225,6 +227,10 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	# Turning is instant (not stop-motion) so the controls feel responsive.
 	_rig.rotation.y = -turn_toward_camera if facing > 0.0 else PI + turn_toward_camera
+	# On a ladder he faces it, his back to us (it stands just behind him).
+	_climb_turn = move_toward(_climb_turn, 1.0 if state == &"climb" else 0.0, delta / 0.15)
+	if _climb_turn > 0.0:
+		_rig.rotation.y = lerp_angle(_rig.rotation.y, PI * 0.5, smoothstep(0.0, 1.0, _climb_turn))
 	_clock += delta
 	if _slash_clock >= 0.0:
 		_slash_clock += delta
@@ -610,6 +616,14 @@ func _pose_model() -> void:
 							smoothstep(0.4, 1.0, _wall_jump_clock / wall_jump_pose_time))
 		&"wall":
 			pose = SamuraiAnimator.wall_slide(_clock)
+		&"climb":
+			# Hand over hand, as fast as he is climbing; a creak of rungs each
+			# time a hand takes hold.
+			var before_grip := _climb_phase
+			_climb_phase = fposmod(_climb_phase + _step * vertical_speed * 0.32, 1.0)
+			if absf(vertical_speed) > 0.1 and (int(before_grip * 2.0) != int(_climb_phase * 2.0)):
+				Sound.play(self, &"step", -8.0)
+			pose = SamuraiAnimator.climb(_climb_phase)
 		&"duck":
 			pose = SamuraiAnimator.duck(_clock)
 		&"crawl":

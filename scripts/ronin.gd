@@ -125,6 +125,10 @@ signal died
 ## through a crawlspace. Under a low ceiling he stays ducked until he is out.
 @export var crawl_speed := 2.0
 
+@export_group("Ladder")
+## Climbing a ladder (W up, S down), in metres per second.
+@export var climb_speed := 3.2
+
 @export_group("Water")
 ## Wading in shallow water: his run is this fraction of its usual speed.
 @export var wading_speed := 0.6
@@ -234,6 +238,9 @@ var drift := 0.0
 ## True while he stands in shallow water (set each frame by the water).
 var wading := false
 var _crawling := false
+## The ladder he is next to this frame (set each frame by the ladder).
+var ladder: Ladder
+var _climbing: Ladder
 
 @onready var _puppet: RoninPuppet = $Puppet
 
@@ -287,7 +294,7 @@ func _physics_process(delta: float) -> void:
 
 	if Input.is_action_just_pressed("jump"):
 		_jump_buffer = jump_buffer_time
-	var busy := _hurt_lock > 0.0 or _healing
+	var busy := _hurt_lock > 0.0 or _healing or _climbing != null
 	if Input.is_action_just_pressed("dash") and _can_dash and _dash_cooldown_left <= 0.0 and not busy:
 		_start_dash(move)
 	if Input.is_action_just_pressed("parry") and _parry_cooldown_left <= 0.0 and _dash_time <= 0.0 and not busy:
@@ -324,7 +331,9 @@ func _physics_process(delta: float) -> void:
 		_start_slash(grounded)
 
 	# --- Work out the velocity ---
-	if _drawing > 0.0:
+	if _update_ladder(delta, grounded):
+		pass
+	elif _drawing > 0.0:
 		# The draw: a straight, very fast line along the ground.
 		velocity = Vector3(facing * draw_distance / draw_time, 0.0, 0.0)
 		_sweep_draw_path()
@@ -691,6 +700,53 @@ func _fell_out_of_world() -> void:
 	fell_in_pit.emit()
 
 
+## Ladders: W at the foot of one (or S at its top) and he takes hold; W/S
+## climb; jump lets go; at the top he steps off onto what it leans on.
+## Returns true while he is on a ladder (it has moved him).
+func _update_ladder(delta: float, grounded: bool) -> bool:
+	var near := ladder
+	ladder = null
+	if _climbing == null:
+		if near == null or _hurt_lock > 0.0 or _dash_time > 0.0 or _drawing > 0.0:
+			return false
+		var at_foot := global_position.y < near.top - 0.4
+		if (at_foot and Input.is_action_pressed("aim_up")) or (not at_foot and grounded and Input.is_action_pressed("aim_down")):
+			_climbing = near
+			_jumping = false
+			_slash_time = 0.0
+			_iai = false
+			_set_ducking(false)
+			if not at_foot:
+				global_position.y = near.top - 0.5  # over the edge, onto the rungs
+		else:
+			return false
+	var rungs := _climbing
+	var climb := Input.get_axis("aim_down", "aim_up")
+	velocity = Vector3((rungs.global_position.x - global_position.x) * 12.0, climb * climb_speed, 0.0)
+	_jump_buffer = 0.0
+	if Input.is_action_just_pressed("jump") or _hurt_lock > 0.0:
+		# Let go: a small hop away from it.
+		_climbing = null
+		velocity = Vector3(facing * 2.5, jump_velocity * 0.6 if not Input.is_action_pressed("aim_down") else 0.0, 0.0)
+		return false
+	if global_position.y >= rungs.top - 0.05 and climb > 0.0:
+		# At the top: step off onto the deck it leans against.
+		_climbing = null
+		facing = rungs.step_off
+		velocity = Vector3(rungs.step_off * 3.4, 5.5, 0.0)
+		_wall_lock = 0.22  # (carried over the edge, not steered back)
+		return false
+	if grounded and climb < 0.0 and global_position.y < rungs.bottom + 0.2:
+		_climbing = null
+		return false
+	return true
+
+
+## True while he is on a ladder.
+func is_climbing() -> bool:
+	return _climbing != null
+
+
 ## Something that drowns or carries him off (deep water, the river): the
 ## screen fades and he is back at the last shrine, as after a fall.
 func fall_in() -> void:
@@ -841,6 +897,8 @@ func _update_puppet() -> void:
 	_puppet.marks = clampf(float(ink_absorbed) / maxf(marks_full_at, 1.0), 0.0, 1.0)
 	if _dead or _hurt_lock > 0.0:
 		_puppet.state = &"hurt"
+	elif _climbing:
+		_puppet.state = &"climb"
 	elif _drawing > 0.0:
 		_puppet.state = &"draw"
 	elif _sliding:

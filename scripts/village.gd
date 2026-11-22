@@ -136,6 +136,8 @@ var river: RiverBridge
 var gatehouse: Gatehouse
 var steps: ShrineSteps
 var fallen: FallenStreet
+var rooftops: RooftopRoad
+var market: MarketStreet
 
 
 func _ready() -> void:
@@ -155,9 +157,12 @@ func _ready() -> void:
 	var yard := PaperMakerYard.new()
 	yard.position = Vector3(1.0, 0.0, 0.0)
 	add_child(yard)
-	var market := MarketStreet.new()
+	market = MarketStreet.new()
 	market.village = self
 	add_child(market)
+	rooftops = RooftopRoad.new()
+	rooftops.village = self
+	add_child(rooftops)
 	fallen = FallenStreet.new()
 	fallen.village = self
 	add_child(fallen)
@@ -413,7 +418,8 @@ func _build_ground_block(left: float, right: float, top: float, thick: float = 8
 	var bottom := top - (12.0 if thick >= 8.0 else thick)
 	front.torn_sheet(_torn_band(left, right, top, maxf(top - 1.2, bottom), 0.0, broken_left, broken_right), STREET_FRONT, Color(0.5, 0.54, 0.68), 0.03)
 	front.color = Color(0.125, 0.135, 0.22)
-	front.torn_sheet(_torn_band(left, right, top - 0.3, bottom, 0.13, broken_left, broken_right), STREET_FRONT + 0.1, Color(0.24, 0.265, 0.39), 0.03)
+	if top - 0.3 > bottom + 0.15:
+		front.torn_sheet(_torn_band(left, right, top - 0.3, bottom, 0.13, broken_left, broken_right), STREET_FRONT + 0.1, Color(0.24, 0.265, 0.39), 0.03)
 	front.color = Color(0.07, 0.076, 0.14)
 	if top - 0.82 > bottom + 0.2:
 		front.torn_sheet(_torn_band(left, right, top - 0.82, bottom, 0.22, broken_left, broken_right), STREET_FRONT + 0.2, Color(0.15, 0.165, 0.27), 0.03)

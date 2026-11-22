@@ -117,7 +117,12 @@ func _run(main: Node) -> void:
 	husk = husks[2]
 	await _face_off(ronin, husk)
 	var before := ronin.health
-	await _frames(70)
+	# (Watched every frame for a while: on a slow computer the husk's
+	# cooldown after its shove can still be running.)
+	for f in 150:
+		await physics_frame
+		if ronin.health < before:
+			break
 	_check("an unparried swipe costs health (%d -> %d)" % [before, ronin.health], ronin.health < before)
 
 	await _face_off(ronin, husk)
@@ -648,6 +653,39 @@ func _expanded_village(main: Node, ronin: Ronin) -> void:
 	await _frames(50)
 	Input.action_release("move_left")
 	_check("from the east, a cut unbars it and the way west is open (x %.1f)" % ronin.global_position.x, gate.opened and ronin.global_position.x < wall[0])
+	# The ladder at the end of Market Street: drawn up until he cuts its cord
+	# from the deck above; then he climbs it from the street.
+	var steps_up: Ladder = village.rooftops.ladder
+	ronin.position = Vector3(steps_up.global_position.x, 0.05, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(10)
+	Input.action_press("aim_up")
+	await _frames(30)
+	Input.action_release("aim_up")
+	_check("before it is kicked down, the ladder cannot be climbed", not ronin.is_climbing() and ronin.global_position.y < 0.5)
+	ronin.position = Vector3(steps_up.global_position.x - 0.9, steps_up.top + 0.05, 0.0)
+	ronin.velocity = Vector3.ZERO
+	ronin.facing = 1.0
+	await _frames(10)
+	Input.action_press("slash")
+	await _frames(2)
+	Input.action_release("slash")
+	await _frames(70)
+	_check("a cut from the deck above lets the ladder down", steps_up.lowered)
+	ronin.position = Vector3(steps_up.global_position.x, 0.05, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(10)
+	Input.action_press("aim_up")
+	var climbed := false
+	for f in 220:
+		await physics_frame
+		climbed = climbed or ronin.is_climbing()
+		if ronin.global_position.y > steps_up.top - 0.2 and not ronin.is_climbing():
+			break
+	Input.action_release("aim_up")
+	await _frames(30)
+	_check("then he climbs it from the street up onto the deck (y %.1f)" % ronin.global_position.y,
+			climbed and ronin.global_position.y > steps_up.top - 0.3 and ronin.is_on_floor())
 	# Three shrines to rest at.
 	_check("there are three shrines", village.find_children("*", "RestShrine", true, false).size() >= 3)
 	# Up the Shrine Steps.

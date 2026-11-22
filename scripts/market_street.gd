@@ -61,9 +61,9 @@ func _ready() -> void:
 	add_child(room)
 	# A crate by the storehouse, solid: something to hop onto.
 	var crate := Scenery.crate(RandomNumberGenerator.new(), 0.9)
-	crate.position = Vector3(SECRET_X + 4.3, 0.0, -0.2)
+	crate.position = Vector3(SECRET_X + 5.15, 0.0, -0.2)
 	add_child(crate)
-	village._add_solid(Vector3(SECRET_X + 4.3, 0.45, 0.0), Vector3(0.9, 0.9, 1.2))
+	village._add_solid(Vector3(SECRET_X + 5.15, 0.45, 0.0), Vector3(0.9, 0.9, 1.2))
 
 
 ## A gallery: the upper storey of a shop built out over the street on posts,

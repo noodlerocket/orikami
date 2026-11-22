@@ -606,3 +606,21 @@ static func crawl(phase: float, time: float) -> Dictionary:
 	pose["foot_r"] = Vector3(-0.14, lift_r * 0.06, 0.22 - cos(phase * TAU) * 0.12)
 	pose["foot_l"] = Vector3(0.14, 0.04 + lift_l * 0.05, -0.3 + cos(phase * TAU) * 0.1)
 	return pose
+
+
+
+## On a ladder, facing it (his back to us): hands on the rungs above his
+## head in turn, the other lower; one knee up on a rung, the other leg
+## straighter. `phase` 0 to 1 over a full cycle (both hands, both feet).
+## (Hand reach points are measured from the shoulders, the way he faces;
+## the ladder's rungs are a hand's length in front of him.)
+static func climb(phase: float) -> Dictionary:
+	var a := sin(phase * TAU)
+	return stance({
+		"hips": Vector3(0.0, -0.06, -0.06), "hips_rot": Vector3(8.0, 0.0, 0.0),
+		"spine": Vector3(4.0, 0.0, 0.0), "head": Vector3(-12.0, 0.0, 0.0),
+		"foot_l": Vector3(0.13, 0.22 + 0.2 * maxf(a, 0.0), 0.2), "toe_l": 20.0,
+		"foot_r": Vector3(-0.13, 0.22 + 0.2 * maxf(-a, 0.0), 0.2), "toe_r": 20.0,
+		"reach_l": Vector3(0.16, 0.38 + 0.2 * maxf(-a, 0.0), 0.3), "aim_l": 1.0,
+		"reach_r": Vector3(-0.16, 0.38 + 0.2 * maxf(a, 0.0), 0.3), "aim_r": 1.0,
+	})
