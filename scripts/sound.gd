@@ -41,6 +41,20 @@ const SOUNDS := {
 	&"hannya_sob_short": {"files": ["hannya_sob_short.mp3"], "volume": -6.0, "vary": 0.06},
 	# The prologue: each pop-up folding up off the page.
 	&"paper_fold": {"files": ["paper_fold.mp3"], "volume": -6.0, "vary": 0.12},
+	# The expanded village: water, planks, the grate, the bell.
+	&"splash": {"files": ["splash.mp3"], "volume": -8.0, "vary": 0.08},
+	&"wade": {"files": ["wade.mp3"], "volume": -8.0, "vary": 0.12},
+	&"plank_creak": {"files": ["plank_creak.mp3"], "volume": -6.0, "vary": 0.1},
+	&"plank_snap": {"files": ["plank_snap.mp3"], "volume": -4.0, "vary": 0.06},
+	&"grate_clank": {"files": ["grate_clank.mp3"], "volume": -7.0, "vary": 0.08},
+	&"fire_bell": {"files": ["fire_bell.mp3"], "volume": -9.0, "vary": 0.03},
+	# The new enemies.
+	&"dog_growl": {"files": ["dog_growl.mp3"], "volume": -9.0, "vary": 0.08},
+	&"dog_bark": {"files": ["dog_bark.mp3"], "volume": -9.0, "vary": 0.08},
+	&"dog_yelp": {"files": ["dog_yelp.mp3"], "volume": -9.0, "vary": 0.08},
+	&"bird_shriek": {"files": ["bird_shriek.mp3"], "volume": -11.0, "vary": 0.1},
+	&"fire_whoosh": {"files": ["fire_whoosh.mp3"], "volume": -8.0, "vary": 0.08},
+	&"fire_burst": {"files": ["fire_burst.mp3"], "volume": -8.0, "vary": 0.08},
 }
 
 ## The rain, wind and village music loops (off for the prologue, which has
@@ -255,3 +269,24 @@ func _apply_levels() -> void:
 		_rain_near.volume_db = rain_volume + _rain_drop + _sounds_db()
 	if _rain_far:
 		_rain_far.volume_db = rain_volume - 3.0 + _rain_drop + _sounds_db()
+
+
+
+## A looping sound standing somewhere in the level (running water, the
+## river): it is heard louder as the camera comes near and fades with
+## distance. `file` is in audio/ (a seamless OGG loop).
+static func place_loop(parent: Node3D, file: String, at: Vector3, volume: float, reach: float) -> AudioStreamPlayer3D:
+	var stream := load(FOLDER + file) as AudioStreamOggVorbis
+	if stream == null:
+		return null
+	stream.loop = true
+	var player := AudioStreamPlayer3D.new()
+	player.stream = stream
+	player.volume_db = volume + _sounds_db()
+	player.unit_size = reach
+	player.max_distance = reach * 3.0
+	player.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
+	player.autoplay = true
+	parent.add_child(player)
+	player.position = at
+	return player

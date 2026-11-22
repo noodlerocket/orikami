@@ -40,6 +40,8 @@ func _ready() -> void:
 	_rng.seed = 8801
 	_build_river()
 	_build_bridge()
+	for x: float in [88.0, 101.0, 114.0]:
+		Sound.place_loop(self, "river_flow.ogg", Vector3(x, WATER, -1.0), -10.0, 7.0)
 	_build_warehouse()
 
 

@@ -79,3 +79,37 @@ should; its energy spreads over 0.7 s, so it is a boom, not a pop.
 | `draw_gleam.mp3` | the iaijutsu draw is charged and ready (hold K) | Gleam of light along a sword blade: one short bright airy shimmer, a high glassy sparkle that rises and fades quickly, soft start, no metal scrape, no bell. *(Julian: the old bell was the same sound as other things. Measured: no energy below 300 Hz, half its energy by 0.25 s, starts quietly; it clipped at 1.2, levelled to 0.73; cut to 0.7 s with a fade-out.)* |
 | `shrine_rest.mp3` | resting at a shrine | Resting at a quiet shrine: a soft deep singing bowl struck once with a padded mallet, warm low resonant hum, long gentle peaceful decay, very calm. *(A pure tone at about 296 Hz, so small speakers still play it; rings out over ~1.5 s. It started at full loudness: a 12 ms fade-in so it cannot click; raised to 0.64 peak; cut to 3.2 s with a fade-out.)* |
 | `hannya_wail.mp3` | the Hannya gathers herself to glide | Wail, a ghostly woman's short rising breathy shriek echoing in the rain, eerie and distant, no words. *(Turned down: it clipped at 1.12; given a 30 ms fade-in.)* |
+
+## The expanded village (overnight, 2026-11-22)
+
+Generated with ElevenLabs, measured with ffmpeg and numpy, shaped and
+levelled (peaks at or under 0.88 in each channel). Sounds that started at
+full loudness got a short fade-in so they cannot click; every one-shot got a
+20 ms fade-out. The three loops are OGG and their ends meet (loudness at the
+two ends within 0.01, no jump at the seam); they are placed in the level with
+`Sound.place_loop`, so they swell as the camera comes near and fade away.
+Three first takes were thrown away: a bark (the file name had a colon, which
+Windows cannot save), a nearly silent grate clank (peak 0.03, mostly a
+click), and a fire whoosh that started at full loudness with 91% of its
+energy below 300 Hz (a pop).
+
+| File | Plays when | Words used to generate it, and what was done |
+| --- | --- | --- |
+| `splash.mp3` | dropping into canal water, a plank landing in it, falling in the river | Splash: a person drops into shallow water in a stone canal, one heavy splash with droplets falling back, slight echo, no music. *(Very quiet, raised 12x; no energy below 300 Hz.)* |
+| `wade.mp3` | each step while wading | Wading footstep in ankle deep water, a single soft slosh, close. *(5 ms fade-in.)* |
+| `plank_creak.mp3` | stepping onto a soggy plank, and as it is about to go; the gate swinging | Creak of a wet old wooden plank bending under weight, slow groan of soaked wood |
+| `plank_snap.mp3` | a plank gives way; the ladder lands; the gate's bar breaks | Snap of a rotten soggy wooden plank breaking, a dull wet crack and splintering |
+| `grate_clank.mp3` | cutting the drain grate; it flips open; a cut on the barred gate from the wrong side | Clank of a heavy rusty iron grate rattling loudly in its stone frame when struck from below, metallic. *(Raised 10x; high-pass at 180 Hz and a 6 ms fade-in, so its strike is not a low thump.)* |
+| `fire_bell.mp3` | cutting the fire-watch bell on the rooftop deck | Hanshō: an old bronze Japanese fire-watch bell struck once with a wooden mallet, deep clang ringing out and fading. *(Almost no energy below 300 Hz; rings over 3 s.)* |
+| `dog_growl.mp3` | the paper dog's tell | Growl of a small fierce dog, low rumbling snarl, close. *(Starts quietly; a growl is low, so 68% below 300 Hz, spread over the whole 0.9 s.)* |
+| `dog_bark.mp3` | the dog charges | Barking dog, one short sharp angry bark from a small dog, close. *(8 ms fade-in.)* |
+| `dog_yelp.mp3` | the dog is cut | Yelp of a small dog that has been struck, one short whimper |
+| `bird_shriek.mp3` | the paper bird's tell; it is struck | Shriek of a crow, one harsh rasping caw, eerie, at night. *(It clipped at 1.4 and started mid-cry: levelled, 15 ms fade-in.)* |
+| `fire_whoosh.mp3` | the lantern husk's tell, and its throw | Whoosh of flames, a burning wad of paper flung through the air, rising airy fire swish, starts quietly. *(High-pass at 180 Hz and a 60 ms fade-in: it was a low rumble that started loud.)* |
+| `fire_burst.mp3` | a burning wad hits something | Flare of burning paper hitting wet ground, a soft fiery puff and crackle of embers. *(High-pass at 220 Hz and a 35 ms fade-in: it started with a low thump.)* |
+| `canal_drips.ogg` | the drain pipe and the canals (looped, six places) | Drips of water falling into a dark stone canal tunnel, slow echoing drops over a faint trickle, ambience. *(Generated as a loop; it clipped at 1.33, levelled.)* |
+| `river_flow.ogg` | the river (looped, three places along it) | River flowing steadily past stone banks in the rain, gentle continuous water ambience |
+| `sluice_pour.ogg` | each sluice (looped) | Pouring water: a steady stream of water falling from a grate onto stone and splashing, continuous |
+
+Measuring tip: decode each channel separately (or `-ac 1` overstates the
+peak of a stereo file: ffmpeg's down-mix sums the channels).

@@ -75,6 +75,12 @@ func _ready() -> void:
 	_build_drips()
 	_build_lights()
 	_build_shaft()
+	# Water dripping and trickling all through the tunnels, and the roar of
+	# each sluice.
+	for x: float in [10.0, 34.0, 60.0, 84.0, 110.0, 130.0]:
+		Sound.place_loop(self, "canal_drips.ogg", Vector3(x, Village.PIPE_FLOOR + 1.0, -1.0), -12.0, 6.0)
+	for x: float in SLUICES:
+		Sound.place_loop(self, "sluice_pour.ogg", Vector3(x, -4.0, 0.0), -6.0, 5.0)
 
 
 func ceiling_at(x: float) -> float:
