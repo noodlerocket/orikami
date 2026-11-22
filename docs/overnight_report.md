@@ -1,7 +1,7 @@
 # Overnight report (2026-11-22)
 
 Good morning. Everything on the approved plan is built, from Part A to
-Part E. Each step is committed **locally** (14 commits, this report included). **Nothing is pushed**:
+Part E. Each step is committed **locally**, one commit per step. **Nothing is pushed**:
 a push rebuilds the downloads, so that is your call. The automated check
 prints ALL PASSED (about 100 checks now, up from about 60).
 
