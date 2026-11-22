@@ -53,7 +53,7 @@ jobs:
       - name: Make the web page (the download page in site/, not the game)
         run: |
           mkdir -p build/web
-          cp site/index.html site/title_loop.mp4 site/title_backdrop.jpg site/yuji_syuku_ui.ttf build/web/
+          cp site/index.html site/title_loop.mp4 site/title_backdrop.jpg site/yuji_syuku_ui.ttf site/favicon.png build/web/
           test -f build/web/index.html
 
       - name: Export the Windows and Mac builds

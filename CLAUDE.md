@@ -596,6 +596,11 @@ There is no controls line along the bottom of the game screen any more
   font and the still in it are copies of `fonts/yuji_syuku_ui.ttf` and
   `textures/title_backdrop.jpg`. The Web export preset and the warm-up
   below are kept but no longer published.
+- **The icon** is Julian's picture (the Ronin before a red sun, 折神;
+  he made it from a design of a brushed ensō), with its white surround cut
+  away: `icon.png` (1024, the window and the Mac app), `icon.ico` (16 to
+  256, the Windows .exe), `site/favicon.png` (the page). Sheet:
+  `docs/screenshots/icon.png`.
 - **Web freezes** (from when the game ran in the browser):** the browser prepares each new kind of material the first
   time it is drawn (up to 3.4 s). `Main._warm_up()` (web only; `--warmup`
   forces it natively) shows the whole level and every effect once behind a
