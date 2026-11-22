@@ -290,6 +290,15 @@ func _ruin() -> void:
 		var at := Vector2(lerpf(left, ridge.x, t), lerpf(9.4, ridge.y, t))
 		b.extrude(PackedVector2Array([at + Vector2(-0.22, -0.02), at + Vector2(0.22, 0.1), at + Vector2(0.2, 0.2), at + Vector2(-0.24, 0.08)]),
 				-1.6 + _rng.randf_range(0.0, 0.6), -0.9 + _rng.randf_range(0.0, 0.6))
+	# What is left of the back wall's frame: charred rails between the posts,
+	# a few laths, for the scorched plaster to cling to.
+	b.color = char_wood
+	for rail: Array in [[left + 0.1, (left + right) * 0.5, 5.2], [left + 0.1, (left + right) * 0.5, 7.9],
+			[(left + right) * 0.5, right - 0.1, 1.7], [(left + right) * 0.5, right - 0.1, 4.3]]:
+		b.box(Vector3((rail[0] + rail[1]) * 0.5, rail[2], -1.3), Vector3(rail[1] - rail[0], 0.14, 0.1))
+	for lath: float in [left + 1.0, left + 2.1, right - 2.4, right - 1.2]:
+		var low := 5.2 if lath < (left + right) * 0.5 else 1.7
+		b.box(Vector3(lath, low + 1.3, -1.32), Vector3(0.06, 2.6, 0.05))
 	# Scorched plaster still on the back wall, torn, black at the edges.
 	b.color = Color(0.32, 0.3, 0.3)
 	b.torn_sheet(PaperMesh.tear(PackedVector2Array([Vector2(left + 0.3, 7.6), Vector2(left + 2.6, 8.1), Vector2(left + 3.3, 6.0),
