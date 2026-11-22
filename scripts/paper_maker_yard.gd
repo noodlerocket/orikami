@@ -76,6 +76,7 @@ func _build(rng: RandomNumberGenerator) -> void:
 
 	# The shrine at her door: where he rests first.
 	shrine = RestShrine.new()
+	shrine.shrine_id = "paper_maker"
 	shrine.position = Vector3(width - 1.1, 0.0, -0.9)
 	shrine.scale = Vector3.ONE * 1.45
 	add_child(shrine)

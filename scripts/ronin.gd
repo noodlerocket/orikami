@@ -241,6 +241,9 @@ var _crawling := false
 ## The ladder he is next to this frame (set each frame by the ladder).
 var ladder: Ladder
 var _climbing: Ladder
+## Counts every time he is put back at a shrine (a fall, a death), so a
+## shrine can tell being put there from walking up to it.
+var respawns := 0
 
 @onready var _puppet: RoninPuppet = $Puppet
 
@@ -791,6 +794,7 @@ func respawn_at_checkpoint() -> void:
 	_wall_lock = 0.0
 	_draw_safe = 0.6  # a moment's safety, without the struck look
 	_in_pit = false
+	respawns += 1
 
 
 # --- Walls -------------------------------------------------------------------
@@ -875,6 +879,7 @@ func revive() -> void:
 	_draw_safe = 0.8
 	_invulnerable = 0.0
 	_dead = false
+	respawns += 1
 
 
 ## Freezes the whole game for a split second.

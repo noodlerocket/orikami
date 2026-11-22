@@ -36,6 +36,10 @@ extends SceneTree
 ##             throw (use --zoom=5)
 ##   ladder    the ladder: let down from the deck, then climbed (use --zoom=6)
 ##   crawl     close-up: crawling through the crawlspace (use --zoom=4.6)
+##   cranes    walking into a bundle of paper cranes: the ring of ink, the
+##             cranes flying off, the count on the HUD (use --zoom=6)
+##   smudge    dying with ink: the Smudge left behind, then cut and taken
+##             back (use --zoom=6)
 ##   marks     close-up of his permanent ink marks: blank, a little, half,
 ##             most, covered (use --zoom=4.6)
 ##   cutscene  the Hannya cutscene, 18 moments through it (times printed)
@@ -122,6 +126,10 @@ func _initialize() -> void:
 			sheet = await _ladder()
 		"crawl":
 			sheet = await _crawl()
+		"cranes":
+			sheet = await _cranes()
+		"smudge":
+			sheet = await _smudge()
 		_:
 			push_error("Unknown sheet: " + args[0])
 			quit(1)
@@ -759,4 +767,53 @@ func _crawl() -> Image:
 		sheet.blit_rect(await _snap(Rect2i(360, 80, 560, 560), tile), Rect2i(Vector2i.ZERO, tile), Vector2i(i * tile.x, 0))
 	Input.action_release("aim_down")
 	Input.action_release("move_right")
+	return sheet
+
+
+
+func _cranes() -> Image:
+	var bundle: CraneBundle = null
+	for b: CraneBundle in _main.get_node("Village").find_children("*", "CraneBundle", true, false):
+		if b.id == "canal_ledge":
+			bundle = b
+	_ronin.set("_draw_safe", 60.0)
+	_ronin.position = bundle.global_position + Vector3(-1.6, 0.1, 0.0)
+	_main.get_node("Camera").snap_to_target()
+	await create_timer(0.6).timeout
+	var tile := Vector2i(427, 240)
+	var sheet := Image.create(tile.x * 3, tile.y * 3, false, Image.FORMAT_RGB8)
+	sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i.ZERO)
+	Input.action_press("move_right")
+	await create_timer(0.2).timeout
+	Input.action_release("move_right")
+	for i in range(1, 9):
+		await create_timer(0.22).timeout
+		sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((i % 3) * tile.x, (i / 3) * tile.y))
+	return sheet
+
+
+func _smudge() -> Image:
+	_ronin.position = Vector3(124.0, 0.1, 0.0)
+	_main.get_node("Camera").snap_to_target()
+	await create_timer(0.4).timeout
+	_ronin.ink = 6
+	_ronin.health = 1
+	_ronin.take_damage(1, _ronin.global_position + Vector3(1.0, 0.0, 0.0))
+	await create_timer(3.4).timeout
+	var smudge: Smudge = _main.get("_smudge")
+	var tile := Vector2i(427, 240)
+	var sheet := Image.create(tile.x * 3, tile.y * 2, false, Image.FORMAT_RGB8)
+	_ronin.position = smudge.global_position + Vector3(-1.3, 0.1, 0.0)
+	_ronin.facing = 1.0
+	_main.get_node("Camera").snap_to_target()
+	for i in 2:
+		await create_timer(0.6).timeout
+		sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i(i * tile.x, 0))
+	Input.action_press("slash")
+	await create_timer(0.05).timeout
+	Input.action_release("slash")
+	for i in range(2, 6):
+
+		await create_timer(0.18).timeout
+		sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((i % 3) * tile.x, (i / 3) * tile.y))
 	return sheet

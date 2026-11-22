@@ -21,6 +21,7 @@ func _ready() -> void:
 	_build_lanterns()
 	_build_tree()
 	shrine = RestShrine.new()
+	shrine.shrine_id = "steps"
 	shrine.position = Vector3(Village.STEPS.x - 1.6, 0.0, -0.9)
 	shrine.scale = Vector3.ONE * 1.45
 	add_child(shrine)

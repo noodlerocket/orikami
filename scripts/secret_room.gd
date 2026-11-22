@@ -77,14 +77,14 @@ func _build(rng: RandomNumberGenerator) -> void:
 	inside.box(Vector3(left + 0.7, 0.18, -deep + 0.4), Vector3(0.8, 0.36, 0.5))
 	inside.color = Scenery.CRIMSON.darkened(0.35)
 	inside.box(Vector3(left + 1.6, 0.25, -deep + 0.35), Vector3(0.6, 0.5, 0.45))
-	# A bundle of folded paper cranes on the shelf (collecting them comes later).
-	inside.color = PaperMesh.WASHI
-	for k in 3:
-		var c := Vector3(right - 1.25 + k * 0.28, 1.28, -deep + 0.22)
-		inside.tri(c + Vector3(-0.12, 0.0, 0.0), c + Vector3(0.0, 0.1, 0.02), c + Vector3(0.02, -0.01, 0.06), Vector3.BACK)
-		inside.tri(c + Vector3(0.0, 0.1, 0.02), c + Vector3(0.13, 0.03, 0.0), c + Vector3(0.02, -0.01, 0.06), Vector3.BACK)
 	var room := inside.build()
 	add_child(room)
+	# A bundle of folded paper cranes on the shelf: the room's secret.
+	var cranes := CraneBundle.new()
+	cranes.id = "secret_room"
+	cranes.count = 5
+	cranes.position = Vector3(right - 1.0, 1.24, -deep + 0.28)
+	add_child(cranes)
 	var lantern := Scenery.lantern(rng, 1.6, 0.6, 0.35)
 	lantern.position = Vector3(right - 0.5, height - 0.05, -0.4)
 	add_child(lantern)

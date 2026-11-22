@@ -58,6 +58,9 @@ func _ready() -> void:
 		{"label": "Settings", "page": &"settings"},
 		{"label": "Controls", "page": &"controls"},
 	]
+	# A saved game: Continue, first (Begin still starts anew, with the prologue).
+	if not download_instead and SaveGame.exists():
+		main_lines.insert(0, {"id": &"continue", "label": "Continue"})
 	if not OS.has_feature("web"):
 		main_lines.append({"id": &"quit", "label": "Quit"})
 	menu.add_page(&"main", "", main_lines)

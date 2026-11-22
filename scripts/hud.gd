@@ -21,6 +21,8 @@ extends Control
 ## How long a splat takes to burst when you are hurt, and to bloom when you heal.
 @export var burst_time := 0.45
 @export var bloom_time := 0.3
+## Seconds the crane count stays up after a bundle is found.
+@export var crane_tag_time := 3.5
 
 const PAPER := Color(0.93, 0.9, 0.84)
 const PAPER_EDGE := Color(0.99, 0.98, 0.95)
@@ -39,8 +41,87 @@ var _sip := 0.0    # counts down after the ink meter changes, for a little swell
 var _started := false
 
 
+var _tag: Control           # the crane count, on its own scrap of paper
+var _cranes := 0
+var _tag_tween: Tween
+
+
+## The crane count: a small paper tag under the strip, with a crane drawn
+## in ink and how many have been found. It fades in when a bundle is found,
+## stays a while, and fades away.
+func cranes_found(total: int) -> void:
+	_cranes = total
+	if _tag == null:
+		_tag = Control.new()
+		_tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_tag.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_tag.modulate.a = 0.0
+		_tag.draw.connect(_draw_tag)
+		add_child(_tag)
+	_tag.queue_redraw()
+	if _tag_tween:
+		_tag_tween.kill()
+	_tag_tween = create_tween()
+	_tag_tween.tween_property(_tag, "modulate:a", 1.0, 0.35).set_trans(Tween.TRANS_SINE)
+	_tag_tween.tween_interval(crane_tag_time)
+	_tag_tween.tween_property(_tag, "modulate:a", 0.0, 0.8).set_trans(Tween.TRANS_SINE)
+
+
+func _draw_tag() -> void:
+	var at := corner + Vector2(6.0, 98.0)
+	var area := Rect2(at, Vector2(138.0, 44.0))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 31
+	var outline := PackedVector2Array()
+	var corners := [area.position, Vector2(area.end.x, area.position.y + 3.0), area.end + Vector2(3.0, -2.0), Vector2(area.position.x - 2.0, area.end.y)]
+	for i in 4:
+		var a: Vector2 = corners[i]
+		var b: Vector2 = corners[(i + 1) % 4]
+		var pieces := maxi(2, int(a.distance_to(b) / 12.0))
+		var out := (b - a).orthogonal().normalized()
+		for k in pieces:
+			outline.append(a.lerp(b, float(k) / pieces) + out * rng.randf_range(-1.8, 1.8))
+	var shadow := PackedVector2Array()
+	for point: Vector2 in outline:
+		shadow.append(point + Vector2(3.0, 4.0))
+	_tag.draw_colored_polygon(shadow, Color(0.0, 0.0, 0.05, 0.3))
+	_tag.draw_colored_polygon(outline, Color(PAPER, 0.96))
+	# A crane, in ink: body, raised wings, neck and tail.
+	var c := at + Vector2(30.0, 25.0)
+	_tag.draw_colored_polygon(PackedVector2Array([c + Vector2(-14, 2), c + Vector2(0, -2), c + Vector2(13, 3), c + Vector2(0, 7)]), Color(INK, 0.85))
+	_tag.draw_colored_polygon(PackedVector2Array([c + Vector2(-3, 0), c + Vector2(-11, -15), c + Vector2(3, -1)]), Color(INK, 0.7))
+	_tag.draw_colored_polygon(PackedVector2Array([c + Vector2(1, -1), c + Vector2(9, -13), c + Vector2(6, 1)]), Color(INK, 0.55))
+	_tag.draw_line(c + Vector2(11, 3), c + Vector2(18, -6), Color(INK, 0.85), 2.0, true)
+	_tag.draw_line(c + Vector2(-12, 2), c + Vector2(-19, -3), Color(INK, 0.85), 2.0, true)
+	var words := str(_cranes)
+	_tag.draw_string(UiStyle.FONT, at + Vector2(58.0, 33.0), words, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Color(INK, 0.9))
+	_tag.draw_string(UiStyle.FONT, at + Vector2(62.0 + UiStyle.width(words, 26), 33.0), "/ 1000", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(INK, 0.45))
+
+
+var _note: Control
+
+
+## "Saved": a small line of brush lettering under the strip, after resting
+## at a shrine. It fades in and away.
+func saved() -> void:
+	if _note == null:
+		_note = Control.new()
+		_note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_note.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_note.modulate.a = 0.0
+		_note.draw.connect(func() -> void:
+			UiStyle.text(_note, corner + Vector2(blot_spacing * _max_health + 90.0, 40.0), "Rested and saved", 20,
+					Color(UiStyle.WASHI.r, UiStyle.WASHI.g, UiStyle.WASHI.b, 0.85), 1.0))
+		add_child(_note)
+	var t := create_tween()
+	t.tween_property(_note, "modulate:a", 1.0, 0.4)
+	t.tween_interval(1.8)
+	t.tween_property(_note, "modulate:a", 0.0, 0.9)
+
+
 ## Start listening to a Ronin's health and ink.
 func watch(ronin: Ronin) -> void:
+	add_to_group(&"hud")
 	_heal_cost = maxi(ronin.heal_cost, 1)
 	ronin.health_changed.connect(_on_health_changed)
 	ronin.ink_changed.connect(_on_ink_changed)

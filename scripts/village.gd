@@ -119,6 +119,12 @@ const MOSS := Color(0.3, 0.34, 0.18)
 @export var dog_positions: Array[Vector2] = [Vector2(76.0, -4.1), Vector2(94.0, -4.9), Vector2(129.0, -4.7)]
 ## Paper birds: the middle of each one's loop, over the rooftops.
 @export var bird_roosts: Array[Vector2] = [Vector2(52.0, 10.0), Vector2(70.5, 12.2), Vector2(90.0, 9.6)]
+## Bundles of paper cranes: [name, x, y, depth, how many]. (A sixth is in
+## Market Street's back room: SecretRoom.)
+const CRANE_BUNDLES := [
+	["gallery_roof", 32.0, 5.64, -0.6, 5], ["chamber", -5.4, -2.0, -1.4, 3], ["ruin", 72.4, 8.6, -0.7, 4],
+	["canal_ledge", 115.0, -5.6, -1.6, 6], ["lookout", 134.5, 11.5, -0.6, 7], ["canal_end", 136.1, -4.8, -1.8, 4],
+	["far_deck", 117.6, 6.4, -0.6, 9]]
 ## Lantern husks (they throw burning paper).
 @export var lantern_husk_positions: Array[Vector2] = [Vector2(111.0, 0.8), Vector2(148.0, 0.1)]
 
@@ -197,6 +203,12 @@ func _ready() -> void:
 		var bird := PaperBird.new()
 		bird.position = Vector3(spot.x, spot.y, 0.0)
 		add_child(bird)
+	for c: Array in CRANE_BUNDLES:
+		var bundle := CraneBundle.new()
+		bundle.id = c[0]
+		bundle.count = c[4]
+		bundle.position = Vector3(c[1], c[2], c[3])
+		add_child(bundle)
 	for spot: Vector2 in lantern_husk_positions:
 		var keeper := LanternHusk.new()
 		keeper.position = Vector3(spot.x, spot.y, 0.0)

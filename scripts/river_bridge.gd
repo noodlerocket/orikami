@@ -332,6 +332,7 @@ func _build_warehouse() -> void:
 	# A lantern by the door, and the shrine in front of it.
 	village._hang_lantern(Vector3(door.x - 1.65, 2.9, z + 0.7), 0.25, 0.8)
 	shrine = RestShrine.new()
+	shrine.shrine_id = "warehouse"
 	shrine.position = Vector3(door.x - 2.4, 0.0, -0.9)
 	shrine.scale = Vector3.ONE * 1.45
 	add_child(shrine)

@@ -7,6 +7,8 @@ var _failures := 0
 
 
 func _initialize() -> void:
+	SaveGame.file = "user://smoke_save.cfg"  # (never touch a real saved game)
+	DirAccess.remove_absolute(SaveGame.file)
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
 	_run.call_deferred(main)
@@ -695,6 +697,7 @@ func _expanded_village(main: Node, ronin: Ronin) -> void:
 	_check("then he climbs it from the street up onto the deck (y %.1f)" % ronin.global_position.y,
 			climbed and ronin.global_position.y > steps_up.top - 0.3 and ronin.is_on_floor())
 	await _new_enemies(village, ronin)
+	await _cranes_and_saving(main, village, ronin)
 	# Three shrines to rest at.
 	_check("there are three shrines", village.find_children("*", "RestShrine", true, false).size() >= 3)
 	# Up the Shrine Steps.
@@ -712,6 +715,68 @@ func _expanded_village(main: Node, ronin: Ronin) -> void:
 	await _frames(20)
 	ronin.set("_draw_safe", 0.0)
 	ronin.health = ronin.max_health
+
+
+## Paper cranes, saving at a shrine, Continue, and the Smudge.
+func _cranes_and_saving(main: Node, village: Village, ronin: Ronin) -> void:
+	# A bundle of cranes is found by walking into it, and counted.
+	var bundle: CraneBundle = null
+	for b: CraneBundle in village.find_children("*", "CraneBundle", true, false):
+		if b.id == "canal_ledge":
+			bundle = b
+	var before := SaveGame.crane_total()
+	ronin.position = bundle.global_position + Vector3(-2.0, 0.1, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(5)
+	Input.action_press("move_right")
+	await _frames(25)
+	Input.action_release("move_right")
+	_check("walking into a bundle of cranes finds them (%d -> %d)" % [before, SaveGame.crane_total()],
+			bundle.taken and SaveGame.crane_total() == before + bundle.count)
+	# Resting at the warehouse shrine saves the game.
+	var shrine: RestShrine = village.river.shrine
+	ronin.position = Vector3(shrine.global_position.x - 3.0, 0.1, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(10)
+	Input.action_press("move_right")
+	while ronin.global_position.x < shrine.global_position.x - 0.3:
+		await process_frame
+	Input.action_release("move_right")
+	await _frames(45)
+	_check("resting at a shrine saves the game", SaveGame.exists() and SaveGame.last_shrine == "warehouse")
+	var cfg := ConfigFile.new()
+	cfg.load(SaveGame.file)
+	_check("the save keeps the shrine and the cranes", cfg.get_value("game", "last_shrine", "") == "warehouse"
+			and (cfg.get_value("game", "cranes", []) as Array).size() >= 1)
+	# Continue puts him back at that shrine, with what he had found.
+	ronin.position = Vector3(10.0, 0.1, 0.0)
+	SaveGame.cranes = []
+	main.call("_continue_from_save")
+	await _frames(5)
+	_check("Continue brings him back to the shrine he saved at (x %.1f)" % ronin.global_position.x,
+			absf(ronin.global_position.x - shrine.global_position.x) < 0.5 and SaveGame.has_crane("canal_ledge"))
+	# Dying with ink leaves a Smudge holding it; cutting it gives it back.
+	ronin.position = Vector3(124.0, 0.1, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(10)
+	ronin.ink = 5
+	ronin.set("_invulnerable", 0.0)
+	ronin.set("_draw_safe", 0.0)
+	ronin.health = 1
+	ronin.take_damage(1, ronin.global_position + Vector3(1.0, 0.0, 0.0))
+	await _frames(200)
+	var smudge: Smudge = main.get("_smudge")
+	_check("dying leaves a Smudge holding his ink (%d ink now)" % ronin.ink, smudge != null and smudge.ink == 5 and ronin.ink == 0)
+	if smudge:
+		ronin.position = smudge.global_position + Vector3(-1.2, 0.1, 0.0)
+		ronin.velocity = Vector3.ZERO
+		ronin.facing = 1.0
+		await _frames(30)
+		Input.action_press("slash")
+		await _frames(2)
+		Input.action_release("slash")
+		await _frames(20)
+		_check("cutting the Smudge gives the ink back (%d)" % ronin.ink, ronin.ink == 5)
 
 
 ## The paper dog, the paper bird and the lantern husk.

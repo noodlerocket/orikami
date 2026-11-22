@@ -108,8 +108,12 @@ func _build_backdrop() -> void:
 func _on_chosen(item: StringName) -> void:
 	match item:
 		&"begin":
+			SaveGame.reset()
 			Sound.duck_music(true)
 			_menu.fade_to_black(func() -> void: get_tree().change_scene_to_file(PROLOGUE_SCENE))
+		&"continue":
+			SaveGame.continuing = true
+			_menu.fade_to_black(func() -> void: get_tree().change_scene_to_file("res://scenes/main.tscn"))
 		&"quit":
 			_menu.fade_to_black(func() -> void: get_tree().quit())
 		&"get_windows", &"get_mac":

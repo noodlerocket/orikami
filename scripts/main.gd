@@ -19,6 +19,8 @@ var _boss: HannyaBoss
 var _warming := false
 var _boss_bar: BossBar
 var _pause: PauseMenu
+var _smudge: Smudge
+var _explore_clock := 0.0
 
 @onready var _ronin: Ronin = $Ronin
 @onready var _camera: FollowCamera = $Camera
@@ -44,6 +46,10 @@ func _ready() -> void:
 	_ronin.died.connect(_on_died)
 	_build_fade()
 	_build_pause()
+	_watch_shortcuts()
+	if SaveGame.continuing:
+		SaveGame.continuing = false
+		_continue_from_save.call_deferred()
 	_debug_screenshot()
 	# The browser version prepares every material and effect once, behind a
 	# loading cover, so the game does not freeze the first time each appears.
@@ -54,7 +60,7 @@ func _ready() -> void:
 		_start_in_well()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	# The Hannya's shadow is only filmed while her shrine could be on screen.
 	var stage: HannyaStage = $Village.stage
 	if stage and not _warming:
@@ -62,10 +68,21 @@ func _process(_delta: float) -> void:
 				or (_boss != null and is_instance_valid(_boss)))
 	if _warming:
 		return  # (he is moved about during the warm-up: no cutscene, no fight)
+	_explore_clock += delta
+	if _explore_clock > 0.4:
+		_explore_clock = 0.0
+		SaveGame.explore(_ronin.global_position)
 	var in_arena := _ronin.global_position.x > Village.ARENA.x + 0.6
-	# Walking into the shrine courtyard for the first time plays the cutscene.
+	# Walking into the shrine courtyard for the first time plays the cutscene
+	# (once it has been seen, in a saved game, the fight starts at once).
 	if not _cutscene_played and in_arena:
-		play_hannya_cutscene()
+		if SaveGame.hannya_fallen:
+			_cutscene_played = true
+		elif SaveGame.hannya_seen:
+			_cutscene_played = true
+			_start_boss_fight()
+		else:
+			play_hannya_cutscene()
 	# After that: coming back in (after dying) starts the fight again. (The
 	# courtyard is sealed while she fights, so it cannot be walked out of.)
 	if _boss and is_instance_valid(_boss) and _boss.health > 0:
@@ -98,6 +115,8 @@ func _start_tutorial() -> void:
 ## The cutscene before the Weeping Hannya fight.
 func play_hannya_cutscene() -> void:
 	_cutscene_played = true
+	SaveGame.hannya_seen = true
+	SaveGame.write()
 	var scene := HannyaCutscene.new()
 	scene.main = self
 	scene.ronin = _ronin
@@ -253,6 +272,8 @@ func _start_boss_fight() -> void:
 	$Overlay.add_child(_boss_bar)
 	_boss_bar.watch(_boss)
 	_boss.defeated.connect(func() -> void:
+		SaveGame.hannya_fallen = true
+		SaveGame.write()
 		$Village.relight_arena_lanterns()
 		$Village.set_arena_sealed(false))
 	_begin_fight()
@@ -293,6 +314,14 @@ func _build_fade() -> void:
 ## He has died: the screen fades out, he is put back together at the start,
 ## and the fight (if there was one) resets; then the screen fades in.
 func _on_died() -> void:
+	# The Smudge: the ink he carried stays where he fell (an older one is lost).
+	if _smudge and is_instance_valid(_smudge):
+		_smudge.dry_up()
+		_smudge = null
+	if _ronin.ink > 0:
+		_leave_smudge(_ronin.global_position, _ronin.ink)
+		_ronin.ink = 0
+		_ronin.ink_changed.emit(0, _ronin.max_ink)
 	var out := create_tween()
 	out.tween_property(_fade, "modulate:a", 1.0, pit_fade_out).set_trans(Tween.TRANS_SINE)
 	await out.finished
@@ -338,6 +367,8 @@ func _on_fell_in_pit() -> void:
 #   --tutorial             start the tutorial cards straight away
 
 func _apply_debug_start() -> void:
+	if not OS.get_cmdline_user_args().is_empty():
+		SaveGame.file = "user://debug_save.cfg"  # (never a real saved game)
 	for arg: String in OS.get_cmdline_user_args():
 		if arg.begins_with("--x="):
 			_ronin.position.x = float(arg.trim_prefix("--x="))
@@ -381,3 +412,63 @@ func _debug_screenshot() -> void:
 			await RenderingServer.frame_post_draw
 			get_viewport().get_texture().get_image().save_png(arg.trim_prefix("--screenshot="))
 			get_tree().quit()
+
+
+
+# --- The saved game ----------------------------------------------------------------
+
+## Leaves the Smudge (where he fell, on the ground below him).
+func _leave_smudge(at: Vector3, ink: int) -> void:
+	var ray := PhysicsRayQueryParameters3D.create(at + Vector3(0.0, 0.5, 0.0), at + Vector3(0.0, -30.0, 0.0), 1)
+	var hit := get_world_3d().direct_space_state.intersect_ray(ray)
+	_smudge = Smudge.new()
+	_smudge.ink = ink
+	$Village.add_child(_smudge)
+	_smudge.global_position = Vector3(at.x, (hit["position"] as Vector3).y if not hit.is_empty() else at.y, 0.0)
+	SaveGame.smudge_at = _smudge.global_position
+	SaveGame.smudge_ink = ink
+
+
+## Shortcuts opened are kept (and saved at once: they are for good).
+func _watch_shortcuts() -> void:
+	var village: Village = $Village
+	village.canals.shortcut_opened.connect(_on_shortcut)
+	village.gatehouse.shortcut_opened.connect(_on_shortcut)
+	village.rooftops.ladder.lowered_now.connect(_on_shortcut.bind(&"ladder"))
+
+
+func _on_shortcut(which: StringName) -> void:
+	SaveGame.opened(String(which))
+	SaveGame.write()
+
+
+## Continue (from the title): back at the last shrine, everything found and
+## opened as it was saved.
+func _continue_from_save() -> void:
+	if not SaveGame.read():
+		return
+	var village: Village = $Village
+	for shrine: RestShrine in village.find_children("*", "RestShrine", true, false):
+		if shrine.shrine_id in SaveGame.rested:
+			shrine.light_quietly()
+		if shrine.shrine_id == SaveGame.last_shrine:
+			var spot := Vector3(shrine.global_position.x, shrine.global_position.y + 0.1, 0.0)
+			_ronin.global_position = spot
+			_ronin.set_checkpoint(spot)
+	_ronin.ink_absorbed = SaveGame.ink_absorbed
+	(_ronin.get_node("Puppet") as RoninPuppet).set_marks_now(clampf(float(SaveGame.ink_absorbed) / _ronin.marks_full_at, 0.0, 1.0))
+	if "grate" in SaveGame.shortcuts:
+		village.canals.open_grate(true)
+	if "gate" in SaveGame.shortcuts:
+		village.gatehouse.open_gate(true)
+	if "ladder" in SaveGame.shortcuts:
+		village.rooftops.ladder.lower(true)
+	for bundle: CraneBundle in village.find_children("*", "CraneBundle", true, false):
+		if SaveGame.has_crane(bundle.id):
+			bundle.collect(true)
+	if SaveGame.smudge_at != Vector3.INF and SaveGame.smudge_ink > 0:
+		_smudge = Smudge.new()
+		_smudge.ink = SaveGame.smudge_ink
+		village.add_child(_smudge)
+		_smudge.global_position = SaveGame.smudge_at
+	_camera.snap_to_target()

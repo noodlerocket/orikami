@@ -5,9 +5,12 @@ extends Node3D
 ## the paper streamers (shide) on its rope flutter, a small bell rings, his
 ## health is made whole, and from then on a fall or a death brings him back
 ## here instead of to the well. Resting again heals him again.
-## (Saving to disk comes later: this is where it will happen.)
+## Resting saves the game (SaveGame).
 
 signal rested
+
+## This shrine's name in the save.
+@export var shrine_id := "shrine"
 
 ## How close (metres along the street) he must stand.
 @export var reach := 1.0
@@ -25,6 +28,7 @@ var _standing := 0.0
 var _rested_here := false   # rested since he last walked up to it
 var _clock := 0.0
 var _last_x := INF
+var _respawns := 0
 
 
 func _ready() -> void:
@@ -126,8 +130,9 @@ func _physics_process(delta: float) -> void:
 			return
 	# Put here (respawned after a fall or a death) rather than walking up:
 	# that is not resting. He rests when he next walks up to it.
-	if absf(ronin.global_position.x - _last_x) > 3.0 and absf(ronin.global_position.x - global_position.x) < reach + 1.0:
+	if (absf(ronin.global_position.x - _last_x) > 3.0 or ronin.respawns != _respawns) 			and absf(ronin.global_position.x - global_position.x) < reach + 1.0:
 		_rested_here = true
+	_respawns = ronin.respawns
 	_last_x = ronin.global_position.x
 	var near := absf(ronin.global_position.x - global_position.x) < reach \
 			and absf(ronin.global_position.y - global_position.y) < 0.6 and ronin.is_on_floor()
@@ -159,6 +164,12 @@ func _rest() -> void:
 		ronin.health_changed.emit(ronin.health, ronin.max_health)
 	_flutter = 1.0
 	Sound.play(self, &"shrine_rest")
+	SaveGame.last_shrine = shrine_id
+	if shrine_id not in SaveGame.rested:
+		SaveGame.rested.append(shrine_id)
+	SaveGame.ink_absorbed = ronin.ink_absorbed
+	SaveGame.write()
+	get_tree().call_group(&"hud", &"saved")
 	if not lit:
 		lit = true
 		_candle.visible = true
@@ -168,3 +179,10 @@ func _rest() -> void:
 		flare.tween_property(_candle_light, "light_energy", 4.0, 0.12)
 		flare.tween_property(_candle_light, "light_energy", 1.6, 0.6).set_trans(Tween.TRANS_SINE)
 	rested.emit()
+
+
+## Lit already (a saved game: he rested here before), without the flare.
+func light_quietly() -> void:
+	lit = true
+	_candle.visible = true
+	_candle_light.light_energy = 1.6
