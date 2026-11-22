@@ -2,13 +2,14 @@
 
 A 2.5D samurai metroidvania where everything is folded paper. It is Julian's
 first game. Built with Godot 4.7.2 (standard, GDScript, Compatibility
-renderer); playable in a browser and as Windows/Mac downloads.
+renderer); played as Windows/Mac downloads (the web page only offers
+them; see "Builds, speed and downloads").
 
 - **This is the real game.** It began as a copy of the finished prototype
   (git tag `prototype-v1`). The prototype is kept, unchanged, in
   `noodlerocket/orikamiprototype` (folder `C:\Users\JulianUribe\Orikami`,
   https://noodlerocket.github.io/orikamiprototype/). Do not work there.
-- Play it: https://noodlerocket.github.io/orikami/
+- The web page (download Windows or Mac): https://noodlerocket.github.io/orikami/
 - Download it: https://github.com/noodlerocket/orikami/releases/latest
 - Code: https://github.com/noodlerocket/orikami (public). Every push to `main`
   runs the automated check, rebuilds the web page and the downloads, and
@@ -182,10 +183,8 @@ and always say plainly what was checked this way and what only he can judge.
 - **Music:** look at loudness second by second to check its shape matches the
   scene, and that a loop's two ends meet smoothly.
 - **Depth fights:** search for sheets built at the same `z` that overlap.
-- **Browser speed:** open the live site in the Browser pane (it must be
-  VISIBLE: a hidden pane is throttled), then time frames with
-  `requestAnimationFrame` in JavaScript (median, slow frames over 33 ms,
-  worst) while holding a key with dispatched `KeyboardEvent`s.
+- **The web page** (`site/`): preview it with `preview_start` "site"
+  (`.claude/launch.json`), at desktop and phone width.
 - **New Meshy models:** `tools/model_look.gd` photographs an unrigged model
   from three sides. Rigged models draw wrongly there; check them in game.
 
@@ -589,7 +588,15 @@ There is no controls line along the bottom of the game screen any more
   (Begin to the prologue) shows black, not a grey flash.
 
 ### Builds, speed and downloads
-- **Web freezes:** the browser prepares each new kind of material the first
+- **No game in the browser** (Julian, 2026-11-21): the site is a download
+  page (`site/index.html`): his title video (`site/title_loop.mp4`, made
+  from `video/title_loop.ogv` with ffmpeg; decoding Theora is fine), the
+  logo, and "Windows / Mac", the one that suits the visitor's computer
+  marked; then the unzip-and-open steps. `site/` has a `.gdignore`. The
+  font and the still in it are copies of `fonts/yuji_syuku_ui.ttf` and
+  `textures/title_backdrop.jpg`. The Web export preset and the warm-up
+  below are kept but no longer published.
+- **Web freezes** (from when the game ran in the browser):** the browser prepares each new kind of material the first
   time it is drawn (up to 3.4 s). `Main._warm_up()` (web only; `--warmup`
   forces it natively) shows the whole level and every effect once behind a
   sumi cover with a pale ensō (`loading_cover.gd`). **Every new effect,
@@ -599,10 +606,9 @@ There is no controls line along the bottom of the game screen any more
 - **Downloads:** export presets "Windows" (one .exe) and "Mac" (universal
   .app, ad-hoc signed, not notarized; needs the ETC2/ASTC texture setting,
   which is on). The workflow (`.github/workflows/deploy.yml`) runs the
-  automated check, exports web, Windows and Mac, replaces the GitHub Release
+  automated check, exports Windows and Mac, copies `site/` as the page, replaces the GitHub Release
   "latest" with `Orikami-Windows.zip` and `Orikami-Mac.zip`, and deploys the
-  page. The page's "Download: Windows · Mac" link is in the Web preset's
-  `html/head_include`. Unsigned: Windows says "protected your PC" (More
+  page. Unsigned: Windows says "protected your PC" (More
   info, Run anyway); a Mac needs right-click, Open the first time.
 - Godot's export templates are NOT installed on this computer (only on
   GitHub's builder), so web/desktop builds can only be tested after a push.
@@ -646,6 +652,7 @@ There is no controls line along the bottom of the game screen any more
 | `scripts/title_screen.gd`, `title_menu.gd`, `pause_menu.gd`, `ink_menu.gd`, `ui_style.gd` | Title screen, pause screen, the shared menu and UI style |
 | `fonts/` | The brush font, cut down for the UI (and its licence) |
 | `video/` | The title video |
+| `site/` | The web page: the title video and the Windows / Mac downloads |
 | `export_presets.cfg` | Web, Windows and Mac export settings (and the page's download link) |
 | `.github/workflows/deploy.yml` | Check, build, release and deploy on every push to `main` |
 
@@ -710,7 +717,7 @@ frame sheet when the change can be seen.
 - Never judged in motion or by ear by Claude: animation, effects and sound
   were checked by frame sheets and measurement only. Volumes are guesses.
 - The Mac download has not been tried on a Mac; a gamepad has never been
-  tested; how long the web loading cover lasts for a first visit is untimed.
+  tested.
 - `tools/model_look.gd` cannot show rigged models (they draw wrongly there).
 - The cloak does not collide with his body: a very strong gust can push it
   through his legs.

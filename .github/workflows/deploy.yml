@@ -1,7 +1,8 @@
 # Builds Orikami every time something is pushed to the "main" branch:
-#   - the web version, published to GitHub Pages;
+#   - the web page (site/): the title video and a choice of download,
+#     published to GitHub Pages (the game itself is not played in the browser);
 #   - downloadable Windows and Mac versions, attached to a GitHub Release
-#     called "latest" (the page links to them: "Download: Windows · Mac").
+#     called "latest" (the page links to them).
 #
 # One-time setup on GitHub: repository Settings > Pages > Source: "GitHub Actions".
 name: Build and deploy to GitHub Pages
@@ -49,10 +50,10 @@ jobs:
       - name: Run the smoke test
         run: '"$RUNNER_TEMP/godot" --headless --path . --script tools/smoke_test.gd'
 
-      - name: Export the web build (single-threaded)
+      - name: Make the web page (the download page in site/, not the game)
         run: |
           mkdir -p build/web
-          "$RUNNER_TEMP/godot" --headless --path . --export-release "Web" build/web/index.html
+          cp site/index.html site/title_loop.mp4 site/title_backdrop.jpg site/yuji_syuku_ui.ttf build/web/
           test -f build/web/index.html
 
       - name: Export the Windows and Mac builds
