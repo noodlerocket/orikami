@@ -115,5 +115,8 @@ energy below 300 Hz (a pop).
 | `shake_off.mp3` | shaking the water off after the canals | Shaking water off a wet paper cloak and straw hat, a quick rustle and a spray of droplets |
 | `cranes_rise.mp3` | a bundle of paper cranes found | Fluttering of many small paper cranes taking flight, soft paper wings rustling upward with a faint airy shimmer, gentle and magical. *(Quiet: raised 5.4x; starts from silence.)* |
 
+| `bamboo_wind.ogg` | the Bamboo of Folded Wind (looped, four places) | Wind through a tall bamboo forest at night, soft steady rustling of leaves and gentle hollow creaking of stems, calm ambience, no birds. *(Generated as a loop; quiet, raised 2.6x; no energy below 300 Hz.)* |
+| `birds_scatter.mp3` | small perched birds take off as he comes near | Small birds startled from a roof, a quick burst of wing flutters taking off and flying away, a couple of soft chirps. *(98% of it was below 300 Hz, a rumble: high-passed twice at 280 Hz so only the airy flutter and chirps are left; levelled to 0.66.)* |
+
 Measuring tip: decode each channel separately (or `-ac 1` overstates the
 peak of a stereo file: ffmpeg's down-mix sums the channels).

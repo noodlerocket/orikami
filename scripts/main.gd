@@ -44,6 +44,7 @@ func _ready() -> void:
 	_ronin.parried.connect(_camera.add_shake.bind(0.12))
 	_ronin.fell_in_pit.connect(_on_fell_in_pit)
 	_ronin.died.connect(_on_died)
+	_ronin.dashed.connect(($Village as Village).stir_petals)
 	_build_fade()
 	_build_pause()
 	_watch_shortcuts()

@@ -43,6 +43,8 @@ func _ready() -> void:
 	_bamboo()
 	_altar()
 	_air()
+	for x: float in [200.0, 218.0, 238.0, 252.0]:
+		Sound.place_loop(self, "bamboo_wind.ogg", Vector3(x, 4.0, -1.0), -6.0, 9.0)
 	shrine = RestShrine.new()
 	shrine.shrine_id = "bamboo"
 	shrine.position = Vector3(SHRINE_X, 1.5, -0.9)

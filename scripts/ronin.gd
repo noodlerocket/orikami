@@ -17,6 +17,8 @@ signal fell_in_pit
 ## He has died (shredded): the screen should fade out, then call revive()
 ## (main.gd does this).
 signal died
+## He dashed (the village stirs fallen petals in his wake).
+signal dashed(at: Vector3, direction: float)
 
 @export_group("Run")
 @export var run_speed := 7.5
@@ -553,6 +555,7 @@ func _start_dash(move: float) -> void:
 	_dash_cooldown_left = dash_cooldown
 	_can_dash = false
 	_jumping = false
+	dashed.emit(global_position, _dash_dir)
 
 
 func _start_slash(grounded: bool) -> void:

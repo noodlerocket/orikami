@@ -125,6 +125,9 @@ const CRANE_BUNDLES := [
 	["gallery_roof", 32.0, 5.64, -0.6, 5], ["chamber", -5.4, -2.0, -1.4, 3], ["ruin", 72.4, 8.6, -0.7, 4],
 	["canal_ledge", 115.0, -5.6, -1.6, 6], ["lookout", 134.5, 11.5, -0.6, 7], ["canal_end", 136.1, -4.8, -1.8, 4],
 	["far_deck", 117.6, 6.4, -0.6, 9]]
+## Little birds perched about the village: [x, y, depth, how many].
+const PERCHES := [[3.0, 2.38, -2.2, 4], [64.5, 1.12, -3.2, 3], [49.5, 7.75, -1.1, 3], [92.0, 1.85, -1.2, 4],
+	[124.4, 6.32, -5.7, 5], [164.6, 3.38, -2.3, 2]]
 ## Lantern husks (they throw burning paper).
 @export var lantern_husk_positions: Array[Vector2] = [Vector2(111.0, 0.8), Vector2(148.0, 0.1)]
 
@@ -209,6 +212,11 @@ func _ready() -> void:
 		var bird := PaperBird.new()
 		bird.position = Vector3(spot.x, spot.y, 0.0)
 		add_child(bird)
+	for perch: Array in PERCHES:
+		var flock := PerchedBirds.new()
+		flock.count = perch[3]
+		flock.position = Vector3(perch[0], perch[1], perch[2])
+		add_child(flock)
 	for c: Array in CRANE_BUNDLES:
 		var bundle := CraneBundle.new()
 		bundle.id = c[0]
@@ -255,6 +263,11 @@ func _process(_delta: float) -> void:
 	var camera := get_viewport().get_camera_3d()
 	if _near and camera:
 		_near.position.y = minf(camera.global_position.y - 4.2, 0.0) * 1.6
+
+
+## Lit windows (by their house's x) whose storm shutters slide shut as he
+## passes, instead of a shadow behind them.
+const SHUTTERS := [35.6, 139.6]
 
 
 ## Height of the street at a given x (ignoring holes): level, then up the
@@ -344,6 +357,23 @@ func _build_houses() -> void:
 			var window: Vector3 = house.position + house.get_meta("window")
 			_add_light(window + Vector3(0.0, 0.0, 1.1), lantern_energy * 0.45, lantern_range * 0.7)
 			_add_wet_shine(window.x, ground, 0.6)
+			# Someone at home: their shadow on the shoji (the Paper-Maker at
+			# her vat in her workshop), or a storm shutter that slides shut.
+			var shadow := VillagerShadow.new()
+			var size: Vector2 = house.get_meta("window_size")
+			shadow.window_size = size
+			shadow.round_window = house.get_meta("window_round")
+			var local: Vector3 = house.get_meta("window")
+			var half: float = h[1] * 0.5
+			if x in SHUTTERS and not shadow.round_window:
+				shadow.shutter = true
+				shadow.side = 1.0 if local.x + size.x * 1.6 < half - 0.3 else -1.0
+			elif x == 5.6:
+				shadow.activity = "papermaker"
+			else:
+				shadow.activity = ["pace", "kneel"][_rng.randi() % 2]
+			shadow.position = window + Vector3(0.0, 0.0, 0.1)
+			add_child(shadow)
 		if h[5] != 0:
 			var side: float = h[5]
 			var half: float = h[1] * 0.5
@@ -1066,6 +1096,50 @@ func _build_foreground() -> void:
 		add_child(tree)
 		var crown: Vector2 = tree.get_meta(&"crown")
 		_add_falling_petals(Vector2(x + crown.x, tree.position.y + crown.y), t[1])
+
+
+## He dashed (Ronin.dashed): near a cherry tree, the fallen petals on
+## the stones are stirred up in his wake and settle again.
+func stir_petals(at: Vector3, direction: float) -> void:
+	var near := false
+	for x: float in [-14.2, 13.4, STEPS.x + 4.4, ARENA.y - 2.6, -8.0]:
+		if absf(at.x - x) < 7.0:
+			near = true
+	if not near:
+		return
+	var swirl := CPUParticles3D.new()
+	swirl.emitting = false
+	swirl.one_shot = true
+	swirl.explosiveness = 0.7
+	swirl.amount = 18
+	swirl.lifetime = 1.6
+	swirl.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	swirl.emission_box_extents = Vector3(0.8, 0.02, 0.8)
+	swirl.direction = Vector3(direction, 1.2, 0.0)
+	swirl.spread = 35.0
+	swirl.gravity = Vector3(-0.4, -1.2, 0.0)
+	swirl.initial_velocity_min = 1.0
+	swirl.initial_velocity_max = 2.4
+	swirl.damping_min = 1.5
+	swirl.damping_max = 2.5
+	swirl.angle_max = 360.0
+	swirl.angular_velocity_min = -300.0
+	swirl.angular_velocity_max = 300.0
+	var petal := QuadMesh.new()
+	petal.size = Vector2(0.12, 0.08)
+	var look := StandardMaterial3D.new()
+	look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	look.albedo_color = PaperMesh.SAKURA.darkened(0.12)
+	look.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	look.cull_mode = BaseMaterial3D.CULL_DISABLED
+	look.disable_fog = true
+	petal.material = look
+	swirl.mesh = petal
+	swirl.cast_shadow = OFF
+	add_child(swirl)
+	swirl.global_position = at + Vector3(-direction * 0.6, 0.05, 0.0)
+	swirl.emitting = true
+	swirl.finished.connect(swirl.queue_free)
 
 
 ## A few petals drifting down from a cherry branch.

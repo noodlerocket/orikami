@@ -365,6 +365,8 @@ static func house(rng: RandomNumberGenerator, width: float, height: float, lit: 
 		shine.position = Vector3(window_at.x, window_at.y, 0.2)
 		root.add_child(shine)
 		root.set_meta("window", Vector3(window_at.x, window_at.y, 0.0))
+		root.set_meta("window_size", window_size)
+		root.set_meta("window_round", is_round)
 
 	# 5. Roof, sloping toward the camera and overhanging the wall.
 	var roof := tiled_roof(rng, -half - 0.75, half + 0.75, Vector2(height - 0.25, 1.75),

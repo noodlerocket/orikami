@@ -59,6 +59,7 @@ const SOUNDS := {
 	&"skid": {"files": ["skid.mp3"], "volume": -10.0, "vary": 0.1},
 	&"shake_off": {"files": ["shake_off.mp3"], "volume": -8.0, "vary": 0.06},
 	&"cranes_rise": {"files": ["cranes_rise.mp3"], "volume": -6.0, "vary": 0.03},
+	&"birds_scatter": {"files": ["birds_scatter.mp3"], "volume": -8.0, "vary": 0.08},
 }
 
 ## The rain, wind and village music loops (off for the prologue, which has
