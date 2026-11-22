@@ -179,6 +179,7 @@ func _physics_process(delta: float) -> void:
 				velocity.x = _dir * patrol_speed
 				if _attack_cooldown_left <= 0.0 and is_on_floor() and _player_in_reach():
 					_set_mode(&"windup")
+					Sound.play(self, &"husk_rasp")
 	move_and_slide()
 	position.z = 0.0
 

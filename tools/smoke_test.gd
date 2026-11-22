@@ -1233,10 +1233,10 @@ func _bamboo_creatures(village: Village, ronin: Ronin) -> void:
 	await _frames(40)
 	# The kite husk: it rears back (the tell), then swoops raking.
 	var kite := KiteHusk.new()
-	var roost := Vector3(BambooGrove.SHIFT + 293.0, ground + 3.2, 0.0)
+	var roost := Vector3(BambooGrove.SHIFT + 299.5, ground + 3.2, 0.0)
 	kite.position = roost
 	village.add_child(kite)
-	reset.call(Vector3(BambooGrove.SHIFT + 295.0, ground + 0.1, 0.0), -1.0)
+	reset.call(Vector3(BambooGrove.SHIFT + 301.5, ground + 0.1, 0.0), -1.0)
 	kite.set("_cooldown", 0.0)
 	order.clear()
 	hurt_before_attack = false
@@ -1278,7 +1278,7 @@ func _bamboo_creatures(village: Village, ronin: Ronin) -> void:
 	kite.set("_cooldown", 0.0)
 	kite.call("_set_mode", &"patrol")
 	kite.set_physics_process(true)
-	reset.call(Vector3(BambooGrove.SHIFT + 295.0, ground + 0.1, 0.0), -1.0)
+	reset.call(Vector3(BambooGrove.SHIFT + 301.5, ground + 0.1, 0.0), -1.0)
 	for f in 150:
 		await physics_frame
 		ronin.velocity.x = 0.0

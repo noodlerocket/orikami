@@ -15,7 +15,7 @@ extends PaperCritter
 
 @export_group("Looks")
 ## Its size: 1 is the model as made (0.95 m nose to tail tip, 0.28 m tall).
-@export var model_scale := 1.05
+@export var model_scale := 1.5  # (1.05 was too small: Julian)
 ## How far it turns its face toward us from side-on (radians).
 @export var turn_to_camera := 0.3
 ## How long it takes to turn round (seconds).
@@ -88,15 +88,16 @@ func _ready() -> void:
 	axis_lock_linear_z = true
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = Vector3(0.75, 0.32, 0.4)
+	var k := model_scale / 1.05  # (its body grows with its looks)
+	box.size = Vector3(0.75 * k, 0.32 * k, 0.4)
 	shape.shape = box
-	shape.position.y = 0.16  # (its bottom at its feet)
+	shape.position.y = 0.16 * k  # (its bottom at its feet)
 	add_child(shape)
-	_make_touch(Vector3(0.75, 0.36, 1.0), Vector3(0.0, 0.18, 0.0))
+	_make_touch(Vector3(0.75 * k, 0.36 * k, 1.0), Vector3(0.0, 0.18 * k, 0.0))
 
 
 func _body_centre() -> Vector3:
-	return Vector3(0.0, 0.2, 0.0)
+	return Vector3(0.0, 0.2 * model_scale / 1.05, 0.0)
 
 
 func _build() -> void:
@@ -300,7 +301,7 @@ func _distance_ahead() -> float:
 ## Its teeth and claws reaching him: an attack (it can be parried).
 func _strike(reach: float) -> void:
 	var shape := BoxShape3D.new()
-	shape.size = Vector3(0.7, 0.7, 2.0)
+	shape.size = Vector3(0.7, 0.7, 2.0) * Vector3(model_scale / 1.05, model_scale / 1.05, 1.0)
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.shape = shape
 	query.collision_mask = 2

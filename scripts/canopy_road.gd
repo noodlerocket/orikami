@@ -15,7 +15,7 @@ const DECKS := [[297.0, 302.5, 9.5, 6.0], [308.0, 312.0, 14.0, 5.0], [315.5, 318
 ## The rising gusts: [x, how high (from the floor)].
 const UPDRAFTS := [[305.0, 15.0], [332.0, 19.0]]
 ## The two stems to climb up between (x).
-const CLIMB_STEMS := [294.9, 296.3]
+const CLIMB_STEMS := [294.0, 296.3]  # (gap about 1.8 m; 0.9 m was too tight: Julian)
 
 var grove: BambooGrove
 var _rng := RandomNumberGenerator.new()

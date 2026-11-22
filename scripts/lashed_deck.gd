@@ -107,7 +107,7 @@ func _ready() -> void:
 ## thick rope every so often, the loose ends hanging. (White paper strips
 ## tied to the ropes were removed: Julian.)
 static func climb_marks(b: PaperMesh, x: float, z: float, from: float, to: float, w: float) -> void:
-	var y := from + 0.7
+	var y := from + CLIMB_CLEAR + 0.3  # (none low down where he walks past)
 	while y < to:
 		b.color = BambooGrove.ROPE.darkened(0.12)
 		for r in 4:

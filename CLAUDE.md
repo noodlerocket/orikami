@@ -606,7 +606,8 @@ has its own script, built from `Village._ready`:
   (dry, `LashedDeck.CLIMB_STRAW`), rope-bound (`climb_marks`; white paper
   strips on them were removed: Julian), stand just behind him (`CLIMB_Z`) and are solid only from
   `CLIMB_CLEAR` (1.8 m) up, so he walks in under them to the gap and jumps
-  up between (Julian). No bamboo stands in front of the path any more (he
+  up between (Julian). The rope ties start above head height; each
+  gap (stem to stem or wall) is about 1.8 m (1 m was too tight). No bamboo stands in front of the path any more (he
   seemed to pass through it); the thick dark ones are just behind him.
   The wings starting to tire rustle softly (`Ronin.tire_sound_db`, the
   `paper_fold` sound). The paper grain is lighter in the bamboo
@@ -626,7 +627,8 @@ has its own script, built from `Village._ready`:
   models given bones in code (`procedural_skin.gd`: each vertex follows up
   to four bones) and posed by hand. They burst into their own paper colours
   (`PaperCritter.confetti_colors`). Sounds `panda_huff`, `panda_squeal`,
-  `kite_rattle`. Sheets `panda`, `kite`; `wings` shows the glide tiring;
+  `kite_rattle`, and the kite's warning `kite_wail`. The town's paper husk
+  rasps as it raises its arms (`husk_rasp`). Sheets `panda`, `kite`; `wings` shows the glide tiring;
   `docs/screenshots/bamboo_tour.png` the new areas.
 - **Akane** (`akane.gd`, `akane_duel.gd`): the grove's last ground (past the
   Falls, `AkaneDuel.CLEARING` 399 to 413.4) is her clearing. Her look is Julian's

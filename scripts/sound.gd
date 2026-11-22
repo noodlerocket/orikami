@@ -69,6 +69,10 @@ const SOUNDS := {
 	&"panda_huff": {"files": ["panda_huff.mp3"], "volume": -9.0, "vary": 0.08},
 	&"panda_squeal": {"files": ["panda_squeal.mp3"], "volume": -11.0, "vary": 0.1},
 	&"kite_rattle": {"files": ["kite_rattle.mp3"], "volume": -9.0, "vary": 0.08},
+	# The kite husk's warning before it swoops (its own sound: Julian).
+	# The paper husk's warning as it raises its arms (Julian).
+	&"husk_rasp": {"files": ["husk_rasp.mp3"], "volume": -8.0, "vary": 0.1},
+	&"kite_wail": {"files": ["kite_wail.mp3"], "volume": -6.0, "vary": 0.06},
 }
 
 ## The rain, wind and village music loops (off for the prologue, which has

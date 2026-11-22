@@ -325,7 +325,8 @@ func _look_for_prey() -> void:
 	if absf(d.x) < reach_side and d.y < 0.6 and d.y > -reach_down:
 		_dir = signf(d.x) if d.x != 0.0 else _dir
 		_set_mode(&"tell")
-		Sound.play(self, &"kite_rattle")
+		Sound.play(self, &"kite_rattle", -6.0)
+		Sound.play(self, &"kite_wail")
 
 
 ## Swoops so its claws, hanging below, rake through where he is.

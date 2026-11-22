@@ -16,7 +16,7 @@ const UPDRAFTS := [[257.5, 17.0], [267.5, 17.0], [277.5, 17.0]]
 ## The decks: [left, right, top].
 const DECKS := [[251.5, 254.5, -5.0], [261.0, 264.0, -2.0], [271.0, 274.0, -4.0], [280.5, 283.5, -3.0]]
 ## The stem by the east wall to climb back up between (x).
-const CLIMB_STEM := 285.7
+const CLIMB_STEM := 284.95  # (gap to the wall about 1.8 m; 1 m was too tight: Julian)
 
 var grove: BambooGrove
 var _rng := RandomNumberGenerator.new()

@@ -11,7 +11,7 @@ extends Node3D
 ## Coordinates are the grove's (a child of BambooGrove).
 
 ## The stem to climb up beside the cliff (x).
-const CLIMB_STEM := 376.75
+const CLIMB_STEM := 375.95  # (gap to the cliff about 1.8 m; 1 m was too tight: Julian)
 ## The pool's water surface.
 const WATER := -0.5
 ## The ledge behind the falls: [left, right, top].
