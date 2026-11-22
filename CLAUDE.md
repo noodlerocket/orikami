@@ -175,6 +175,10 @@ the game)**
   (`shrine_rest`); the small temple bell (`draw_ready`) is for menus and
   the tutorial's seal.
 - A sound that "pops" is wrong. Check every new sound by measurement.
+- When he asks for a sound to be "more X", change the sound he has a little
+  (process it: pitch, an undertone, echo) before generating a new one. A
+  new "monstrous" Hannya cry was "really silly and bad"; the original sob,
+  slightly lowered with an undertone and an echo, is what he wanted.
 
 **Specific settings he has judged** (do not change without being asked)
 - Rain splashes: `Village.splash_strength` 0.5 (fainter and stronger both
@@ -862,7 +866,5 @@ frame sheet when the change can be seen.
 - Nothing is saved between sessions (ink marks reset).
 - The husk's model has no wind cloth.
 - `docs/design.md` still names the Kasa-obake as the first boss.
-- The check "the husk shoves when touching hurts him" fails now and then
-  (it looks at the husk at one instant); run again before suspecting it.
 - One foreground rock near the climbing course cannot be filled (a warning
   in the log, "could not triangulate"): that rock is simply missing.

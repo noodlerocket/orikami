@@ -95,6 +95,10 @@ func _run(main: Node) -> void:
 	# Touching a husk hurts.
 	ronin.set("_invulnerable", 0.0)
 	husk = husks[2]
+	# (Back to walking first: caught mid-swipe or recovering, a husk does not
+	# shove, and the check would depend on what it happened to be doing.)
+	husk.call("_set_mode", &"patrol")
+	husk.set("_attack_cooldown_left", 1.0)
 	ronin.position = husk.position
 	ronin.velocity = Vector3.ZERO
 	await _frames(10)
