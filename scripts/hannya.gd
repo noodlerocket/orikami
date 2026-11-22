@@ -132,3 +132,17 @@ func _build(silhouette: bool) -> Array:
 func back_position() -> Vector3:
 	var skeleton := _animator.skeleton
 	return skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone("Spine")).origin
+
+
+
+## Where her head is (the "Head" bone), in the world: for the ending.
+func head_position() -> Vector3:
+	var skeleton := _animator.skeleton
+	return skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone("Head")).origin
+
+
+## Fades her paper away (0 = solid, 1 = gone), for the ending.
+func set_fade(amount: float) -> void:
+	for paper: StandardMaterial3D in _materials:
+		paper.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA if amount > 0.0 else BaseMaterial3D.TRANSPARENCY_DISABLED
+		paper.albedo_color.a = 1.0 - amount

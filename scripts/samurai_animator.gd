@@ -637,3 +637,18 @@ static func skid() -> Dictionary:
 		"foot_r": Vector3(-0.15, 0.03, -0.36), "toe_r": 40.0,
 		"hand_r": HILT,
 	})
+
+
+
+## The Crane Glide: tipped forward, arms out and a little back under the
+## wings, legs trailing together behind, head up to see where he goes.
+static func glide(time: float) -> Dictionary:
+	var sway := sin(time * 2.1) * 0.02
+	return stance({
+		"hips": Vector3(0.0, 0.0, 0.0), "hips_rot": Vector3(32.0, 0.0, sway * 40.0),
+		"spine": Vector3(8.0, 0.0, 0.0), "head": Vector3(-32.0, 0.0, 0.0),
+		"foot_l": Vector3(0.08, 0.18, -0.36), "toe_l": 55.0,
+		"foot_r": Vector3(-0.08, 0.12, -0.3), "toe_r": 50.0,
+		"reach_l": Vector3(0.42, 0.0, -0.1), "aim_l": 1.0,
+		"reach_r": Vector3(-0.42, 0.02 + sway, -0.1), "aim_r": 1.0,
+	})

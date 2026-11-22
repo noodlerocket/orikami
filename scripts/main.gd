@@ -68,11 +68,16 @@ func _process(delta: float) -> void:
 				or (_boss != null and is_instance_valid(_boss)))
 	if _warming:
 		return  # (he is moved about during the warm-up: no cutscene, no fight)
+	# Once the courtyard's far gate is open (or he is past it), the camera
+	# may follow him on into the bamboo (it glides there: it never jumps).
+	var village: Village = $Village
+	if village.bamboo.gate_open or _ronin.global_position.x > Village.ARENA.y:
+		_camera.max_x = BambooGrove.EAST_END - 9.0
 	_explore_clock += delta
 	if _explore_clock > 0.4:
 		_explore_clock = 0.0
 		SaveGame.explore(_ronin.global_position)
-	var in_arena := _ronin.global_position.x > Village.ARENA.x + 0.6
+	var in_arena := _ronin.global_position.x > Village.ARENA.x + 0.6 and _ronin.global_position.x < Village.ARENA.y
 	# Walking into the shrine courtyard for the first time plays the cutscene
 	# (once it has been seen, in a saved game, the fight starts at once).
 	if not _cutscene_played and in_arena:
@@ -271,11 +276,11 @@ func _start_boss_fight() -> void:
 	_boss_bar.set_anchors_preset(Control.PRESET_FULL_RECT)
 	$Overlay.add_child(_boss_bar)
 	_boss_bar.watch(_boss)
+	_boss.ending_follows = true
 	_boss.defeated.connect(func() -> void:
 		SaveGame.hannya_fallen = true
 		SaveGame.write()
-		$Village.relight_arena_lanterns()
-		$Village.set_arena_sealed(false))
+		_play_ending())
 	_begin_fight()
 
 
@@ -292,7 +297,7 @@ func _build_pause() -> void:
 	_pause.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_pause.can_pause = func() -> bool:
 		for child: Node in get_children():
-			if child is HannyaCutscene or child is WellCutscene:
+			if child is HannyaCutscene or child is WellCutscene or child is HannyaEnding:
 				return false
 		return not _warming
 	layer.add_child(_pause)
@@ -401,6 +406,17 @@ func _apply_debug_start() -> void:
 			(func() -> void:
 				await get_tree().create_timer(0.5).timeout
 				_pause.open()).call_deferred()
+		elif arg == "--ending":
+			# The fight, won at once: her fall and the ending cutscene.
+			_cutscene_played = true
+			_ronin.position = Vector3(Village.ARENA.x + 3.0, 1.6, 0.0)
+			(func() -> void:
+				_start_boss_fight()
+				await get_tree().create_timer(0.3).timeout
+				_boss.health = 0
+				_boss.call("_die")).call_deferred()
+		elif arg == "--glide":
+			_ronin.has_glide = true  # (as if learned in the bamboo)
 		elif arg == "--map":
 			# The pause screen's map, with the whole village explored and two
 			# shrines rested at (to see what a full map looks like).
@@ -477,9 +493,32 @@ func _continue_from_save() -> void:
 	for bundle: CraneBundle in village.find_children("*", "CraneBundle", true, false):
 		if SaveGame.has_crane(bundle.id):
 			bundle.collect(true)
+	if "glide" in SaveGame.abilities:
+		_ronin.has_glide = true
+		village.bamboo.learn_glide(true)
+	if SaveGame.hannya_fallen:
+		# She is gone: the courtyard is quiet, its far gate open.
+		village.bamboo.open_gate(true)
+		village.stage.stop_shadow()
+		village.stage.hannya.visible = false
 	if SaveGame.smudge_at != Vector3.INF and SaveGame.smudge_ink > 0:
 		_smudge = Smudge.new()
 		_smudge.ink = SaveGame.smudge_ink
 		village.add_child(_smudge)
 		_smudge.global_position = SaveGame.smudge_at
 	_camera.snap_to_target()
+
+
+
+## After she falls: her mask, her peace, the lanterns, the gate to the
+## bamboo (hannya_ending.gd).
+func _play_ending() -> void:
+	var scene := HannyaEnding.new()
+	scene.main = self
+	scene.ronin = _ronin
+	scene.village = $Village
+	scene.boss = _boss
+	scene.game_camera = _camera
+	add_child(scene)
+	if is_instance_valid(_boss_bar):
+		_boss_bar.hide_bar()

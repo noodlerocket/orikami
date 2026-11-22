@@ -149,6 +149,9 @@ var gatehouse: Gatehouse
 var steps: ShrineSteps
 var fallen: FallenStreet
 var rooftops: RooftopRoad
+var bamboo: BambooGrove
+## The invisible wall at the courtyard's far end (gone when its gate opens).
+var east_wall: StaticBody3D
 var market: MarketStreet
 
 
@@ -190,6 +193,9 @@ func _ready() -> void:
 	steps = ShrineSteps.new()
 	steps.village = self
 	add_child(steps)
+	bamboo = BambooGrove.new()
+	bamboo.village = self
+	add_child(bamboo)
 	_build_foreground()
 	for spot: Vector2 in enemy_positions:
 		var husk: Node3D = HUSK_SCENE.instantiate()
@@ -409,8 +415,8 @@ func _build_ground() -> void:
 			[STEPS.y, ARENA.y + 0.5, STEPS_TOP, 8.0, false, false]]:
 		_build_ground_block(g[0], g[1], g[2], g[3], g[4], g[5])
 	# Invisible walls at both ends of the level.
-	for x: float in [-16.5, ARENA.y]:
-		_add_solid(Vector3(x, 10.0, 0.0), Vector3(1.0, 40.0, 4.0))
+	_add_solid(Vector3(-16.5, 10.0, 0.0), Vector3(1.0, 40.0, 4.0))
+	east_wall = _add_solid(Vector3(ARENA.y + 0.5, 10.0, 0.0), Vector3(1.0, 40.0, 4.0))
 
 
 func _build_ground_block(left: float, right: float, top: float, thick: float = 8.0,

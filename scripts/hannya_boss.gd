@@ -32,6 +32,10 @@ signal health_changed(current: int, maximum: int)
 signal posture_changed(current: int, maximum: int)
 signal defeated
 
+## When set (main.gd does), she does not burst into scraps when she falls:
+## the ending cutscene shows what becomes of her.
+var ending_follows := false
+
 @export_group("Health")
 @export var max_health := 30
 ## Parries (or glide parries, which count double) before she staggers.
@@ -736,6 +740,11 @@ func _die() -> void:
 	_music.stop()
 	Sound.play(self, &"taiko_hit")
 	await get_tree().create_timer(1.6).timeout
+	if ending_follows:
+		# The ending (hannya_ending.gd) takes it from here: she stays, fallen.
+		Sound.duck_music(false)
+		defeated.emit()
+		return
 	Confetti.burst(get_parent(), puppet.back_position(), 160)
 	Confetti.burst(get_parent(), puppet.back_position() + Vector3(0.0, 0.8, 0.0), 120)
 	Sound.play(self, &"paper_burst", 6.0)

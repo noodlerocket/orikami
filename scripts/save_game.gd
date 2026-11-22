@@ -25,6 +25,8 @@ static var ink_absorbed := 0
 static var shortcuts: Array[String] = []
 static var hannya_seen := false
 static var hannya_fallen := false
+## Abilities learned ("glide").
+static var abilities: Array[String] = []
 static var smudge_at := Vector3.INF
 static var smudge_ink := 0
 ## Explored map cells: "layer:x" keys (layers "under", "street", "roofs").
@@ -46,6 +48,7 @@ static func reset() -> void:
 	shortcuts = []
 	hannya_seen = false
 	hannya_fallen = false
+	abilities = []
 	smudge_at = Vector3.INF
 	smudge_ink = 0
 	explored = {}
@@ -61,6 +64,7 @@ static func write() -> void:
 	cfg.set_value("game", "shortcuts", shortcuts)
 	cfg.set_value("game", "hannya_seen", hannya_seen)
 	cfg.set_value("game", "hannya_fallen", hannya_fallen)
+	cfg.set_value("game", "abilities", abilities)
 	cfg.set_value("game", "smudge_at", smudge_at if smudge_at != Vector3.INF else Vector3(0, -999, 0))
 	cfg.set_value("game", "smudge_ink", smudge_ink)
 	cfg.set_value("game", "explored", explored.keys())
@@ -78,6 +82,7 @@ static func read() -> bool:
 	shortcuts.assign(cfg.get_value("game", "shortcuts", []))
 	hannya_seen = cfg.get_value("game", "hannya_seen", false)
 	hannya_fallen = cfg.get_value("game", "hannya_fallen", false)
+	abilities.assign(cfg.get_value("game", "abilities", []))
 	var at: Vector3 = cfg.get_value("game", "smudge_at", Vector3(0, -999, 0))
 	smudge_at = at if at.y > -900.0 else Vector3.INF
 	smudge_ink = cfg.get_value("game", "smudge_ink", 0)

@@ -36,6 +36,8 @@ extends SceneTree
 ##             throw (use --zoom=5)
 ##   ladder    the ladder: let down from the deck, then climbed (use --zoom=6)
 ##   crawl     close-up: crawling through the crawlspace (use --zoom=4.6)
+##   ending    after the Hannya falls: the ending cutscene, 12 moments (run
+##             with --ending)
 ##   cranes    walking into a bundle of paper cranes: the ring of ink, the
 ##             cranes flying off, the count on the HUD (use --zoom=6)
 ##   smudge    dying with ink: the Smudge left behind, then cut and taken
@@ -126,6 +128,8 @@ func _initialize() -> void:
 			sheet = await _ladder()
 		"crawl":
 			sheet = await _crawl()
+		"ending":
+			sheet = await _ending()
 		"cranes":
 			sheet = await _cranes()
 		"smudge":
@@ -816,4 +820,17 @@ func _smudge() -> Image:
 
 		await create_timer(0.18).timeout
 		sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((i % 3) * tile.x, (i / 3) * tile.y))
+	return sheet
+
+
+
+func _ending() -> Image:
+	var tile := Vector2i(427, 240)
+	var sheet := Image.create(tile.x * 4, tile.y * 3, false, Image.FORMAT_RGB8)
+	var started := Time.get_ticks_msec()
+	var times := [2.2, 2.9, 3.6, 4.4, 5.4, 7.0, 8.6, 10.6, 11.9, 13.0, 14.8, 16.4]
+	for i in times.size():
+		while (Time.get_ticks_msec() - started) / 1000.0 < times[i] + 0.4:
+			await process_frame
+		sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((i % 4) * tile.x, (i / 4) * tile.y))
 	return sheet

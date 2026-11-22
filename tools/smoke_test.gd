@@ -443,6 +443,45 @@ func _run(main: Node) -> void:
 			last_x = cam.global_position.x
 		Input.action_release("move_left")
 		_check("the camera glides out of the courtyard (biggest step %.2f m)" % biggest, biggest < 0.4)
+		# Her fall: the ending cutscene plays, can be skipped, and the far gate
+		# to the bamboo is open after it.
+		ronin.set("_draw_safe", 30.0)
+		boss.begin()
+		boss.health = 0
+		boss.call("_die")
+		var ending: HannyaEnding = null
+		for f in 240:
+			await physics_frame
+			for child: Node in main.get_children():
+				if child is HannyaEnding:
+					ending = child
+			if ending:
+				break
+		_check("when she falls, the ending cutscene plays", ending != null)
+		Input.action_press("jump")
+		await _frames(60)
+		Input.action_release("jump")
+		await _frames(10)
+		var grove: BambooGrove = main.get_node("Village").bamboo
+		_check("it can be skipped, and the gate to the bamboo is open", grove.gate_open and ronin.is_physics_processing()
+				and not is_instance_valid(ending))
+		# The Crane Glide carries him over the first ravine.
+		ronin.has_glide = true
+		ronin.position = Vector3(BambooGrove.GROUND[0][1] - 0.6, BambooGrove.GROUND[0][2] + 0.05, 0.0)
+		ronin.velocity = Vector3.ZERO
+		await _frames(10)
+		Input.action_press("move_right")
+		Input.action_press("jump")
+		var glided := false
+		for f in 150:
+			await physics_frame
+			glided = glided or ronin.is_gliding()
+		Input.action_release("jump")
+		Input.action_release("move_right")
+		await _frames(20)
+		_check("gliding carries him over the bamboo ravine (x %.1f)" % ronin.global_position.x,
+				glided and ronin.global_position.x > BambooGrove.GROUND[1][0] and ronin.global_position.y > 1.0)
+		ronin.has_glide = false
 
 	# Dying: he shreds, the screen fades, he is whole again at the start.
 	ronin.set("_invulnerable", 0.0)

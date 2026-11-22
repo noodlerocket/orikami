@@ -178,6 +178,9 @@ var _cut_clock := -1.0            # seconds into the current cut, or -1
 var _sheathed := false            # true once the sword is back in during this cut
 var _land_clock := -1.0           # seconds since he touched down, or -1
 var _skid_clock := -1.0           # seconds into a skid, or -1
+var _wings: Node3D                # the Crane Glide's paper wings
+var _wing_pair: Array[Node3D] = []
+var _wings_open := 0.0            # 0 = folded away, 1 = spread
 var _shake_clock := -1.0          # seconds into shaking the water off, or -1
 var _was_airborne := false
 var _run_blend := 0.0             # 0 = standing, 1 = fully into his run
@@ -234,6 +237,7 @@ func _process(delta: float) -> void:
 	if _climb_turn > 0.0:
 		_rig.rotation.y = lerp_angle(_rig.rotation.y, PI * 0.5, smoothstep(0.0, 1.0, _climb_turn))
 	_clock += delta
+	_update_wings(delta)
 	if _shake_clock >= 0.0:
 		_shake_clock += delta
 		var left := maxf(0.0, 1.0 - _shake_clock / 0.55)
@@ -305,6 +309,53 @@ func play_slash(direction: Vector2) -> void:
 	_cut_clock = 0.0
 	_sheathed = false
 	_pose()
+
+
+## The Crane Glide's wings: two long folded paper wings, like a crane's,
+## that unfold out of his cloak at the shoulders when he glides (scaled out
+## from nothing along their length, so they are drawn out, never popping)
+## and fold away again when he lands.
+func _build_wings() -> void:
+	_wings = Node3D.new()
+	_wings.position = Vector3(-0.08, 1.18, 0.0)
+	_rig.add_child(_wings)
+	for side: float in [-1.0, 1.0]:
+		var wing := Node3D.new()
+		_wings.add_child(wing)
+		var b := PaperMesh.new(71 + int(side))
+		b.texture_world = false
+		b.shade_jitter = 0.12
+		# A crane's wing: a long leading edge out and up, primaries folded
+		# into a few long points at the trailing edge, a crease along it.
+		b.color = PaperMesh.WASHI
+		var root := Vector3(0.0, 0.0, 0.0)
+		var tip := Vector3(-0.35, 0.55, side * 1.35)
+		b.tri(root + Vector3(0.12, 0.0, 0.0), tip, root + Vector3(-0.3, -0.05, side * 0.1))
+		b.color = PaperMesh.WASHI.darkened(0.12)
+		b.tri(root + Vector3(-0.3, -0.05, side * 0.1), tip, Vector3(-0.75, 0.15, side * 0.95))
+		b.tri(Vector3(-0.75, 0.15, side * 0.95), tip, Vector3(-0.6, 0.35, side * 1.25))
+		b.color = PaperMesh.WASHI.darkened(0.25)
+		b.tri(root + Vector3(-0.3, -0.05, side * 0.1), Vector3(-0.75, 0.15, side * 0.95), Vector3(-0.62, -0.1, side * 0.5))
+		var mesh := b.build()
+		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		wing.add_child(mesh)
+		_wing_pair.append(wing)
+	_wings.scale = Vector3.ONE * 0.001
+	_wings.visible = false
+
+
+func _update_wings(delta: float) -> void:
+	if _wings == null:
+		return
+	_wings_open = move_toward(_wings_open, 1.0 if state == &"glide" else 0.0, delta / (0.16 if state == &"glide" else 0.22))
+	_wings.visible = _wings_open > 0.0
+	var u := smoothstep(0.0, 1.0, _wings_open)
+	_wings.scale = Vector3(maxf(u, 0.001), maxf(u, 0.001), maxf(u, 0.001))
+	for i in _wing_pair.size():
+		# A slow, shallow beat while gliding, and the gusts lifting them.
+		var side := -1.0 if i == 0 else 1.0
+		var lift := sin(_clock * 3.2) * 0.08 + Wind.speed_at(global_position.x) * 0.015
+		_wing_pair[i].rotation.x = side * lift
 
 
 ## Called by ronin.gd on a sharp turn at a run: he skids, kicking up grit
@@ -464,6 +515,7 @@ func _build() -> void:
 	if use_model and model_scene:
 		_build_model()
 		_build_sweeps()
+		_build_wings()
 		return
 	_build_legs()
 	_body = _piece(_rig, Vector3(0.0, 0.62, 0.0))
@@ -680,6 +732,8 @@ func _pose_model() -> void:
 							smoothstep(0.4, 1.0, _wall_jump_clock / wall_jump_pose_time))
 		&"wall":
 			pose = SamuraiAnimator.wall_slide(_clock)
+		&"glide":
+			pose = SamuraiAnimator.glide(_clock)
 		&"climb":
 			# Hand over hand, as fast as he is climbing; a creak of rungs each
 			# time a hand takes hold.

@@ -125,6 +125,19 @@ signal died
 ## through a crawlspace. Under a low ceiling he stays ducked until he is out.
 @export var crawl_speed := 2.0
 
+@export_group("Crane Glide")
+## Learned in the Bamboo of Folded Wind. In the air, falling, hold jump:
+## paper wings unfold and he glides.
+@export var has_glide := false
+## The fastest he sinks while gliding (metres per second).
+@export var glide_fall_speed := 1.4
+## How strongly gravity pulls while gliding (1 = as usual).
+@export var glide_gravity := 0.25
+## How fast he glides forward (metres per second).
+@export var glide_speed := 9.0
+## How much the wind carries him while gliding (gusts push the wings).
+@export var glide_wind := 0.35
+
 @export_group("Forgiveness")
 ## Jumping up into the corner of a ledge: if he would have cleared it with
 ## his head this far to one side, he is nudged round it.
@@ -258,6 +271,7 @@ var _climbing: Ladder
 ## shrine can tell being put there from walking up to it.
 var respawns := 0
 var _skid := 0.0
+var _gliding := false
 var _wet := 0.0       # > 0: he is still wet from the water (seconds left)
 var _still := 0.0     # how long he has stood still on dry ground
 
@@ -355,6 +369,7 @@ func _physics_process(delta: float) -> void:
 		_skid = skid_time
 		_puppet.play_skid(wading)
 	# --- Work out the velocity ---
+	_gliding = false
 	if _update_ladder(delta, grounded):
 		pass
 	elif _drawing > 0.0:
@@ -381,11 +396,16 @@ func _physics_process(delta: float) -> void:
 		# Knocked back: no control for a moment.
 		_apply_gravity(delta, grounded)
 	else:
+		# The Crane Glide: falling, jump held, wings out.
+		_gliding = (has_glide and not grounded and velocity.y < 0.5 and Input.is_action_pressed("jump")
+				and not _sliding and _climbing == null and _hurt_lock <= 0.0)
+		if _gliding:
+			drift += Wind.direction.x * Wind.speed_at(global_position.x) * glide_wind
 		if _recoil_left <= 0.0 and _wall_lock <= 0.0:
 			var rate := air_acceleration
 			if grounded:
 				rate = ground_acceleration if move != 0.0 else ground_deceleration
-			velocity.x = move_toward(velocity.x, move * run_speed + drift, rate * delta)
+			velocity.x = move_toward(velocity.x, move * (glide_speed if _gliding else run_speed) + drift, rate * delta)
 			if move != 0.0 and _slash_time <= 0.0:
 				facing = signf(move)
 		_apply_gravity(delta, grounded)
@@ -517,6 +537,9 @@ func _count_down(delta: float) -> void:
 
 func _apply_gravity(delta: float, grounded: bool) -> void:
 	if grounded and velocity.y <= 0.0:
+		return
+	if _gliding:
+		velocity.y = maxf(velocity.y - gravity * glide_gravity * delta, -glide_fall_speed)
 		return
 	var pull := gravity * (fall_gravity_multiplier if velocity.y < 0.0 else 1.0)
 	velocity.y = maxf(velocity.y - pull * delta, -max_fall_speed)
@@ -818,6 +841,11 @@ func _update_ladder(delta: float, grounded: bool) -> bool:
 	return true
 
 
+## True while he glides on paper wings.
+func is_gliding() -> bool:
+	return _gliding
+
+
 ## True while he is on a ladder.
 func is_climbing() -> bool:
 	return _climbing != null
@@ -989,6 +1017,8 @@ func _update_puppet() -> void:
 		_puppet.state = &"dash"
 	elif _healing:
 		_puppet.state = &"heal"
+	elif _gliding and not is_on_floor():
+		_puppet.state = &"glide"
 	elif not is_on_floor():
 		_puppet.state = &"jump" if velocity.y > 0.0 else &"fall"
 	elif absf(velocity.x) > 0.5:

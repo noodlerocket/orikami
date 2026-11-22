@@ -16,6 +16,7 @@ extends Node3D
 
 var _drops: CPUParticles3D
 var _look: ShaderMaterial
+var _level := 1.0
 
 
 func _ready() -> void:
@@ -58,3 +59,14 @@ func _process(_delta: float) -> void:
 		_look.set_shader_parameter(&"clip_on", camera.global_position.y < 3.5)
 	# The rain slants further over in a gust.
 	_drops.direction = Vector3(-0.04 - Wind.speed_at(global_position.x) * wind_slant, -1.0, 0.0)
+
+
+
+## The rain eases (to `level` of itself: 0.25 = a quarter) over `time`
+## seconds, or comes back (level 1).
+func ease_off(level: float, time: float) -> void:
+	var t := create_tween()
+	t.tween_method(func(v: float) -> void:
+		_look.set_shader_parameter(&"tint", Color(streak_color.r, streak_color.g, streak_color.b, streak_color.a * v)),
+		_level, level, time).set_trans(Tween.TRANS_SINE)
+	_level = level
