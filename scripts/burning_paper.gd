@@ -128,7 +128,7 @@ func _physics_process(delta: float) -> void:
 			_flare()
 			return
 		if not _returned and target.has_method("receive_strike"):
-			if target.receive_strike(damage, global_position - Vector3(signf(velocity.x) * 0.3, 0.0, 0.0)):
+			if target.receive_strike(damage, global_position - Vector3(signf(velocity.x) * 0.3, 0.0, 0.0), &"fire"):
 				# Parried: knocked back at the thrower, faster.
 				_returned = true
 				var home := thrower.global_position + Vector3(0.0, 0.9, 0.0) if is_instance_valid(thrower) else global_position + Vector3(-signf(velocity.x) * 5.0, 0.0, 0.0)

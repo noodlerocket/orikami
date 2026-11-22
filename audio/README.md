@@ -118,5 +118,23 @@ energy below 300 Hz (a pop).
 | `bamboo_wind.ogg` | the Bamboo of Folded Wind (looped, four places) | Wind through a tall bamboo forest at night, soft steady rustling of leaves and gentle hollow creaking of stems, calm ambience, no birds. *(Generated as a loop; quiet, raised 2.6x; no energy below 300 Hz.)* |
 | `birds_scatter.mp3` | small perched birds take off as he comes near | Small birds startled from a roof, a quick burst of wing flutters taking off and flying away, a couple of soft chirps. *(98% of it was below 300 Hz, a rumble: high-passed twice at 280 Hz so only the airy flutter and chirps are left; levelled to 0.66.)* |
 
+Akane's duel (2026-11-22). Two takes for her landing came back almost silent
+(peaks 0.03 and 0.02) and were thrown away: she lands with the usual `land`.
+
+| File | Plays when | Words used to generate it, and what was done |
+| --- | --- | --- |
+| `music_akane_duel.ogg` | her duel (loops; fades over 2.5 s when she yields or he falls: `AkaneDuel.music_volume`, `music_fade_time`) | music_v2, 75 s: duel music for a swift, elegant swordswoman, a fox spirit, fought in a sunlit bamboo forest; shamisen ostinato, darting shakuhachi, koto runs, steady taiko; even, steady energy so it loops. *(Its calm opening was cut: the loop is 27.5 s to the end, 44.5 s, its last 3 s blended into its start (equal power). Loudness is even, rms 0.07 to 0.15 second by second; the two ends meet at 0.079 and 0.089. Peak 0.89.)* |
+| `akane_slash.mp3` | each of her cuts | Swish of a thin katana cutting fast through the air, a single crisp high airy whoosh, very quick, no metallic ring, no impact. *(High-pass at 280 Hz twice, 12 ms fade-in, 50 ms fade-out. Peak 0.81; none of its energy in the first 50 ms; 11% below 300 Hz.)* |
+| `akane_draw.mp3` | her iai lunge | Rushing dash of a swordswoman lunging past at great speed, a fast rising swoosh of blade and fluttering silk robes. *(Processed like her slash. Peak 0.85.)* |
+| `fox_fire.mp3` | she throws a fox-fire | Eerie fox fire igniting, a soft breathy whoosh of a ghostly flame flaring up with a faint high glassy chime. *(High-pass, raised 1.5x. Peak 0.73; 19% below 300 Hz.)* |
+
+The bamboo's creatures (2026-11-22): the red panda and the kite husk.
+
+| File | Plays when | Words used to generate it, and what was done |
+| --- | --- | --- |
+| `panda_huff.mp3` | the red panda rears up (its tell); softly when it swats | Huffing threat call of an angry red panda: a sharp nasal huff-quack, then a short twittering hiss and squeal, small wild animal standing its ground, close, dry, no music. *(Builds from quiet to its loudest at 1 s; trimmed to 1.3 s, a 0.2 s fade-out where it stopped abruptly. Peak 0.69; under 1% below 300 Hz.)* |
+| `panda_squeal.mp3` | the red panda is cut | Squeaky short yelp of a small red panda being struck, a high chirping squeal, close, dry, no music. *(It clipped at 1.07: levelled to 0.77, 12 ms fade-in, cut to 0.42 s. It starts at once, but high: under 1% below 300 Hz, so not a pop.)* |
+| `kite_rattle.mp3` | the kite husk's tell; quietly in strong gusts; it is cut | Rattling stiff washi paper kite on a bamboo frame shuddering violently in a gust of wind, a dry papery thrum and flutter swelling, eerie, no music. *(It started loud: 50 ms fade-in, 0.3 s fade-out. Peak 0.75; 44% below 300 Hz (the thrum) but spread over the whole 1.5 s, under 1% in the first 50 ms.)* |
+
 Measuring tip: decode each channel separately (or `-ac 1` overstates the
 peak of a stereo file: ffmpeg's down-mix sums the channels).

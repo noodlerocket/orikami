@@ -214,7 +214,7 @@ func _physics_process(delta: float) -> void:
 	position.z = 0.0
 	if mode == &"patrol" or mode == &"recover":
 		for body: Node3D in _touch.get_overlapping_bodies():
-			if body.has_method("take_damage") and body.take_damage(contact_damage, global_position):
+			if body.has_method("take_damage") and body.take_damage(contact_damage, global_position, hurt_kind):
 				_dir = signf(body.global_position.x - global_position.x)
 				_set_mode(&"snap")
 
@@ -231,7 +231,7 @@ func _bite(reach: float) -> void:
 		var target: Object = result["collider"]
 		if target.has_method("receive_strike"):
 			_struck_this_charge = true
-			if target.receive_strike(attack_damage, global_position):
+			if target.receive_strike(attack_damage, global_position, hurt_kind):
 				velocity.x = -_dir * 7.0
 				velocity.y = 3.5
 				_on_parried()

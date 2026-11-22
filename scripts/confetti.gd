@@ -4,7 +4,7 @@ extends RefCounted
 ## Usage: Confetti.burst(get_parent(), global_position, 48)
 
 
-static func burst(parent: Node, at: Vector3, amount: int = 48) -> void:
+static func burst(parent: Node, at: Vector3, amount: int = 48, palette: Array = []) -> void:
 	var scraps := CPUParticles3D.new()
 	scraps.emitting = false
 	scraps.one_shot = true
@@ -26,11 +26,18 @@ static func burst(parent: Node, at: Vector3, amount: int = 48) -> void:
 	scraps.scale_amount_max = 1.6
 
 	# Each scrap picks a random colour from this strip of paper colours.
+	# (`palette`, when given, is the creature's own paper colours instead.)
 	var colors := Gradient.new()
-	colors.set_color(0, Color(0.55, 0.6, 0.74))
-	colors.set_color(1, PaperMesh.WASHI)
-	colors.add_point(0.35, Color(0.2, 0.22, 0.36))
-	colors.add_point(0.7, Color(0.75, 0.78, 0.86))
+	if palette.size() >= 2:
+		colors.set_color(0, palette[0])
+		colors.set_color(1, palette[palette.size() - 1])
+		for k in range(1, palette.size() - 1):
+			colors.add_point(float(k) / (palette.size() - 1), palette[k])
+	else:
+		colors.set_color(0, Color(0.55, 0.6, 0.74))
+		colors.set_color(1, PaperMesh.WASHI)
+		colors.add_point(0.35, Color(0.2, 0.22, 0.36))
+		colors.add_point(0.7, Color(0.75, 0.78, 0.86))
 	scraps.color_initial_ramp = colors
 
 	var scrap := QuadMesh.new()

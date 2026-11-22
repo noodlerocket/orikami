@@ -12,7 +12,8 @@ extends SceneTree
 ##             fast fall, landing, hurt, heal            (use --zoom=4.6)
 ##   cuts      forward, up and down cuts, ten moments each, in the game camera
 ##   endings   the last moments of each cut, with timings printed
-##   struck    being hurt: soaked in ink, blots shrinking, clean (use --zoom=4.6)
+##   struck    being hurt, one row each: ink (soaked, blots shrinking), fire
+##             (scorched, embers), a cut (torn slit, scraps), to clean (--zoom=4.6)
 ##   hud       the health display: full, just hurt, low with a heal ready, last point
 ##   parry     a whole exchange with a husk, played for real: its tell, the
 ##             parry and clash, a second parry, the stagger, the finishing cut
@@ -32,6 +33,11 @@ extends SceneTree
 ##             shaking itself off, staggered (use --zoom=3)
 ##   bird      close-up of the paper bird: wingbeats, the tell, the dive,
 ##             knocked, staggered (use --zoom=3)
+##   panda     close-up of the red panda in the bamboo: walking, sitting up to
+##             look, the tell (reared up), the charge, the spring, landing,
+##             struck, staggered, facing right, and bursting when killed
+##   kite      the kite husk in the bamboo: drifting, the tell, the swoop,
+##             knocked, struck, tumbling (staggered), and bursting
 ##   lantern   close-up of the lantern husk: shamble, the throw's tell, the
 ##             throw (use --zoom=5)
 ##   ladder    the ladder: let down from the deck, then climbed (use --zoom=6)
@@ -49,6 +55,8 @@ extends SceneTree
 ##   boss      the Hannya fight running for real (cutscene skipped), 24 moments
 ##   death     he dies and shreds into strips, eight moments (use --zoom=6)
 ##   seal      the ink wall rising at the courtyard entrance, then seen mid-jump
+##   wings     the Crane Glide held in the bamboo until the wings tire: open,
+##             gliding, sagging and trembling, folding away, falling (--zoom=4.6)
 ##   heal      a real heal, held to the end: the ensō painted on, closing,
 ##             dissolving (use --zoom=5)
 ##   grate     the drain grate in Well Square: shut, cut open from below
@@ -124,12 +132,24 @@ func _initialize() -> void:
 			sheet = await _seal()
 		"heal":
 			sheet = await _heal()
+		"wings":
+			sheet = await _wings()
 		"dog":
 			sheet = await _critter(PaperDog, [[&"patrol", 0.0], [&"patrol", 0.3], [&"tell", 0.15], [&"tell", 0.45],
 					[&"charge", 0.05], [&"charge", 0.12], [&"skid", 0.1], [&"recover", 0.12], [&"recover", 0.3], [&"stagger", 0.3]])
 		"bird":
 			sheet = await _critter(PaperBird, [[&"patrol", 0.0], [&"patrol", 0.2], [&"patrol", 0.4], [&"tell", 0.2],
 					[&"tell", 0.5], [&"dive", 0.1], [&"knocked", 0.1], [&"stagger", 0.3]])
+		"panda":
+			sheet = await _wild("panda", [[&"patrol", 0.0, {"move": true}], [&"patrol", 0.13, {"move": true}], [&"look", 0.9, {}],
+					[&"tell", 0.12, {}], [&"tell", 0.5, {}], [&"charge", 0.05, {}], [&"charge", 0.14, {}], [&"pounce", 0.08, {}],
+					[&"pounce", 0.24, {}], [&"land", 0.1, {}], [&"hurt", 0.06, {"flash": true}], [&"stagger", 0.6, {}],
+					[&"patrol", 0.2, {"move": true, "right": true}], [&"tell", 0.5, {"right": true}], [&"tell", 0.5, {"front": true}],
+					[&"stagger", 0.6, {"front": true}], [&"look", 0.9, {"front": true}], [&"pounce", 0.1, {"front": true}], [&"patrol", 0.0, {"die": true}]])
+		"kite":
+			sheet = await _wild("kite", [[&"patrol", 0.0, {}], [&"patrol", 1.3, {"move": true}], [&"tell", 0.15, {}],
+					[&"tell", 0.55, {}], [&"dive", 0.1, {}], [&"dive", 0.5, {}], [&"knocked", 0.1, {}],
+					[&"knocked", 0.1, {"flash": true}], [&"stagger", 0.4, {}], [&"stagger", 1.2, {}], [&"patrol", 0.0, {"die": true}]])
 		"lantern":
 			sheet = await _lantern()
 		"ladder":
@@ -229,19 +249,36 @@ func _cuts(columns: int, gap: float, skip: float) -> Image:
 	return sheet
 
 
+## One row per kind of blow (ink, fire, cut), each struck from in front at
+## chest height and photographed over its whole life: the hit, the peak,
+## fading, and gone (invulnerability over, as in the game).
 func _struck() -> Image:
 	_ronin.set_physics_process(false)
-	_puppet.state = &"hurt"
-	_puppet.blinking = true
 	var tile := Vector2i(400, 400)
-	var sheet := Image.create(tile.x * 3, tile.y, false, Image.FORMAT_RGB8)
-	var waits := [0.12, 0.3, 0.4]
-	for i in 3:
-		await create_timer(waits[i]).timeout
-		if i == 1:
-			_puppet.state = &"idle"
-		var piece := await _snap(Rect2i(360, 80, 560, 560), tile)
-		sheet.blit_rect(piece, Rect2i(Vector2i.ZERO, tile), Vector2i(i * tile.x, 0))
+	var moments := [0.03, 0.1, 0.25, 0.45, 0.7, 0.9, 1.15]
+	var sheet := Image.create(tile.x * moments.size(), tile.y * 3, false, Image.FORMAT_RGB8)
+	var kinds: Array[StringName] = [&"ink", &"fire", &"cut"]
+	for row in kinds.size():
+		_puppet.blinking = false
+		_puppet.state = &"idle"
+		await create_timer(0.5).timeout
+		_puppet.state = &"hurt"
+		_puppet.struck(kinds[row], _ronin.global_position + Vector3(_ronin.facing * 1.0, 0.4, 0.0))
+		_puppet.blinking = true
+		var start := Time.get_ticks_msec()
+		var times := []
+		for i in moments.size():
+			while (Time.get_ticks_msec() - start) / 1000.0 < moments[i]:
+				await process_frame
+			var age := (Time.get_ticks_msec() - start) / 1000.0
+			if age > 0.3:
+				_puppet.state = &"idle"
+			if age >= _ronin.invulnerable_time:
+				_puppet.blinking = false  # as the Ronin does when he can be hurt again
+			times.append(snappedf(age, 0.01))
+			var piece := await _snap(Rect2i(360, 80, 560, 560), tile)
+			sheet.blit_rect(piece, Rect2i(Vector2i.ZERO, tile), Vector2i(i * tile.x, row * tile.y))
+		print(kinds[row], " struck, pictures taken at (s): ", times)
 	return sheet
 
 
@@ -688,6 +725,30 @@ func _heal() -> Image:
 	return sheet
 
 
+## The Crane Glide held until the wings tire (Ronin.glide_time): ten
+## moments from the jump (times printed).
+func _wings() -> Image:
+	_ronin.has_glide = true
+	_ronin.set("_draw_safe", 60.0)
+	_ronin.global_position = Vector3(BambooGrove.SHIFT + 320.0, 12.0, 0.0)
+	_ronin.velocity = Vector3.ZERO
+	await create_timer(0.3).timeout
+	_main.get_node("Camera").snap_to_target()
+	var tile := Vector2i(320, 320)
+	var sheet := Image.create(tile.x * 5, tile.y * 2, false, Image.FORMAT_RGB8)
+	Input.action_press("jump")
+	var started := Time.get_ticks_msec()
+	var times := [0.3, 0.9, 1.4, 1.55, 1.7, 1.85, 2.0, 2.1, 2.3, 2.6]
+	for i in times.size():
+		while (Time.get_ticks_msec() - started) / 1000.0 < times[i]:
+			await process_frame
+		var piece := await _snap(Rect2i(340, 60, 600, 600), tile)
+		sheet.blit_rect(piece, Rect2i(Vector2i.ZERO, tile), Vector2i((i % 5) * tile.x, (i / 5) * tile.y))
+		print("%.2f s: gliding %s, tired %.2f" % [times[i], _ronin.is_gliding(), _ronin.glide_tiredness()])
+	Input.action_release("jump")
+	return sheet
+
+
 ## Close-ups of one of the paper creatures in each of its poses.
 func _critter(kind: Variant, shots: Array) -> Image:
 	var critter: PaperCritter = null
@@ -719,6 +780,67 @@ func _critter(kind: Variant, shots: Array) -> Image:
 		critter.call("_process", 0.0)
 		await create_timer(0.05).timeout
 		var piece := await _snap(Rect2i(360, 80, 560, 560), tile)
+		sheet.blit_rect(piece, Rect2i(Vector2i.ZERO, tile), Vector2i((i % columns) * tile.x, (i / columns) * tile.y))
+	return sheet
+
+
+## The bamboo's creatures (the red panda, the kite husk), placed in the grove
+## in daylight just as the grove places them, then held in each pose. Each
+## shot: [mode, seconds into it, {"move": walking, "right": facing right,
+## "flash": just cut, "die": killed (the burst), "front": seen from three-
+## quarters in front (the panda)}].
+func _wild(kind: String, shots: Array) -> Image:
+	_ronin.set_physics_process(false)
+	_ronin.visible = false
+	var x := BambooGrove.SHIFT + BambooGrove.ARRIVE_X + 5.0
+	_ronin.global_position = Vector3(x - 4.0, 1.6, 0.0)
+	await create_timer(0.3).timeout
+	var down := PhysicsRayQueryParameters3D.create(Vector3(x, 30.0, 0.0), Vector3(x, -20.0, 0.0), 1)
+	var hit := root.get_world_3d().direct_space_state.intersect_ray(down)
+	var ground: float = hit["position"].y if not hit.is_empty() else 1.55
+	var critter: PaperCritter = RedPanda.new() if kind == "panda" else KiteHusk.new()
+	critter.position = Vector3(x, ground + (0.05 if kind == "panda" else 2.6), 0.0)
+	_main.get_node("Village").add_child(critter)
+	await create_timer(0.6).timeout
+	critter.set_physics_process(false)
+	critter.set_process(false)
+	var cam: Camera3D = _main.get_node("Camera")
+	cam.set_process(false)
+	cam.set_physics_process(false)
+	var tile := Vector2i(400, 400)
+	var columns := 5
+	var sheet := Image.create(tile.x * columns, tile.y * ceili(shots.size() / float(columns)), false, Image.FORMAT_RGB8)
+	var at := critter.global_position
+	print("%s stands at %s (ground %.2f)" % [kind, at, ground])
+	for i in shots.size():
+		var extra: Dictionary = shots[i][2]
+		if kind == "panda" and extra.get("front", false):
+			cam.look_at_from_position(at + Vector3(-1.1, 0.45, 1.1), at + Vector3(0.0, 0.25, 0.0))
+		elif kind == "panda":
+			cam.global_position = at + Vector3(0.0, 0.36, 1.7)
+			cam.rotation = Vector3(-0.08, 0.0, 0.0)
+		else:
+			cam.global_position = at + Vector3(0.0, -0.45, 4.0)
+			cam.rotation = Vector3(0.0, 0.0, 0.0)
+		critter.set("_dir", 1.0 if extra.get("right", false) else -1.0)
+		critter.global_position = at
+		critter.mode = shots[i][0]
+		critter.set("_mode_time", shots[i][1])
+		critter.set("_clock", 3.0 + shots[i][1])
+		critter.set("_last_clock", 100.0)  # (poses at once, without easing)
+		critter.set("_gait", shots[i][1])
+		critter.set("_seal_show", 1.0 if critter.mode == &"stagger" else 0.0)
+		critter.velocity = Vector3(float(critter.get("_dir")) * (0.9 if extra.get("move", false) else 0.0), 0.0, 0.0)
+		critter.set("_dive_dir", Vector3(-0.7, -0.7, 0.0).normalized())
+		critter.call("_pose")
+		critter.call("_process", 0.0)
+		critter.call("_set_flash", extra.get("flash", false))
+		if extra.get("die", false):
+			critter.take_hit(99, Vector2(1.0, 0.0))
+			await create_timer(0.12).timeout
+		else:
+			await create_timer(0.08).timeout
+		var piece := await _snap(Rect2i(280, 0, 720, 720), tile)
 		sheet.blit_rect(piece, Rect2i(Vector2i.ZERO, tile), Vector2i((i % columns) * tile.x, (i / columns) * tile.y))
 	return sheet
 

@@ -192,7 +192,7 @@ func _strike() -> void:
 		var target: Object = result["collider"]
 		if target.has_method("receive_strike"):
 			_struck = true
-			if target.receive_strike(attack_damage, global_position):
+			if target.receive_strike(attack_damage, global_position, hurt_kind):
 				velocity = Vector3(-_dive_dir.x * 4.0, 2.0, 0.0)
 				_on_parried()
 			return

@@ -555,7 +555,7 @@ func _physics_process(delta: float) -> void:
 			velocity.x = move_toward(velocity.x, 0.0, 14.0 * delta)
 			if _mode_time >= cut_windup:
 				_set_mode(&"cut")
-				Sound.play(self, &"slash", -2.0)
+				Sound.play(self, &"akane_slash", -2.0)
 				velocity.x = facing * 4.0
 		&"cut":
 			velocity.x = move_toward(velocity.x, 0.0, 30.0 * delta)
@@ -571,14 +571,14 @@ func _physics_process(delta: float) -> void:
 			velocity.x = move_toward(velocity.x, 0.0, 20.0 * delta)
 			if _mode_time >= cut_gap:
 				_set_mode(&"cut")
-				Sound.play(self, &"slash", -2.0)
+				Sound.play(self, &"akane_slash", -2.0)
 				velocity.x = facing * 4.0
 		&"draw_tell":
 			velocity.x = move_toward(velocity.x, 0.0, 20.0 * delta)
 			if _mode_time >= draw_tell:
 				_set_mode(&"draw")
 				_draw_start = global_position.x
-				Sound.play(self, &"dash", -1.0)
+				Sound.play(self, &"akane_draw", -1.0)
 		&"draw":
 			velocity.x = facing * draw_speed
 			if not _hit_this_cut:
@@ -659,7 +659,7 @@ func _swing(reach: float, height: float, cost: int, back: float = 0.0) -> void:
 		if not target.has_method("receive_strike"):
 			continue
 		_hit_this_cut = true
-		if target.receive_strike(1, global_position):
+		if target.receive_strike(1, global_position, &"cut"):
 			_parried(cost)
 			_spark(Color(1.0, 0.82, 0.4))
 		return
@@ -678,7 +678,7 @@ func _throw_fire() -> void:
 	var to := ronin.global_position + Vector3(_rng.randf_range(-0.6, 0.6), 0.8, 0.0)
 	var t := clampf(absf(to.x - from.x) / 9.0, 0.45, 0.9)
 	fire.velocity = Vector3((to.x - from.x) / t, (to.y - from.y) / t + fire.gravity * t * 0.5, 0.0)
-	Sound.play(self, &"fire_whoosh", -2.0)
+	Sound.play(self, &"fox_fire", -2.0)
 
 
 ## A burst of sparks where blades meet.

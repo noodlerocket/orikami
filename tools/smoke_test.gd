@@ -581,6 +581,8 @@ func _run(main: Node) -> void:
 			if not on:
 				floating += 1
 		_check("every bamboo stem stands on ground (%d stems, %d not)" % [grove.stem_feet.size(), floating], floating == 0 and grove.stem_feet.size() > 50)
+		ronin.set("_draw_safe", 120.0)  # (the grove's creatures must not knock him off these routes)
+		ronin.health = ronin.max_health
 		# The Crane Glide carries him over the first ravine.
 		ronin.has_glide = true
 		ronin.position = Vector3(BambooGrove.SHIFT + BambooGrove.GROUND[0][1] - 0.6, BambooGrove.GROUND[0][2] + 0.05, 0.0)
@@ -597,6 +599,78 @@ func _run(main: Node) -> void:
 		await _frames(20)
 		_check("gliding carries him over the bamboo ravine (x %.1f)" % ronin.global_position.x,
 				glided and ronin.global_position.x > BambooGrove.SHIFT + BambooGrove.GROUND[1][0] and ronin.global_position.y > 1.0)
+		# The glide tires: the wings hold him for glide_time, then fold away.
+		ronin.position = Vector3(BambooGrove.SHIFT + 320.0, 9.0, 0.0)
+		ronin.velocity = Vector3.ZERO
+		await _frames(2)
+		Input.action_press("jump")
+		var glide_frames := 0
+		for f in 240:
+			await physics_frame
+			if ronin.is_gliding():
+				glide_frames += 1
+		Input.action_release("jump")
+		_check("the wings tire: he glides %.2f s of %.1f s held" % [glide_frames / 60.0, 4.0],
+				absf(glide_frames / 60.0 - ronin.glide_time) < 0.15)
+		# The Windfall Gorge: too wide for one glide; riding the rising gusts
+		# (hovering in each until it has lifted him) carries him over.
+		var ride := func(start: Vector3, goal_x: float, rise_to: float, seconds: float) -> void:
+			ronin.global_position = start
+			ronin.velocity = Vector3.ZERO
+			await _frames(5)
+			Input.action_press("jump")
+			for f in int(seconds * 60.0):
+				await physics_frame
+				var at := ronin.global_position
+				if at.x > goal_x:
+					# (Over the goal: let go, and wait to land.)
+					Input.action_release("move_right")
+					Input.action_release("jump")
+					if ronin.is_on_floor():
+						break
+					continue
+				# In a gust: steer to its middle and let it lift him; then on.
+				var gust: Updraft = null
+				for u: Updraft in Updraft.all:
+					if absf(u.global_position.x - at.x) < u.width * 0.5 and Updraft.lift_at(at) > 0.0:
+						gust = u
+				if gust and at.y < rise_to:
+					Input.action_release("move_right")
+					Input.action_release("move_left")
+					if at.x < gust.global_position.x - 0.3:
+						Input.action_press("move_right")
+					elif at.x > gust.global_position.x + 0.3:
+						Input.action_press("move_left")
+				else:
+					Input.action_release("move_left")
+					Input.action_press("move_right")
+			Input.action_release("move_right")
+			Input.action_release("move_left")
+			Input.action_release("jump")
+			await _frames(30)
+		await ride.call(Vector3(BambooGrove.SHIFT + 247.5, 1.55, 0.0), BambooGrove.SHIFT + 287.2, 7.0, 16.0)
+		_check("riding the rising gusts carries him over the Windfall Gorge (x %.1f, y %.1f)" % [ronin.global_position.x - BambooGrove.SHIFT, ronin.global_position.y],
+				ronin.global_position.x > BambooGrove.SHIFT + 287.0 and ronin.global_position.y > 1.0)
+		# The Canopy Road: up between the two bound stems by wall jumps...
+		ronin.global_position = Vector3(BambooGrove.SHIFT + (CanopyRoad.CLIMB_STEMS[0] + CanopyRoad.CLIMB_STEMS[1]) * 0.5, 1.55, 0.0)
+		ronin.velocity = Vector3.ZERO
+		await _frames(5)
+		var highest := 0.0
+		for k in 24:
+			Input.action_press("jump")
+			await _frames(9)
+			Input.action_release("jump")
+			await _frames(3)
+			highest = maxf(highest, ronin.global_position.y)
+		_check("he climbs between the canopy's bound stems by wall jumps (up to %.1f m)" % highest, highest > CanopyRoad.DECKS[0][2])
+		# ...and from the first deck, a rising gust lifts him to the second.
+		await ride.call(Vector3(BambooGrove.SHIFT + 300.5, 9.55, 0.0), BambooGrove.SHIFT + 308.0, 15.8, 8.0)
+		_check("a rising gust lifts him from the first canopy deck to the second (x %.1f, y %.1f)" % [ronin.global_position.x - BambooGrove.SHIFT, ronin.global_position.y],
+				ronin.is_on_floor() and absf(ronin.global_position.y - CanopyRoad.DECKS[1][2]) < 0.3)
+		# The Falls: from the cliff top, one long glide over the pool to the far bank.
+		await ride.call(Vector3(BambooGrove.SHIFT + 382.5, 13.55, 0.0), BambooGrove.SHIFT + 396.5, 0.0, 8.0)
+		_check("from the top of the Falls he glides over the pool to the far bank (x %.1f, y %.1f)" % [ronin.global_position.x - BambooGrove.SHIFT, ronin.global_position.y],
+				ronin.global_position.x > BambooGrove.SHIFT + 396.0 and ronin.global_position.y > 1.9 and not ronin.is_in_pit())
 		# Akane: the first time he steps into her clearing, she meets him (play
 		# stops); skipped, the duel begins behind a wall of wind; a parried cut
 		# costs her posture; broken far enough, she yields and is gone.
@@ -622,6 +696,8 @@ func _run(main: Node) -> void:
 		await _frames(30)
 		_check("skipped, the duel begins behind a wall of wind", duel.akane.active and ronin.is_physics_processing()
 				and duel.get("_wall") != null)
+		var duel_music: AudioStreamPlayer = duel.get("_music")
+		_check("her own duel music plays while they fight", duel_music.playing and duel_music.stream.resource_path.ends_with("music_akane_duel.ogg"))
 		var akane := duel.akane
 		akane.set_physics_process(false)
 		akane.global_position = ronin.global_position + Vector3(1.6, 0.0, 0.0)
@@ -644,6 +720,7 @@ func _run(main: Node) -> void:
 		await _frames(270)
 		_check("broken far enough, she yields and is gone (and the wind wall falls); he can move again", akane.mode() == &"gone"
 				and SaveGame.akane_dueled and duel.get("_wall") == null and ronin.is_physics_processing())
+		_check("her music has faded away once she is gone", not duel_music.playing)
 		# ...and over the Rooftop Road's gap above the river (the first Crane
 		# Glide gate), even against the gusts.
 		ronin.position = Vector3(RooftopRoad.GLIDE_GAP.x - 0.3, 6.7, 0.0)
@@ -907,6 +984,7 @@ func _expanded_village(main: Node, ronin: Ronin) -> void:
 	var corner_jump := await _jump_height(ronin, 40)
 	_check("a jump that clips a corner slips round it (%.2f m up)" % corner_jump, corner_jump > 2.0)
 	await _new_enemies(village, ronin)
+	await _bamboo_creatures(village, ronin)
 	await _cranes_and_saving(main, village, ronin)
 	# Three shrines to rest at.
 	_check("there are three shrines", village.find_children("*", "RestShrine", true, false).size() >= 3)
@@ -1082,6 +1160,208 @@ func _new_enemies(village: Village, ronin: Ronin) -> void:
 			break
 	_check("the lantern husk throws burning paper", thrown != null)
 	_check("a parried wad flies back and burns the thrower", not is_instance_valid(keeper) or keeper.health < hp)
+	await _struck_kinds(village, ronin)
+
+
+## The bamboo's creatures, the red panda and the kite husk, made here at the
+## west end of the long floor under the canopy, out of reach of the ones the
+## grove places (BambooGrove.PANDAS, KITES): each gives its
+## tell before it attacks, its attack hurts unparried, a parry staggers it
+## and a cut then finishes it; the kite can be pogo'd.
+func _bamboo_creatures(village: Village, ronin: Ronin) -> void:
+	var ground := 1.5
+	var reset := func(at: Vector3, face: float) -> void:
+		ronin.position = at
+		ronin.velocity = Vector3.ZERO
+		ronin.facing = face
+		ronin.health = ronin.max_health
+		ronin.set("_invulnerable", 0.0)
+		ronin.set("_draw_safe", 0.0)
+	var parry_now := func() -> void:
+		if ronin.get("_parry_time") <= 0.0 and ronin.get("_parry_cooldown_left") <= 0.0:
+			Input.action_press("parry")
+			await physics_frame
+			Input.action_release("parry")
+	# The red panda: it rears up (the tell), then charges and springs.
+	var panda := RedPanda.new()
+	panda.position = Vector3(BambooGrove.SHIFT + 290.0, ground + 0.05, 0.0)
+	village.add_child(panda)
+	panda.set("_dir", 1.0)
+	reset.call(panda.position + Vector3(4.2, 0.1, 0.0), -1.0)
+	await _frames(20)
+	panda.global_position.x = BambooGrove.SHIFT + 290.0
+	reset.call(Vector3(BambooGrove.SHIFT + 294.2, ground + 0.1, 0.0), -1.0)
+	var order: Array[StringName] = []
+	var hurt_before_attack := false
+	for f in 150:
+		await physics_frame
+		ronin.velocity.x = 0.0
+		if order.is_empty() or order[-1] != panda.mode:
+			order.append(panda.mode)
+		if ronin.health < ronin.max_health and not (&"charge" in order):
+			hurt_before_attack = true
+		if ronin.health < ronin.max_health:
+			break
+	var told_first := order.find(&"tell") >= 0 and order.find(&"tell") < order.find(&"charge")
+	_check("the red panda rears up (its tell) before it charges (%s)" % [order], told_first and not hurt_before_attack)
+	_check("and its charge or spring hurts him unparried (%d/%d)" % [ronin.health, ronin.max_health], ronin.health < ronin.max_health)
+	await _frames(60)
+	panda.global_position = Vector3(BambooGrove.SHIFT + 290.0, ground + 0.05, 0.0)
+	panda.velocity = Vector3.ZERO
+	panda.set("_dir", 1.0)
+	panda.set("_cooldown", 0.0)
+	panda.call("_set_mode", &"patrol")
+	reset.call(Vector3(BambooGrove.SHIFT + 294.2, ground + 0.1, 0.0), -1.0)
+	for f in 150:
+		await physics_frame
+		ronin.velocity.x = 0.0
+		if panda.mode in [&"charge", &"pounce"] and absf(panda.global_position.x - ronin.global_position.x) < 2.2:
+			await parry_now.call()
+		if panda.is_staggered():
+			break
+	_check("a parried charge throws the red panda over, staggered (%s, %d/%d)" % [panda.mode, ronin.health, ronin.max_health],
+			panda.is_staggered() and ronin.health == ronin.max_health)
+	await _frames(30)
+	ronin.position = panda.global_position + Vector3(1.2, 0.1, 0.0)
+	ronin.facing = -1.0
+	await _frames(2)
+	Input.action_press("slash")
+	await _frames(2)
+	Input.action_release("slash")
+	await _frames(20)
+	_check("and one cut finishes it", not is_instance_valid(panda))
+	await _frames(40)
+	# The kite husk: it rears back (the tell), then swoops raking.
+	var kite := KiteHusk.new()
+	var roost := Vector3(BambooGrove.SHIFT + 293.0, ground + 3.2, 0.0)
+	kite.position = roost
+	village.add_child(kite)
+	reset.call(Vector3(BambooGrove.SHIFT + 295.0, ground + 0.1, 0.0), -1.0)
+	kite.set("_cooldown", 0.0)
+	order.clear()
+	hurt_before_attack = false
+	for f in 150:
+		await physics_frame
+		ronin.velocity.x = 0.0
+		if order.is_empty() or order[-1] != kite.mode:
+			order.append(kite.mode)
+		if ronin.health < ronin.max_health and not (&"dive" in order):
+			hurt_before_attack = true
+		if ronin.health < ronin.max_health:
+			break
+	told_first = order.find(&"tell") >= 0 and order.find(&"tell") < order.find(&"dive")
+	_check("the kite husk rears back (its tell) before it swoops (%s)" % [order], told_first and not hurt_before_attack)
+	_check("and its claws hurt him unparried (%d/%d)" % [ronin.health, ronin.max_health], ronin.health < ronin.max_health)
+	await _frames(60)
+	# Cut down onto from above, he bounces off it.
+	ronin.set("_invulnerable", 5.0)
+	kite.set_physics_process(false)
+	kite.global_position = roost
+	kite.call("_set_mode", &"patrol")
+	ronin.position = roost + Vector3(0.0, 1.35, 0.0)
+	ronin.velocity = Vector3.ZERO
+	Input.action_press("aim_down")
+	await _frames(3)
+	Input.action_press("slash")
+	await _frames(2)
+	Input.action_release("slash")
+	Input.action_release("aim_down")
+	var best := -99.0
+	for i in 12:
+		await _frames(1)
+		best = maxf(best, ronin.velocity.y)
+	_check("he can pogo off a kite husk (%.1f m/s, its health %d)" % [best, kite.health], best > 6.0 and kite.health < kite.max_health)
+	await _frames(60)
+	# A parried swoop sends it tumbling, staggered; a cut then finishes it.
+	kite.global_position = roost
+	kite.velocity = Vector3.ZERO
+	kite.set("_cooldown", 0.0)
+	kite.call("_set_mode", &"patrol")
+	kite.set_physics_process(true)
+	reset.call(Vector3(BambooGrove.SHIFT + 295.0, ground + 0.1, 0.0), -1.0)
+	for f in 150:
+		await physics_frame
+		ronin.velocity.x = 0.0
+		if kite.mode == &"dive" and kite.global_position.distance_to(ronin.global_position + Vector3(0.0, 0.9, 0.0)) < 2.4:
+			await parry_now.call()
+		if kite.is_staggered():
+			break
+	_check("a parried swoop sends the kite husk tumbling, staggered (%s, %d/%d)" % [kite.mode, ronin.health, ronin.max_health],
+			kite.is_staggered() and ronin.health == ronin.max_health)
+	await _frames(30)
+	kite.set_physics_process(false)
+	kite.global_position = ronin.global_position + Vector3(-1.2, 0.9, 0.0)
+	ronin.facing = -1.0
+	await _frames(2)
+	Input.action_press("slash")
+	await _frames(2)
+	Input.action_release("slash")
+	await _frames(20)
+	_check("and one cut finishes it", not is_instance_valid(kite))
+	ronin.set("_invulnerable", 0.0)
+	ronin.health = ronin.max_health
+	ronin.position = Vector3(20.0, 0.1, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(20)
+
+
+## What a blow does to his paper depends on what struck him: ink soaks it,
+## fire scorches it, a blade, claws or teeth tear it; and nothing is left
+## once he can be hurt again.
+func _struck_kinds(village: Village, ronin: Ronin) -> void:
+	var puppet: RoninPuppet = ronin.get_node("Puppet")
+	var shown := func() -> Dictionary:
+		return {&"ink": puppet.shows_ink(), &"fire": puppet.shows_burn(), &"cut": puppet.shows_tear()}
+	var wait_clean := func() -> void:
+		for f in 600:
+			if ronin.get("_invulnerable") <= 0.0:
+				break
+			await physics_frame
+		await _frames(5)
+	for kind: StringName in [&"ink", &"fire", &"cut"]:
+		ronin.set("_invulnerable", 0.0)
+		ronin.set("_draw_safe", 0.0)
+		ronin.health = ronin.max_health
+		ronin.take_damage(1, ronin.global_position + Vector3(1.0, 0.0, 0.0), kind)
+		await _frames(3)
+		var now: Dictionary = shown.call()
+		_check("a blow of %s shows %s and nothing else %s" % [kind, kind, now], now[kind] and now.values().count(true) == 1)
+		await wait_clean.call()
+		now = shown.call()
+		_check("and once he can be hurt again nothing is left on him %s" % now, now.values().count(true) == 0)
+	# A real burning wad, unparried, scorches him (no ink).
+	ronin.set("_invulnerable", 0.0)
+	ronin.set("_draw_safe", 0.0)
+	ronin.health = ronin.max_health
+	ronin.velocity = Vector3.ZERO
+	ronin.last_hurt_kind = &""
+	var wad := BurningPaper.new()
+	village.add_child(wad)
+	wad.global_position = ronin.global_position + Vector3(1.2, 0.9, 0.0)
+	wad.velocity = Vector3(-8.0, 0.0, 0.0)
+	for f in 30:
+		await physics_frame
+		if ronin.last_hurt_kind != &"":
+			break
+	_check("burning paper scorches him (%s)" % ronin.last_hurt_kind, ronin.last_hurt_kind == &"fire" and puppet.shows_burn() and not puppet.shows_ink())
+	await wait_clean.call()
+	# A paper dog's bite tears his paper (no ink).
+	var dogs := village.find_children("*", "PaperDog", true, false)
+	if not dogs.is_empty():
+		var dog: PaperDog = dogs[0]
+		dog.set_physics_process(false)
+		ronin.last_hurt_kind = &""
+		ronin.set("_invulnerable", 0.0)
+		ronin.set("_draw_safe", 0.0)
+		ronin.health = ronin.max_health
+		dog.global_position = ronin.global_position + Vector3(-0.6, 0.0, 0.0)
+		dog.set("_dir", 1.0)
+		await _frames(2)
+		dog.call("_bite", 0.5)
+		await _frames(3)
+		_check("a paper dog's bite tears his paper (%s)" % ronin.last_hurt_kind, ronin.last_hurt_kind == &"cut" and puppet.shows_tear() and not puppet.shows_ink())
+		dog.set_physics_process(true)
+		await wait_clean.call()
 
 
 ## Puts the Ronin just in front of the husk, the two facing each other.

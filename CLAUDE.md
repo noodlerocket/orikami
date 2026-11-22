@@ -48,7 +48,7 @@ Windows and Mac carry Julian's icon.
 
 **Next:** Julian plays the overnight work and judges it (the report lists
 what only he can judge). Then: Julian judges Akane's duel (built: proposed lore, she yields
-rather than dies); music for the duel; the road on past the bamboo (the
+rather than dies; her music and sounds are in); the road on past the bamboo (the
 open middle of the game); the endings (the ink marks are saved; nothing
 reads them yet).
 
@@ -167,6 +167,10 @@ the game)**
   screen (`keep_below_center`): when he gets that high it rises exactly
   enough. In the climbing course (`climb_zone`) it follows him up and keeps
   him centred, no higher than `climb_max_y`.
+- In the bamboo (`rest_zone`, set by `Main._set_camera_limits`) it keeps to
+  the height of the ground he last stood on (`rest_height` 2.7 above it, so
+  on the grove floor it is exactly where it always was): it does not bob
+  with jumps, goes down when he drops below, up when he lands higher.
 - It follows him into the shrine courtyard like anywhere else and stops at
   its middle (`max_x`). A hard lock on the courtyard made it jump: rejected.
 
@@ -380,8 +384,16 @@ There is no controls line along the bottom of the game screen any more
 - **Ink marks:** `ink_absorbed` counts every drop ever taken in (healing
   does not wash it off); at `marks_full_at` (150) he is covered in flowing
   brush strokes (shader, drawn on at `marks_draw_speed`). Saved (`SaveGame.ink_absorbed`).
-- **Struck:** ink drops fly off, his paper is soaked black, the blots shrink
-  away while he is invulnerable (shader `ink`).
+- **Struck** depends on what hit him (Julian: the effect should match the
+  attacker). `receive_strike`/`take_damage` take a last `kind`:
+  `&"ink"` (default: husks, the Hannya, the Smudge): ink drops fly off, his
+  paper is soaked black, the blots shrink away while he is invulnerable
+  (shader `ink`); `&"fire"` (burning paper, Akane's fox-fires): a char with
+  a glowing ember rim, embers, ash and smoke, the scorch fading back to
+  white (`burn_*`); `&"cut"` (swords, claws, bites: dogs, birds, Akane's
+  cuts, every `PaperCritter` by default via `hurt_kind`): a slit at his
+  waist with pale torn edges, paper scraps, a sideways jolt (`tear_*`). All
+  settings in `RoninPuppet` "Struck"; sheet `struck` (one row per kind).
 - **Death:** he shreds into white strips and scraps (`RoninPuppet.shred`),
   the screen fades, he is revived whole at the well (`died`, `revive()`).
   Deep water and the river fade the same way and cost `pit_damage` (1).
@@ -564,9 +576,52 @@ has its own script, built from `Village._ready`:
   into deep mist with a stone lantern (`_build_mist_way`; a copy of the
   courtyard's gate there was "a weird scene arrangement"). Shrine 4, the altar where he learns the
   Crane Glide (`Ronin.has_glide`, `glide_*` settings; paper wings on the
-  puppet, `_build_wings`).
+  puppet, `_build_wings`). The glide was made weaker for the bigger grove
+  (Julian: "not too overpowered"): sinks at `glide_fall_speed` 2.0 (was
+  1.4), forward `glide_speed` 8 (was 9), and the wings tire after
+  `glide_time` 2.0 s (they sag and tremble for the last
+  `glide_tire_warning`, then fold and he falls). Landing, clinging to a
+  wall, a pogo or a rising gust gives them back. One glide covers about
+  11 m from a jump.
+- **The grown grove** (Julian: the size of the town, lots of glide;
+  `docs/bamboo_map.png` is the plan, `tools/bamboo_map.py`): `GROUND` rows
+  now carry how deep their rock goes. After the two ravines:
+  the Windfall Gorge (`windfall_gorge.gd`, 249 to 287, floor -9.5, a back
+  wall of rock, a stream; three rising gusts `UPDRAFTS`; decks; climb out
+  by the east wall and `CLIMB_STEM`; cranes `gorge_floor`); the Canopy Road
+  (`canopy_road.gd`, 292 to 346: decks 9.5 to 18.5 m up, two gusts, up
+  between `CLIMB_STEMS`; cranes `canopy_top`; the floor below is the plain
+  way); the paper mill (`paper_mill.gd`: shrine 5 `mill`, house, vats as
+  steps to a drying loft with cranes `mill_loft`, an overshot waterwheel
+  fed by a bamboo flume from the Falls' cliff top); the Falls
+  (`bamboo_falls.gd`: a 12 m cliff climbed beside `CLIMB_STEM`, a stream
+  pouring off it (`shaders/waterfall.gdshader`), a deep pool `POOL` that
+  carries him back to the last shrine, a ledge behind the water with
+  cranes `behind_falls`; one long glide down to Akane's clearing).
+  `Updraft` (`updraft.gd`): a rising gust out of a cleft, leaves riding it
+  up; lifts him only while gliding (`Ronin.updraft_lift` 7, `width` 3.2,
+  fading near its top). `LashedDeck` (`lashed_deck.gd`): bamboo decks
+  lashed to stems standing on the ground behind them (and ropes to the
+  front), dip and creak when landed on. Stems he can climb wear rope
+  bindings (`LashedDeck.climb_marks`); others cannot be climbed.
+- **The grove's creatures** (Julian: red pandas instead of dogs, a flying
+  husk-like creature instead of birds; `BambooGrove.PANDAS`, `KITES`):
+  `RedPanda` (`red_panda.gd`, Meshy `models/redpanda.glb`, picture
+  `docs/reference/redpanda_side.png`): pads about, sits up to look; its
+  tell is the red panda's threat stance (rears up, forelegs flung wide,
+  huffs), then it bounds and springs, claws first; parried it flips onto
+  its back. `KiteHusk` (`kite_husk.gd`, `models/kitehusk.glb`,
+  `docs/reference/kitehusk_front.png`): a haunted paper kite with a husk's
+  weeping mask and clawed arms, riding the wind; its tell: leans back, arms
+  wide, the eye weeps; then it swoops and rakes; pogo-able; parried it
+  tumbles; torn streamers tied behind its hem. Both are unrigged Meshy
+  models given bones in code (`procedural_skin.gd`: each vertex follows up
+  to four bones) and posed by hand. They burst into their own paper colours
+  (`PaperCritter.confetti_colors`). Sounds `panda_huff`, `panda_squeal`,
+  `kite_rattle`. Sheets `panda`, `kite`; `wings` shows the glide tiring;
+  `docs/screenshots/bamboo_tour.png` the new areas.
 - **Akane** (`akane.gd`, `akane_duel.gd`): the grove's last ground (past the
-  rope bridge, `AkaneDuel.CLEARING`) is her clearing. Her look is Julian's
+  Falls, `AkaneDuel.CLEARING` 399 to 413.4) is her clearing. Her look is Julian's
   picture of her (white kitsune mask with red markings, long black hair,
   white robes painted in ink over red hakama, gold-crested bow, geta; a
   first fox-warrior model was rejected); Meshy model `models/akane.glb`
@@ -586,8 +641,9 @@ has its own script, built from `Village._ready`:
   near-perfect player beats her in about 36 s, taking 3 hits. Her slash
   effect is the Ronin's kind (slash_sweep shader) in vermilion
   (`swoosh_tint`): a swoosh round her per cut reaching `cut_reach`, and a
-  streak along her draw (`streak_time`); sheet `akane_cut`. No duel
-  music yet (the village music is hushed). Sheets: `akane`, `akane_poses`.
+  streak along her draw (`streak_time`); sheet `akane_cut`. Her own
+  duel music (`music_akane_duel.ogg`, `AkaneDuel.music_volume`, fades as she
+  yields) and sounds (`akane_slash`, `akane_draw`, `fox_fire`). Sheets: `akane`, `akane_poses`.
 - Backdrop glows (the moon's, the castle's, far lamps) are vertex-colour
   discs (`Backdrop._soft_disc`), not `Scenery.halo`: a halo square once
   flashed up as a pale rectangle round the moon on the rooftops (rare, not
@@ -937,6 +993,7 @@ through:
 | `art_source/` | Source art Godot ignores (the brush font and its licence) |
 | `docs/design.md`, `docs/reference/`, `docs/screenshots/` | Design doc, art references, frame sheets |
 | `scripts/canals.gd`, `fallen_street.gd`, `soggy_plank.gd`, `river_bridge.gd`, `gatehouse.gd`, `shrine_steps.gd`, `rooftop_road.gd`, `ladder.gd`, `bamboo_grove.gd` | The expanded village's areas (see "The expanded village") |
+| `scripts/windfall_gorge.gd`, `canopy_road.gd`, `paper_mill.gd`, `bamboo_falls.gd`, `updraft.gd`, `lashed_deck.gd` | The grown bamboo grove's areas, its rising gusts and lashed decks |
 | `scripts/paper_critter.gd`, `paper_dog.gd`, `paper_bird.gd`, `lantern_husk.gd`, `burning_paper.gd` | The new enemies |
 | `scripts/akane.gd`, `akane_duel.gd`, `brush_line.gd` | Akane and her duel at the end of the bamboo; a brushed spoken line |
 | `scripts/paper_maker.gd` | The Paper-Maker at her vat (Meshy model `models/papermaker.glb`, posed by hand) |

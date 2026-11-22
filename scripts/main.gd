@@ -120,7 +120,11 @@ func _set_camera_limits() -> void:
 	if BambooGrove.in_grove(_ronin.global_position.x):
 		_camera.min_x = BambooGrove.SHIFT + BambooGrove.GATE_X + 5.0
 		_camera.max_x = BambooGrove.SHIFT + BambooGrove.EAST_END - 9.0
+		if _camera.rest_zone.x < 0.0:
+			_camera.set(&"_rest_y", _ronin.global_position.y)  # (just arrived)
+		_camera.rest_zone = Vector2(BambooGrove.SHIFT + BambooGrove.GATE_X, BambooGrove.SHIFT + BambooGrove.EAST_END + 5.0)
 	else:
+		_camera.rest_zone = Vector2(-1000.0, -1000.0)
 		_camera.min_x = -7.0
 		_camera.max_x = (Village.ARENA.x + Village.ARENA.y) * 0.5
 		# Once the far gate stands open (after her), the camera may go on far
@@ -228,6 +232,7 @@ func _warm_up() -> void:
 		func() -> void: puppet.play_slash(Vector2(1, 0)),
 		func() -> void: puppet.play_deflect(),
 		func() -> void: puppet.play_block(),
+		func() -> void: puppet.warm_struck(),  # a scorch and a tear, their embers and scraps
 		func() -> void:
 			puppet.state = &"iai"
 			puppet.iai_charge = 1.0,
@@ -296,6 +301,7 @@ func _warm_up() -> void:
 		done += 1
 		cover.progress = float(done) / total
 	# Put everything back as it was.
+	puppet.restore()
 	puppet.state = &"idle"
 	puppet.iai_charge = 0.0
 	_ronin.global_position = _ronin.get("_spawn_position")

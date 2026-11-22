@@ -19,11 +19,16 @@ extends CharacterBody3D
 @export_group("Getting hit")
 @export var flash_time := 0.12
 @export var confetti_count := 30
+## The colours of the paper scraps it bursts into (empty: the town's own).
+var confetti_colors: Array = []
 @export var knockback_speed := 6.0
 @export_group("Stop-motion")
 @export var frames_per_second := 12.0
 
 var health := 0
+## What touching (or being struck by) it does to the Ronin's paper: claws,
+## teeth and beaks tear it (&"cut"); see Ronin.take_damage.
+var hurt_kind: StringName = &"cut"
 var posture := 0
 ## What it is doing now (each kind has its own set of modes).
 var mode: StringName = &"patrol"
@@ -94,7 +99,7 @@ func take_hit(damage: int, direction: Vector2) -> void:
 	_set_flash(true)
 	_flash = flash_time
 	if health <= 0:
-		Confetti.burst(get_parent(), global_position + _body_centre(), roundi(confetti_count * (1.5 if finishing else 1.0)))
+		Confetti.burst(get_parent(), global_position + _body_centre(), roundi(confetti_count * (1.5 if finishing else 1.0)), confetti_colors)
 		Sound.play(self, &"paper_burst", 2.0 if finishing else -1.0)
 		queue_free()
 		return
@@ -128,7 +133,7 @@ func _check_touch() -> void:
 		return
 	for body: Node3D in _touch.get_overlapping_bodies():
 		if body.has_method("take_damage"):
-			body.take_damage(contact_damage, global_position)
+			body.take_damage(contact_damage, global_position, hurt_kind)
 
 
 func _tick(delta: float) -> void:

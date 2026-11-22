@@ -120,6 +120,26 @@ extends Node3D
 @export var ink_fade_time := 1.0
 ## How many drops of ink fly off.
 @export var ink_drops := 26
+## What a blow does to his paper depends on what struck him (Ronin.take_damage):
+## ink (husks, the Hannya) soaks it, as above; fire scorches it; a blade, claws
+## or teeth tear it.
+## Fire: how long the scorch takes to heal back to white (match it to the
+## Ronin's invulnerable_time), how far it spreads over him (metres), and how
+## quickly it spreads.
+@export var burn_fade_time := 1.0
+@export var burn_size := 0.36
+@export var burn_spread_time := 0.12
+## How many glowing embers, flakes of ash and wisps of smoke lift off him.
+@export var burn_embers := 10
+@export var burn_ash := 7
+@export var burn_smoke := 4
+## A cut: how long the slit takes to close, how long it is (metres), and how
+## many scraps of paper are knocked off.
+@export var tear_fade_time := 1.0
+@export var tear_length := 0.5
+@export var tear_scraps := 8
+## How far a cut knocks his body sideways (metres) before it settles back.
+@export var tear_jolt := 0.08
 
 @export_group("Cloth")
 ## Wind speed (metres per second) that lifts the cloak to 45 degrees. Lower
@@ -180,6 +200,8 @@ var _land_clock := -1.0           # seconds since he touched down, or -1
 var _skid_clock := -1.0           # seconds into a skid, or -1
 var _wings: Node3D                # the Crane Glide's paper wings
 var _wing_pair: Array[Node3D] = []
+## How tired the glide's wings are (0 fresh, 1 about to give out); set by the Ronin.
+var wing_tire := 0.0
 var _wings_open := 0.0            # 0 = folded away, 1 = spread
 var _shake_clock := -1.0          # seconds into shaking the water off, or -1
 var _was_airborne := false
@@ -190,6 +212,16 @@ var _streaks: CPUParticles3D      # speed lines left behind by a dash
 var _ink := 0.0                   # how much ink is on him (1 = just struck)
 var _ink_drops: CPUParticles3D    # the ink that splashes off when he is struck
 var _was_struck := false
+var _hurt_kind: StringName = &"ink"  # what struck him last (struck())
+var _struck_fresh := false        # struck() has started the effect already
+var _burn_clock := -1.0           # seconds since he was scorched, or -1
+var _tear_clock := -1.0           # seconds since he was cut, or -1
+var _jolt_clock := -1.0           # seconds into the jolt of a cut, or -1
+var _jolt_dir := 0.0
+var _embers: CPUParticles3D       # glowing embers lifting off a scorch
+var _ash: CPUParticles3D          # flakes of ash curling up off it
+var _smoke: CPUParticles3D        # thin wisps of smoke
+var _scraps: CPUParticles3D       # scraps of paper knocked off by a cut
 var _sweep_tilt: Node3D           # tips the sideways swoosh toward the camera
 var _sweep_side: MeshInstance3D   # the swoosh for a forward cut: round him, from the side
 var _sweep_tall: MeshInstance3D   # the swoosh for cuts aimed up or down
@@ -276,6 +308,7 @@ func _process(delta: float) -> void:
 		_cloth.set_shader_parameter(&"marks", _marks_shown)
 		_update_clash(delta)
 		_update_draw_trail(delta)
+		_update_hurt(delta)
 	# The blade is only out while he strikes, in the hand nearest the camera.
 	var drawn := _slash_clock >= 0.0
 	if not _model:
@@ -355,6 +388,9 @@ func _update_wings(delta: float) -> void:
 		# A slow, shallow beat while gliding, and the gusts lifting them.
 		var side := -1.0 if i == 0 else 1.0
 		var lift := sin(_clock * 3.2) * 0.08 + Wind.speed_at(global_position.x) * 0.015
+		# Tiring (Ronin.glide_time): the wings sag and tremble before they
+		# give out and fold away.
+		lift += wing_tire * 0.45 + sin(_clock * 31.0 + i) * 0.06 * wing_tire
 		_wing_pair[i].rotation.x = side * lift
 
 
@@ -633,6 +669,7 @@ func _build_model() -> void:
 	_ink_drops.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_ink_drops.position = Vector3(0.0, 0.9, 0.3)
 	add_child(_ink_drops)
+	_build_hurt_effects()
 
 
 ## How far (in metres) the very end of the cloak can swing.
@@ -860,9 +897,13 @@ func _pose_model() -> void:
 
 	# Struck: ink splashes off him and soaks his paper black, then the blots
 	# shrink away while he cannot be hurt again. (No flickering in and out.)
-	if blinking and not _was_struck:
-		_ink = 1.0
-		_ink_drops.restart()
+	# A scorch or a tear is started by struck() and runs in _update_hurt;
+	# being made invulnerable without struck() (an old caller) means ink.
+	if blinking and not _was_struck and not _struck_fresh:
+		_hurt_kind = &"ink"
+		_start_struck(Vector3.ZERO)
+	if blinking:
+		_struck_fresh = false
 	_was_struck = blinking
 	_ink = maxf(0.0, _ink - _step / ink_fade_time) if blinking else 0.0
 	_cloth.set_shader_parameter(&"ink", _ink)
@@ -1654,6 +1695,291 @@ func shred() -> void:
 func restore() -> void:
 	_rig.visible = true
 	_ink = 0.0
+	_burn_clock = -1.0
+	_tear_clock = -1.0
+	_jolt_clock = -1.0
+	if _cloth:
+		_cloth.set_shader_parameter(&"burn_reach", 0.0)
+		_cloth.set_shader_parameter(&"burn_glow", 0.0)
+		_cloth.set_shader_parameter(&"tear", 0.0)
+	_rig.position.x = 0.0
+
+
+# --- Struck: ink, fire or a cut ---------------------------------------------------
+
+## Called by the Ronin when a blow hurts him. `kind` is &"ink", &"fire" or
+## &"cut" (see Ronin.take_damage); `from` is where the blow came from.
+func struck(kind: StringName, from: Vector3) -> void:
+	if not _model:
+		return  # the old folded puppet only blinks
+	_hurt_kind = kind
+	_struck_fresh = true
+	_start_struck(from - global_position)
+
+
+## Starts the look of a blow. `offset` is where it came from, relative to him.
+func _start_struck(offset: Vector3) -> void:
+	var toward := signf(offset.x)
+	if toward == 0.0:
+		toward = facing
+	# Where on his body it lands: the front of his chest if it came from in
+	# front, his back if from behind, on the side we see, at a height between
+	# his waist and shoulders. (In the model's resting space: +z is his front,
+	# -x his right side, which faces us when he faces right; 1 unit = 1 m.)
+	var height := clampf(lerpf(0.95, offset.y + 0.6, 0.5), 0.7, 1.12) + randf_range(-0.06, 0.06)
+	var at := Vector3(-0.08 * facing, height, 0.1 if toward == facing else -0.12)
+	var spot := Vector3(toward * 0.14, height, 0.28)  # the same place, around him, for the particles
+	match _hurt_kind:
+		&"fire":
+			_burn_clock = 0.0
+			_cloth.set_shader_parameter(&"burn_at", at)
+			for bits: CPUParticles3D in [_embers, _ash, _smoke]:
+				bits.position = spot
+				bits.restart()
+		&"cut":
+			_tear_clock = 0.0
+			var slope := 0.85 if randf() < 0.5 else -0.85
+			# A little lower, across his middle: his forearms, held across
+			# his chest, would hide it there.
+			_cloth.set_shader_parameter(&"tear_at", at - Vector3(0.0, 0.15, 0.0))
+			_cloth.set_shader_parameter(&"tear_normal", Vector3(0.0, 1.0, slope).normalized())
+			_scraps.position = spot - Vector3(0.0, 0.15, 0.0)
+			_scraps.direction = Vector3(-toward, 0.7, 0.3)
+			_scraps.restart()
+			_jolt_clock = 0.0
+			_jolt_dir = -toward
+		_:
+			_ink = 1.0
+			_ink_drops.restart()
+
+
+## Every frame (smoothly, not in stop-motion steps): the scorch spreads and
+## heals, the slit opens and closes, the cut's jolt settles. Nothing is left
+## once he can be hurt again.
+func _update_hurt(delta: float) -> void:
+	if _burn_clock >= 0.0:
+		_burn_clock += delta
+		var f := _burn_clock / maxf(burn_fade_time, 0.01)
+		if f >= 1.0 or not blinking:
+			_burn_clock = -1.0
+			_cloth.set_shader_parameter(&"burn_reach", 0.0)
+			_cloth.set_shader_parameter(&"burn_glow", 0.0)
+		else:
+			# Spreads out fast (easing out), holds, then shrinks back as his
+			# paper heals; the ember line dies down first.
+			var spread := 1.0 - pow(1.0 - clampf(_burn_clock / maxf(burn_spread_time, 0.01), 0.0, 1.0), 2.0)
+			var heal := pow(1.0 - smoothstep(0.25, 1.0, f), 0.6)
+			_cloth.set_shader_parameter(&"burn_reach", burn_size * spread * heal)
+			_cloth.set_shader_parameter(&"burn_glow", 1.0 - smoothstep(0.08, 0.6, f))
+	if _tear_clock >= 0.0:
+		_tear_clock += delta
+		var f := _tear_clock / maxf(tear_fade_time, 0.01)
+		if f >= 1.0 or not blinking:
+			_tear_clock = -1.0
+			_cloth.set_shader_parameter(&"tear", 0.0)
+		else:
+			# Drawn across him in a flash, held open, then closing from its
+			# ends and narrowing to nothing.
+			var drawn := smoothstep(0.0, 0.07, _tear_clock)
+			var open := 1.0 - smoothstep(0.3, 1.0, f)
+			_cloth.set_shader_parameter(&"tear", open)
+			_cloth.set_shader_parameter(&"tear_length", tear_length * drawn * (0.4 + 0.6 * open))
+	if _jolt_clock >= 0.0:
+		_jolt_clock += delta
+		# Knocked aside in a few hundredths of a second, easing back.
+		var shape := smoothstep(0.0, 0.035, _jolt_clock) * (1.0 - smoothstep(0.035, 0.25, _jolt_clock))
+		_rig.position.x = _jolt_dir * tear_jolt * shape
+		if _jolt_clock > 0.25:
+			_jolt_clock = -1.0
+			_rig.position.x = 0.0
+
+
+## True while a scorch or a tear shows on him (for the automated check).
+func shows_burn() -> bool:
+	return _burn_clock >= 0.0
+
+
+func shows_tear() -> bool:
+	return _tear_clock >= 0.0
+
+
+func shows_ink() -> bool:
+	return _ink > 0.0
+
+
+## A soft round glow (for embers and smoke): a radial fade, white, tinted by
+## the particles' own colours.
+static func _soft_glow(additive: bool) -> StandardMaterial3D:
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(1, 1, 1, 1))
+	ramp.set_color(1, Color(1, 1, 1, 0))
+	ramp.add_point(0.35, Color(1, 1, 1, 0.8))
+	var dot := GradientTexture2D.new()
+	dot.gradient = ramp
+	dot.fill = GradientTexture2D.FILL_RADIAL
+	dot.fill_from = Vector2(0.5, 0.5)
+	dot.fill_to = Vector2(1.0, 0.5)
+	dot.width = 32
+	dot.height = 32
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	if additive:
+		mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	mat.albedo_texture = dot
+	mat.vertex_color_use_as_albedo = true
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	mat.disable_fog = true
+	return mat
+
+
+static func _ramp(stops: Array) -> Gradient:
+	var ramp := Gradient.new()
+	var offsets := PackedFloat32Array()
+	var colours := PackedColorArray()
+	for stop: Array in stops:
+		offsets.append(stop[0])
+		colours.append(stop[1])
+	ramp.offsets = offsets
+	ramp.colors = colours
+	return ramp
+
+
+static func _curve(points: Array) -> Curve:
+	var curve := Curve.new()
+	for point: Vector2 in points:
+		curve.add_point(point)
+	return curve
+
+
+func _hurt_particles(amount: int, life: float) -> CPUParticles3D:
+	var bits := CPUParticles3D.new()
+	bits.emitting = false
+	bits.one_shot = true
+	bits.amount = maxi(amount, 1)
+	bits.lifetime = life
+	bits.local_coords = false
+	bits.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	bits.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	bits.emission_sphere_radius = 0.1
+	add_child(bits)
+	return bits
+
+
+## The particles of a scorch (embers, ash, smoke) and of a cut (scraps).
+func _build_hurt_effects() -> void:
+	# Embers: small sparks drifting up and out, orange going dull red as
+	# they cool, shrinking away.
+	_embers = _hurt_particles(burn_embers, 0.9)
+	_embers.explosiveness = 0.75
+	_embers.direction = Vector3.UP
+	_embers.spread = 45.0
+	_embers.initial_velocity_min = 0.6
+	_embers.initial_velocity_max = 1.8
+	_embers.gravity = Vector3(-0.4, 1.0, 0.0)
+	_embers.damping_min = 0.5
+	_embers.damping_max = 1.5
+	_embers.scale_amount_min = 0.5
+	_embers.scale_amount_max = 1.1
+	_embers.scale_amount_curve = _curve([Vector2(0.0, 1.0), Vector2(0.6, 0.7), Vector2(1.0, 0.0)])
+	_embers.color_ramp = _ramp([[0.0, Color(1.0, 0.78, 0.4, 1.0)], [0.35, Color(1.0, 0.45, 0.12, 0.9)],
+			[1.0, Color(0.55, 0.12, 0.04, 0.0)]])
+	var spark := QuadMesh.new()
+	spark.size = Vector2(0.05, 0.05)
+	spark.material = _soft_glow(true)
+	_embers.mesh = spark
+
+	# Ash: little charred flakes of his paper, curling over and over as
+	# they rise, greying and fading.
+	_ash = _hurt_particles(burn_ash, 1.2)
+	_ash.explosiveness = 0.6
+	_ash.direction = Vector3(0.0, 1.0, 0.2)
+	_ash.spread = 50.0
+	_ash.initial_velocity_min = 0.4
+	_ash.initial_velocity_max = 1.1
+	_ash.gravity = Vector3(-0.3, 0.5, 0.0)
+	_ash.damping_min = 0.8
+	_ash.damping_max = 1.6
+	_ash.angle_max = 360.0
+	_ash.angular_velocity_min = -320.0
+	_ash.angular_velocity_max = 320.0
+	_ash.scale_amount_min = 0.6
+	_ash.scale_amount_max = 1.2
+	_ash.scale_amount_curve = _curve([Vector2(0.0, 1.0), Vector2(0.7, 0.85), Vector2(1.0, 0.2)])
+	_ash.color_ramp = _ramp([[0.0, Color(0.1, 0.08, 0.07, 1.0)], [0.5, Color(0.28, 0.26, 0.26, 0.85)],
+			[1.0, Color(0.45, 0.44, 0.46, 0.0)]])
+	var flake := QuadMesh.new()
+	flake.size = Vector2(0.05, 0.035)
+	var char_look := StandardMaterial3D.new()
+	char_look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	char_look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	char_look.vertex_color_use_as_albedo = true
+	char_look.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	char_look.cull_mode = BaseMaterial3D.CULL_DISABLED
+	char_look.disable_fog = true
+	flake.material = char_look
+	_ash.mesh = flake
+
+	# Smoke: a few faint grey wisps that thicken, swell and thin away.
+	_smoke = _hurt_particles(burn_smoke, 1.3)
+	_smoke.explosiveness = 0.5
+	_smoke.direction = Vector3.UP
+	_smoke.spread = 25.0
+	_smoke.initial_velocity_min = 0.35
+	_smoke.initial_velocity_max = 0.7
+	_smoke.gravity = Vector3(-0.25, 0.3, 0.0)
+	_smoke.angle_max = 360.0
+	_smoke.scale_amount_min = 0.8
+	_smoke.scale_amount_max = 1.2
+	_smoke.scale_amount_curve = _curve([Vector2(0.0, 0.35), Vector2(1.0, 1.0)])
+	_smoke.color_ramp = _ramp([[0.0, Color(0.32, 0.3, 0.3, 0.0)], [0.2, Color(0.32, 0.3, 0.3, 0.3)],
+			[1.0, Color(0.5, 0.5, 0.53, 0.0)]])
+	var puff := QuadMesh.new()
+	puff.size = Vector2(0.3, 0.3)
+	puff.material = _soft_glow(false)
+	_smoke.mesh = puff
+
+	# Scraps: small torn pieces of his white paper knocked off the cut,
+	# fluttering down and shrinking away.
+	_scraps = _hurt_particles(tear_scraps, 0.9)
+	_scraps.explosiveness = 0.9
+	_scraps.direction = Vector3(-1.0, 0.7, 0.3)
+	_scraps.spread = 40.0
+	_scraps.initial_velocity_min = 1.5
+	_scraps.initial_velocity_max = 3.6
+	_scraps.gravity = Vector3(0.0, -6.0, 0.0)
+	_scraps.damping_min = 2.0
+	_scraps.damping_max = 4.0
+	_scraps.angle_max = 360.0
+	_scraps.angular_velocity_min = -540.0
+	_scraps.angular_velocity_max = 540.0
+	_scraps.scale_amount_min = 0.6
+	_scraps.scale_amount_max = 1.3
+	_scraps.scale_amount_curve = _curve([Vector2(0.0, 1.0), Vector2(0.7, 0.85), Vector2(1.0, 0.0)])
+	_scraps.color_initial_ramp = _ramp([[0.0, Color(1.0, 0.98, 0.94)], [1.0, Color(0.82, 0.8, 0.76)]])
+	var scrap := QuadMesh.new()
+	scrap.size = Vector2(0.07, 0.045)
+	var paper := StandardMaterial3D.new()
+	paper.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	paper.vertex_color_use_as_albedo = true
+	paper.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	paper.cull_mode = BaseMaterial3D.CULL_DISABLED
+	paper.disable_fog = true
+	scrap.material = paper
+	_scraps.mesh = scrap
+
+
+## For the web warm-up: shows a scorch and a tear (and their particles) once;
+## restore() clears them.
+func warm_struck() -> void:
+	if not _model:
+		return
+	for bits: CPUParticles3D in [_embers, _ash, _smoke, _scraps]:
+		bits.restart()
+	_cloth.set_shader_parameter(&"burn_reach", burn_size)
+	_cloth.set_shader_parameter(&"burn_glow", 1.0)
+	_cloth.set_shader_parameter(&"tear", 1.0)
+	_cloth.set_shader_parameter(&"tear_length", tear_length)
 
 
 # --- The draw's "ready" cue ----------------------------------------------------

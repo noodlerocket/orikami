@@ -1,7 +1,7 @@
 class_name AkaneDuel
 extends Node3D
 ## Akane's clearing at the end of the Bamboo of Folded Wind (the last ground,
-## past the rope bridge), and the meeting there (Akane).
+## past the Falls), and the meeting there (Akane).
 ##
 ## The first time he steps in: play stops, she drops out of the bamboo and
 ## lands before him, and her warning is brushed along the bottom of the
@@ -16,9 +16,9 @@ extends Node3D
 ## Coordinates are the grove's (this is a child of BambooGrove).
 
 ## The clearing (grove x).
-const CLEARING := Vector2(243.0, 257.4)
+const CLEARING := Vector2(399.0, 413.4)
 ## Where she lands and waits.
-const HER_X := 252.0
+const HER_X := 408.0
 
 var grove: BambooGrove
 var akane: Akane
@@ -39,6 +39,13 @@ var _ground := 2.1
 var _parting_said := false
 var _warned := false
 var _held := false
+var _music: AudioStreamPlayer
+var _music_fade: Tween
+
+## How loud her duel music plays (dB, before the Music volume setting).
+@export var music_volume := -8.0
+## How long her music takes to fade away when she yields or he falls.
+@export var music_fade_time := 2.5
 
 
 func _ready() -> void:
@@ -58,6 +65,27 @@ func _ready() -> void:
 		akane.visible = false
 		akane.set_physics_process(false)
 	_build_wind_wall()
+	_music = AudioStreamPlayer.new()
+	_music.stream = load("res://audio/music_akane_duel.ogg")
+	(_music.stream as AudioStreamOggVorbis).loop = true
+	Sound.follow_level(_music, music_volume)
+	add_child(_music)
+
+
+## Her duel music (music_akane_duel.ogg, a seamless loop): starts with the
+## fight; fades away when she yields or he falls.
+func _play_music(on: bool) -> void:
+	if _music_fade:
+		_music_fade.kill()
+		_music_fade = null
+	if on:
+		Sound.follow_level(_music, music_volume)
+		if not _music.playing:
+			_music.play()
+	elif _music.playing:
+		_music_fade = create_tween()
+		_music_fade.tween_property(_music, "volume_db", -60.0, music_fade_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		_music_fade.tween_callback(_music.stop)
 
 
 ## The wall of whirling leaves at the clearing's west edge: down until the
@@ -233,6 +261,7 @@ func _start_fight() -> void:
 	akane.begin()
 	_set_wall(true)
 	Sound.duck_music(true)
+	_play_music(true)
 	if _bar == null:
 		_bar = BossBar.new()
 		_bar.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -249,6 +278,7 @@ func _on_yielded() -> void:
 	_state = &"parting"
 	_time = 0.0
 	SaveGame.akane_dueled = true
+	_play_music(false)
 	if _bar:
 		_bar.hide_bar()
 
@@ -296,5 +326,6 @@ func _on_ronin_died() -> void:
 		_set_wall(false)
 		if _bar:
 			_bar.hide_bar()
+		_play_music(false)
 		Sound.duck_music(false)
 		akane.reset(Vector3(BambooGrove.SHIFT + HER_X, _ground + 0.05, 0.0)))

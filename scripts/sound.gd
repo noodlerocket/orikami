@@ -54,12 +54,21 @@ const SOUNDS := {
 	&"dog_yelp": {"files": ["dog_yelp.mp3"], "volume": -9.0, "vary": 0.08},
 	&"bird_shriek": {"files": ["bird_shriek.mp3"], "volume": -11.0, "vary": 0.1},
 	&"fire_whoosh": {"files": ["fire_whoosh.mp3"], "volume": -8.0, "vary": 0.08},
+	# Akane's own: her thin quick swish, her rushing draw, her fox-fire flaring.
+	&"akane_slash": {"files": ["akane_slash.mp3"], "volume": -1.0, "vary": 0.07},
+	&"akane_draw": {"files": ["akane_draw.mp3"], "volume": -1.0, "vary": 0.04},
+	&"fox_fire": {"files": ["fox_fire.mp3"], "volume": -10.0, "vary": 0.08},
 	&"fire_burst": {"files": ["fire_burst.mp3"], "volume": -8.0, "vary": 0.08},
 	# Moving: a skid, shaking off water; cranes found.
 	&"skid": {"files": ["skid.mp3"], "volume": -10.0, "vary": 0.1},
 	&"shake_off": {"files": ["shake_off.mp3"], "volume": -8.0, "vary": 0.06},
 	&"cranes_rise": {"files": ["cranes_rise.mp3"], "volume": -6.0, "vary": 0.03},
 	&"birds_scatter": {"files": ["birds_scatter.mp3"], "volume": -8.0, "vary": 0.08},
+	# The bamboo's creatures: the red panda's threat huff and its squeal when
+	# struck; the kite husk rattling in the wind before it dives.
+	&"panda_huff": {"files": ["panda_huff.mp3"], "volume": -9.0, "vary": 0.08},
+	&"panda_squeal": {"files": ["panda_squeal.mp3"], "volume": -11.0, "vary": 0.1},
+	&"kite_rattle": {"files": ["kite_rattle.mp3"], "volume": -9.0, "vary": 0.08},
 }
 
 ## The rain, wind and village music loops (off for the prologue, which has

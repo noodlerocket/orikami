@@ -8,7 +8,14 @@ extends Node3D
 ## ravines too wide to jump. On an old altar in the grove a great paper crane
 ## waits: walk up to it and it rises, circles, and folds itself into his
 ## cloak: the Crane Glide (hold jump in the air). Then the ravines can be
-## crossed. (Only the first stretch is built: the road goes on.)
+## crossed.
+##
+## Grown to the town's size (Julian: "lots of opportunities to use the
+## glide"; docs/bamboo_map.png): past the two ravines, the Windfall Gorge
+## (rising gusts out of a deep gorge, WindfallGorge), the Canopy Road (decks
+## lashed high in the stems, CanopyRoad), the paper mill (shrine 5,
+## PaperMill), the Falls (a climb, then one long glide down, BambooFalls),
+## and Akane's clearing at the end.
 ##
 ## It is its own place, not a continuation of the town's street (Julian:
 ## "once you walk out of the town the screen should fade out and then you
@@ -22,15 +29,31 @@ extends Node3D
 ## the town). Its own numbers (GROUND, ALTAR_X...) are before this shift.
 const SHIFT := 1000.0
 ## The grove runs from the courtyard's far gate to here.
-const EAST_END := 258.0
+const EAST_END := 414.0
 ## Where he arrives in the grove (local x), and where he arrives back in the
 ## courtyard (town x).
 const ARRIVE_X := Village.ARENA.y + 1.6
 const RETURN_X := Village.ARENA.y - 1.4
 ## The gate in the courtyard's far wall.
 const GATE_X := Village.ARENA.y + 0.4
-## [left x, right x, top] of the ground (between them, ravines).
-const GROUND := [[Village.ARENA.y - 6.0, 213.0, 1.5], [221.5, 234.0, 1.5], [242.0, EAST_END, 2.1]]
+## [left x, right x, top, how deep its rock goes (optional)] of the ground.
+## Between the first three: the two ravines (bridged). Then the Windfall
+## Gorge's floor between its two lips; the long floor under the canopy and
+## the mill; the cliff of the Falls; the pool (no ground); Akane's clearing.
+const GROUND := [[Village.ARENA.y - 6.0, 213.0, 1.5], [221.5, 234.0, 1.5], [242.0, 249.0, 1.5, 24.0],
+	[249.0, 287.0, -9.5, 14.0], [287.0, 378.0, 1.5, 24.0], [378.0, 384.0, 13.5, 18.0], [396.0, EAST_END, 2.1, 6.0]]
+## The Windfall Gorge (between its lips), and the gorge's floor.
+const GORGE := Vector2(249.0, 287.0)
+## The pool under the Falls (between the cliff and the far bank).
+const POOL := Vector2(384.0, 396.0)
+## The second shrine in the grove: at the paper mill.
+const MILL_SHRINE_X := 356.0
+## The grove's creatures (Julian: red pandas instead of dogs, kite husks
+## instead of birds): where each red panda prowls (x, ground) ...
+const PANDAS := [Vector2(228.0, 1.5), Vector2(268.0, -9.5), Vector2(312.0, 1.5), Vector2(340.0, 1.5), Vector2(373.0, 1.5)]
+## ... and where each kite husk rides the wind (its roost in the air): two
+## over the gorge between the gusts, one in the canopy, one over the pool.
+const KITES := [Vector2(262.5, 0.5), Vector2(272.5, -0.5), Vector2(327.0, 17.0), Vector2(390.0, 8.0)]
 ## The altar with the great crane.
 const ALTAR_X := 206.0
 ## The fourth shrine, just inside the gate.
@@ -90,13 +113,25 @@ func _ready() -> void:
 	_build_mist_way()
 	_build_sky()
 	for g: Array in GROUND:
-		_ground(g[0], g[1], g[2])
+		_ground(g[0], g[1], g[2], g[3] if g.size() > 3 else 10.0)
 	_ravines()
 	_bamboo()
 	_altar()
 	_air()
-	for x: float in [200.0, 218.0, 238.0, 252.0]:
-		Sound.place_loop(self, "bamboo_wind.ogg", Vector3(x, 4.0, -1.0), -6.0, 9.0)
+	for x: float in [200.0, 218.0, 238.0, 252.0, 300.0, 325.0, 350.0, 404.0]:
+		Sound.place_loop(self, "bamboo_wind.ogg", Vector3(x, _foot(x) + 2.5, -1.0), -6.0, 9.0)
+	# The new stretch, area by area.
+	for area: Node3D in [WindfallGorge.new(), CanopyRoad.new(), PaperMill.new(), BambooFalls.new()]:
+		area.set(&"grove", self)
+		add_child(area)
+	for spot: Vector2 in PANDAS:
+		var panda := RedPanda.new()
+		panda.position = Vector3(spot.x, spot.y, 0.0)
+		add_child(panda)
+	for spot: Vector2 in KITES:
+		var kite := KiteHusk.new()
+		kite.position = Vector3(spot.x, spot.y, 0.0)
+		add_child(kite)
 	# Akane's clearing, at the end (akane_duel.gd).
 	duel = AkaneDuel.new()
 	duel.grove = self
@@ -285,14 +320,14 @@ func open_gate(at_once: bool = false) -> void:
 
 # --- The ground ------------------------------------------------------------------
 
-func _ground(left: float, right: float, top: float) -> void:
-	_solid(Vector3((left + right) * 0.5, top - 4.0, -1.5), Vector3(right - left, 8.0, 6.0))
+func _ground(left: float, right: float, top: float, deep: float = 10.0) -> void:
+	_solid(Vector3((left + right) * 0.5, top - maxf(deep, 8.0) * 0.5, -1.5), Vector3(right - left, maxf(deep, 8.0), 6.0))
 	var b := PaperMesh.new(_rng.randi())
 	b.shade_jitter = 0.1
 	# The rock under the path (its sides show at the ravines), and the mossy
 	# forest floor on top, reaching far back so the stems behind stand on it.
 	b.color = ROCK
-	b.box(Vector3((left + right) * 0.5, top - 5.02, (FLOOR_BACK + 1.34) * 0.5), Vector3(right - left, 10.0, 1.34 - FLOOR_BACK))
+	b.box(Vector3((left + right) * 0.5, top - deep * 0.5 - 0.02, (FLOOR_BACK + 1.34) * 0.5), Vector3(right - left, deep, 1.34 - FLOOR_BACK))
 	var x := left
 	while x < right - 0.01:
 		var x1 := minf(x + 3.0, right)
@@ -312,21 +347,21 @@ func _ground(left: float, right: float, top: float) -> void:
 			across *= 2.2
 		b.quad(at - along, at - across, at + along, at + across, Vector3.UP)
 	add_child(b.build())
-	_cliff_face(left, right, top)
+	_cliff_face(left, right, top, deep)
 
 
 ## The cut front of the path, as in Julian's picture: a shaggy lip of moss
 ## hanging over the edge; under it a band of red washi printed with sakura
 ## and seigaiha waves, torn and pasted over the rock; below, faceted rock
 ## going down into the mist.
-func _cliff_face(left: float, right: float, top: float) -> void:
+func _cliff_face(left: float, right: float, top: float, deep: float = 10.0) -> void:
 	var z := Village.STREET_FRONT
 	var f := PaperMesh.new(_rng.randi())
 	f.shade_jitter = 0.06
 	# The rock: a jittered net of facets (triangles), each its own shade,
 	# darkening downward, as if crumpled.
 	var cols := int(ceil((right - left) / 0.8)) + 1
-	var rows := 12
+	var rows := maxi(12, int(ceil(deep / 0.75)))
 	var grid: Array = []
 	for r in rows + 1:
 		var line: Array[Vector2] = []
@@ -452,7 +487,7 @@ func _seigaiha(b: PaperMesh, c: Vector2, r: float, z: float) -> void:
 ## a rope bridge still standing, that sags and sways as he crosses. Mist
 ## wells up from far below.
 func _ravines() -> void:
-	for i in GROUND.size() - 1:
+	for i in 2:
 		var left: float = GROUND[i][1]
 		var right: float = GROUND[i + 1][0]
 		var veil := PaperMesh.new(1)
@@ -591,12 +626,17 @@ func _bamboo() -> void:
 				var cx := x + _rng.randf_range(-0.6, 0.6)
 				var z: float = row[0] + _rng.randf_range(-0.5, 0.5)
 				if _standing(cx, 0.35):
-					_culm(cx, z, _rng.randf_range(13.0, 18.0), row[1], row[2])
+					# (Down in the gorge they grow up out of it; under the
+					# canopy road, taller, so the decks have stems to hang on.)
+					var tall := _rng.randf_range(13.0, 18.0) + maxf(1.5 - _foot(cx), 0.0) * 0.9
+					if cx > 290.0 and cx < 346.0:
+						tall += 6.0
+					_culm(cx, z, tall, row[1], row[2])
 		x += _rng.randf_range(1.2, 2.1)
 	# Framing stems in front, rising from below the screen, few and dark.
 	x = GATE_X + 4.0
 	while x < EAST_END:
-		_culm(x + _rng.randf_range(-1.0, 1.0), _rng.randf_range(3.2, 3.9), 30.0, 1.5, -0.25, -14.0)
+		_culm(x + _rng.randf_range(-1.0, 1.0), _rng.randf_range(3.2, 3.9), 50.0, 1.5, -0.25, -14.0)
 		x += _rng.randf_range(9.0, 14.0)
 
 

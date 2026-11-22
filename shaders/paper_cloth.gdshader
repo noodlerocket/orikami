@@ -31,6 +31,25 @@ uniform vec3 hilt_slide = vec3(0.0);
 // 0 = clean. As it falls, the blots shrink away.
 uniform float ink = 0.0;
 uniform vec3 ink_color : source_color = vec3(0.07, 0.07, 0.1);
+// Struck by fire: his paper is scorched round burn_at (a point on his resting
+// body, like `body`). burn_reach = how far the scorch has spread, in metres
+// (0 = none): a black char in the middle, a glowing ember line along its
+// edge (burn_glow = how bright it still is), brown scorch round that.
+uniform vec3 burn_at = vec3(0.0, 1.0, 0.1);
+uniform float burn_reach = 0.0;
+uniform float burn_glow = 0.0;
+uniform vec3 char_color : source_color = vec3(0.075, 0.05, 0.035);
+uniform vec3 scorch_color : source_color = vec3(0.46, 0.3, 0.16);
+uniform vec3 ember_color : source_color = vec3(1.0, 0.42, 0.1);
+// Struck by a blade, claws or teeth: a slit torn across him through tear_at,
+// along the plane whose normal is tear_normal. tear = how open it is (1 just
+// torn, 0 closed); tear_length = how long it is, in metres.
+uniform vec3 tear_at = vec3(0.0, 1.0, 0.1);
+uniform vec3 tear_normal = vec3(0.0, 0.7, 0.7);
+uniform float tear = 0.0;
+uniform float tear_length = 0.0;
+uniform vec3 tear_gap_color : source_color = vec3(0.12, 0.12, 0.16);
+uniform vec3 tear_shadow_color : source_color = vec3(0.42, 0.41, 0.46);
 // His permanent ink marks: 0 = blank, 1 = covered in dense calligraphy. They
 // grow from faint thin strokes in a few places to bold strokes everywhere.
 uniform float marks = 0.0;
@@ -112,7 +131,51 @@ void fragment() {
 	float stain = (1.0 - smoothstep(ink - 0.08, ink + 0.02, pattern)) * step(0.001, ink);
 	float marked = ink_marks(body, marks) * 0.92;
 	vec3 inked = mix(tint, mark_color, marked);
-	ALBEDO = mix(inked, ink_color, stain);
+	vec3 colour = mix(inked, ink_color, stain);
+	float lit = (1.0 - stain) * (1.0 - marked);
+	vec3 shine = vec3(0.0);
+
+	// Scorched: a ragged edge (two sizes of noise), char inside, the ember
+	// line on the char's edge, brown scorch fading out beyond it.
+	if (burn_reach > 0.001) {
+		float d = distance(body, burn_at) + (noise3(body * 13.0) - 0.5) * 0.09
+				+ (noise3(body * 37.0 + 5.0) - 0.5) * 0.035;
+		float core = burn_reach * 0.62;
+		float charred = 1.0 - smoothstep(core - 0.012, core + 0.004, d);
+		float scorched = (1.0 - smoothstep(core, burn_reach, d)) * (1.0 - charred);
+		float rim = (1.0 - smoothstep(0.0, 0.016, abs(d - core))) * burn_glow;
+		// A few sparks still smouldering in the char.
+		float sparks = smoothstep(0.74, 0.8, noise3(body * 48.0)) * charred * burn_glow * 0.7;
+		colour = mix(colour, scorch_color, scorched * 0.85);
+		colour = mix(colour, char_color, charred);
+		lit *= 1.0 - max(charred, scorched * 0.7);
+		shine += ember_color * (rim * 1.6 + sparks * 1.2);
+		colour = mix(colour, ember_color, rim * 0.8);
+	}
+
+	// Torn: a narrow dark gap through the paper with pale ragged fibres on
+	// both lips, and a soft crease shadow below it where the paper buckles.
+	if (tear > 0.001 && tear_length > 0.001) {
+		vec3 n = normalize(tear_normal);
+		vec3 rel = body - tear_at;
+		float across = dot(rel, n) + (noise3(body * 60.0) - 0.5) * 0.01;
+		float along = length(rel - n * dot(rel, n));
+		// Pointed at both ends, like a slit.
+		float taper = 1.0 - smoothstep(tear_length * 0.3, tear_length * 0.5, along);
+		float w = 0.022 * tear * taper;
+		if (w > 0.0005) {
+			float gap = 1.0 - smoothstep(w * 0.45, w * 0.8, abs(across));
+			float lips = (1.0 - smoothstep(w * 0.8, w * 1.9 + 0.003, abs(across))) * (1.0 - gap);
+			float crease = (1.0 - smoothstep(w, w + 0.07 * tear * taper, -across)) * step(across, 0.0) * (1.0 - gap - lips);
+			colour = mix(colour, tear_shadow_color, crease * 0.8);
+			colour = mix(colour, vec3(1.0, 0.99, 0.96), lips);
+			colour = mix(colour, tear_gap_color, gap);
+			lit *= 1.0 - max(gap, crease * 0.5);
+			shine += vec3(1.0, 0.99, 0.95) * lips * 0.35;
+		}
+	}
+
+	ALBEDO = colour;
 	ROUGHNESS = 1.0;
-	EMISSION = tint * glow_color * glow * (1.0 - stain) * (1.0 - marked);
+	EMISSION = tint * glow_color * glow * lit + shine;
 }

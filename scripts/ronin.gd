@@ -135,12 +135,23 @@ signal dashed(at: Vector3, direction: float)
 ## Learned in the Bamboo of Folded Wind. In the air, falling, hold jump:
 ## paper wings unfold and he glides.
 @export var has_glide := false
-## The fastest he sinks while gliding (metres per second).
-@export var glide_fall_speed := 1.4
+## The fastest he sinks while gliding (metres per second). (1.4 was too
+## kind: from the bamboo tops he could cross the whole grove.)
+@export var glide_fall_speed := 2.0
 ## How strongly gravity pulls while gliding (1 = as usual).
 @export var glide_gravity := 0.25
-## How fast he glides forward (metres per second).
-@export var glide_speed := 9.0
+## How fast he glides forward (metres per second). (Was 9.)
+@export var glide_speed := 8.0
+## How long the wings hold him up in one flight (seconds). Then they tire
+## and fold away and he falls. Landing, clinging to a wall, a pogo bounce or
+## a rising gust (Updraft) gives them back.
+@export var glide_time := 2.0
+## The wings start to tire (droop and tremble) this long before they give out.
+@export var glide_tire_warning := 0.6
+## How fast a rising gust lifts him while he glides (metres per second).
+@export var updraft_lift := 7.0
+## How quickly he is caught up to that lift (metres per second, per second).
+@export var updraft_catch := 22.0
 ## How much the wind carries him while gliding (gusts push the wings).
 @export var glide_wind := 0.35
 
@@ -236,6 +247,8 @@ var _slash_hits: Array[Object] = []
 var _recoil_left := 0.0
 var _hurt_lock := 0.0
 var _invulnerable := 0.0
+## What the last blow that hurt him was: &"ink", &"fire" or &"cut".
+var last_hurt_kind: StringName = &""
 var _heal_progress := 0.0
 var _healing := false
 var _parry_time := 0.0
@@ -285,6 +298,7 @@ var _climbing: Ladder
 var respawns := 0
 var _skid := 0.0
 var _gliding := false
+var _glide_left := 0.0   # how long the wings can still hold him (glide_time)
 var _wet := 0.0       # > 0: he is still wet from the water (seconds left)
 var _still := 0.0     # how long he has stood still on dry ground
 
@@ -331,6 +345,7 @@ func _physics_process(delta: float) -> void:
 
 	if grounded:
 		_coyote = coyote_time
+		_glide_left = glide_time
 		if _dash_time <= 0.0:
 			_can_dash = true
 		_grounded_time += delta
@@ -415,10 +430,16 @@ func _physics_process(delta: float) -> void:
 		_apply_gravity(delta, grounded)
 	else:
 		# The Crane Glide: falling, jump held, wings out.
-		_gliding = (has_glide and not grounded and velocity.y < 0.5 and Input.is_action_pressed("jump")
-				and not _sliding and _climbing == null and _hurt_lock <= 0.0)
+		var lift := Updraft.lift_at(global_position)
+		if lift > 0.0 and has_glide:
+			_glide_left = glide_time  # (a rising gust rests the wings)
+		_gliding = (has_glide and not grounded and (velocity.y < 0.5 or lift > 0.0) and Input.is_action_pressed("jump")
+				and not _sliding and _climbing == null and _hurt_lock <= 0.0 and _glide_left > 0.0)
 		if _gliding:
+			_glide_left = maxf(_glide_left - delta, 0.0)
 			drift += Wind.direction.x * Wind.speed_at(global_position.x) * glide_wind
+			if lift > 0.0:
+				velocity.y = move_toward(velocity.y, updraft_lift * lift, updraft_catch * delta)
 		if _recoil_left <= 0.0 and _wall_lock <= 0.0:
 			var rate := air_acceleration
 			if grounded:
@@ -473,7 +494,8 @@ func _set_ducking(on: bool) -> void:
 
 ## Called by an enemy's ATTACK (not by touching it). Returns true if the
 ## blow was parried, so the attacker can be knocked off balance.
-func receive_strike(amount: int, from: Vector3) -> bool:
+## `kind` is what the blow does to his paper if it lands (see take_damage).
+func receive_strike(amount: int, from: Vector3, kind: StringName = &"ink") -> bool:
 	if _dead:
 		return false
 	var toward := signf(from.x - global_position.x)
@@ -483,7 +505,7 @@ func receive_strike(amount: int, from: Vector3) -> bool:
 	if _guarding and (toward == facing or toward == 0.0) and _hurt_lock <= 0.0:
 		_block(toward if toward != 0.0 else facing)
 		return false  # blocked: no harm to him, but no posture lost by them either
-	take_damage(amount, from)
+	take_damage(amount, from, kind)
 	return false
 
 
@@ -511,9 +533,14 @@ func _block(toward: float) -> void:
 
 ## Called by enemies when they touch the Ronin. Returns true if it hurt him
 ## (false while he cannot be hurt).
-func take_damage(amount: int, from: Vector3) -> bool:
+## `kind` is what the blow does to his paper: &"ink" soaks it black (husks,
+## the Hannya), &"fire" scorches it (burning paper, fox-fires), &"cut" tears
+## a slit in it (swords, claws, teeth, beaks).
+func take_damage(amount: int, from: Vector3, kind: StringName = &"ink") -> bool:
 	if _invulnerable > 0.0 or _draw_safe > 0.0 or _dead:
 		return false
+	last_hurt_kind = kind
+	_puppet.struck(kind, from)
 	health = maxi(health - amount, 0)
 	health_changed.emit(health, max_health)
 	hurt.emit()
@@ -557,7 +584,8 @@ func _apply_gravity(delta: float, grounded: bool) -> void:
 	if grounded and velocity.y <= 0.0:
 		return
 	if _gliding:
-		velocity.y = maxf(velocity.y - gravity * glide_gravity * delta, -glide_fall_speed)
+		if Updraft.lift_at(global_position) <= 0.0:
+			velocity.y = maxf(velocity.y - gravity * glide_gravity * delta, -glide_fall_speed)
 		return
 	var pull := gravity * (fall_gravity_multiplier if velocity.y < 0.0 else 1.0)
 	velocity.y = maxf(velocity.y - pull * delta, -max_fall_speed)
@@ -737,6 +765,7 @@ func _on_slash_connected(finishing: bool = false, inky: bool = true) -> void:
 		velocity.y = pogo_velocity
 		_jumping = false
 		_can_dash = true
+		_glide_left = glide_time
 	elif _slash_dir.x != 0.0:
 		velocity.x = -_slash_dir.x * recoil_speed
 		_recoil_left = recoil_time
@@ -865,6 +894,13 @@ func is_gliding() -> bool:
 	return _gliding
 
 
+## How tired the glide's wings are: 0 fresh, 1 about to give out.
+func glide_tiredness() -> float:
+	if glide_tire_warning <= 0.0:
+		return 0.0
+	return clampf(1.0 - _glide_left / glide_tire_warning, 0.0, 1.0)
+
+
 ## True while the screen fades after a fall (into water or out of the world).
 func is_in_pit() -> bool:
 	return _in_pit
@@ -943,6 +979,7 @@ func _find_wall() -> void:
 			_wall_normal = signf(normal.x)
 			_wall_side = _wall_normal
 			_wall_coyote = wall_coyote
+			_glide_left = glide_time  # (holding a wall rests the wings)
 
 
 ## Can he cling to this wall? Any solid part of the level will do (Julian:
@@ -1067,6 +1104,7 @@ func _update_puppet() -> void:
 		_puppet.state = &"heal"
 	elif _gliding and not is_on_floor():
 		_puppet.state = &"glide"
+		_puppet.wing_tire = glide_tiredness()
 	elif not is_on_floor():
 		_puppet.state = &"jump" if velocity.y > 0.0 else &"fall"
 	elif absf(velocity.x) > 0.5:

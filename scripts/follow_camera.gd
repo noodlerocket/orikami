@@ -49,6 +49,15 @@ extends Camera3D
 @export var under_from := -0.4
 @export var under_full := -2.6
 
+## The Bamboo of Folded Wind (between these x positions), where the way goes
+## high and low (gorges, decks in the stems): the camera keeps to the height
+## of the ground he last stood on (so it does not bob with every jump), goes
+## down with him when he drops below it, and up when he lands higher. Gliding
+## up a rising gust, the rule below (keep_below_center) lifts it.
+@export var rest_zone := Vector2(-1000.0, -1000.0)
+## In that zone: how far above the ground he stands on the camera sits.
+@export var rest_height := 2.7
+
 
 ## Never let his middle rise above the middle of the screen: when he jumps
 ## or climbs high enough that it would, the camera rises with him, exactly.
@@ -77,6 +86,8 @@ var target: Node3D
 var _shake := 0.0
 var _lead := 0.0  # how far the view is leading right now (eases toward look_ahead)
 
+
+var _rest_y := 0.0   # the height of the ground he last stood on (rest_zone)
 
 func _ready() -> void:
 	rotation_degrees = Vector3(tilt_degrees, 0.0, 0.0)
@@ -130,6 +141,10 @@ func _wanted_lead() -> float:
 func _goal() -> Vector3:
 	var at := target.global_position
 	var y := maxf(lerpf(level_height, at.y, follow_height) + height_offset, min_y)
+	if at.x > rest_zone.x and at.x < rest_zone.y:
+		if target is CharacterBody3D and (target as CharacterBody3D).is_on_floor():
+			_rest_y = at.y
+		y = minf(_rest_y, at.y) + rest_height
 	if at.x > under_zone.x and at.x < under_zone.y and at.y < under_from:
 		var down := smoothstep(under_from, under_full, at.y)
 		y = lerpf(y, at.y + under_height, down)
