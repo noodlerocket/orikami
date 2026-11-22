@@ -3,9 +3,9 @@ extends Node3D
 ## The River and the Red Bridge (area 4 of the expanded village,
 ## docs/village_map.png). The river crosses the street, flowing toward us
 ## between stone embankments; a red arched bridge spans it, but its middle
-## has fallen in: jump, and dash, to get across. Out over the water the
-## gusts are strong enough to push him (Wind), back toward the west, the way
-## the wind blows. Falling in, the river carries him off (back to the last
+## has fallen in: jump, and dash, to get across. (Gusts over the water used
+## to push him west; Julian had that taken out: "the samurai slides slowly
+## to the left".) Falling in, the river carries him off (back to the last
 ## shrine). On the east bank stands the river warehouse, with the second
 ## shrine at its door.
 
@@ -18,14 +18,6 @@ const WATER := -0.75
 const BED := -1.45
 ## Faded red lacquer: a red bridge, but old and rained on.
 const LACQUER := Color(0.46, 0.15, 0.11)
-
-@export_group("Gusts")
-## How fast the wind carries him out over the water (metres per second, per
-## metre per second of wind). In a full gust it carries him about 2.5 m/s
-## west: jumping the gap eastward then falls short, so wait for a lull.
-@export var gust_drift := 0.45
-## Out over the gap it carries him this much harder (no rail to lean on).
-@export var gap_push_gain := 1.3
 
 var village: Village
 var shrine: RestShrine
@@ -347,13 +339,6 @@ func _physics_process(_delta: float) -> void:
 			return
 	var at := _ronin.global_position
 	var over := at.x > Village.RIVER.x + 0.2 and at.x < Village.RIVER.y - 0.2
-	if over and at.y > WATER - 0.5:
-		# Gusts over the water push him the way the wind blows.
-		var gust := maxf(Wind.speed_at(at.x) - Wind.breeze * 0.5, 0.0)
-		var carry := gust * gust_drift * (gap_push_gain if _in_gap(at.x) else 1.0)
-		if _ronin.is_on_floor():
-			carry *= 0.3  # on the deck he can lean into it
-		_ronin.drift += Wind.direction.x * carry
 	# Into the river: a splash, and the current carries him off.
 	if over and _last_y >= WATER and at.y < WATER and at.y > BED:
 		WaterFx.splash(get_parent(), Vector3(at.x, WATER, 0.0), 1.3)

@@ -33,8 +33,9 @@ signal dashed(at: Vector3, direction: float)
 @export var jump_velocity := 13.5
 @export var gravity := 38.0
 ## Extra gravity while falling, so jumps feel less floaty.
-@export var fall_gravity_multiplier := 1.25
-@export var max_fall_speed := 22.0
+## (1.25 and a top speed of 22 were "too fast for paper": Julian.)
+@export var fall_gravity_multiplier := 1.0
+@export var max_fall_speed := 17.0
 ## Letting go of jump early multiplies upward speed by this (variable height).
 @export var jump_cut_multiplier := 0.4
 ## Grace period: you can still jump this long after walking off a ledge.
@@ -81,6 +82,9 @@ signal dashed(at: Vector3, direction: float)
 @export var wall_coyote := 0.1
 ## Holding away from the wall this long lets go of it.
 @export var wall_let_go_time := 0.15
+## Any wall reaching this high above his feet can be clung to (lower ones,
+## like a step or a crate, are climbed over instead).
+@export var cling_check_height := 1.2
 
 @export_group("Parry")
 ## After pressing parry, a blow that lands within this many seconds is
@@ -160,6 +164,12 @@ signal dashed(at: Vector3, direction: float)
 @export_group("Water")
 ## Wading in shallow water: his run is this fraction of its usual speed.
 @export var wading_speed := 0.6
+## Fallen into the river or deep water: how fast he sinks out of sight
+## (metres per second) while the screen fades. He used to stop on the river's
+## bed, still half out of the water (Julian: "sink quicker").
+@export var sink_speed := 5.0
+## How far down he sinks (metres): enough to be gone under the water.
+@export var sink_depth := 2.2
 
 @export_group("Block")
 ## Holding parry keeps his guard up after the parry window: a blow from the
@@ -250,6 +260,7 @@ var _wall_side := 0.0       # the side of the last wall he touched
 var _wall_lock := 0.0       # time left in a wall jump's push
 var _wall_away := 0.0       # how long he has held away from the wall
 var _sliding := false       # clinging to a wall and sliding down it
+var _sinking := false        # in water: sinking straight down, through the bed
 var _in_pit := false        # falling into a pit; waiting for the screen to fade
 var _dead := false
 var _grounded_time := 0.0
@@ -298,6 +309,11 @@ func _physics_process(delta: float) -> void:
 
 	if _in_pit:
 		velocity.x = 0.0
+		if _sinking:
+			# He goes down out of sight. (Only how he looks: his body stops on
+			# the bed as before, so nothing below the river, in the canals,
+			# notices him.)
+			_puppet.position.y = maxf(_puppet.position.y - sink_speed * delta, -sink_depth)
 		_apply_gravity(delta, grounded)
 		move_and_slide()
 		_update_puppet()
@@ -772,8 +788,8 @@ func _forgive(rising: float, heading: float, move: float) -> void:
 			step += 0.08
 	if not is_on_floor() and move != 0.0 and is_on_wall() and signf(heading) == move and velocity.y > -9.0:
 		for i in get_slide_collision_count():
-			var wall := get_slide_collision(i).get_collider() as Node
-			if wall and wall.has_meta(&"climbable"):
+			var hit := get_slide_collision(i)
+			if _can_cling(hit.get_collider() as Node, hit.get_normal()):
 				return  # (that is for clinging to)
 		var lift := 0.1
 		while lift <= ledge_hop + 0.001:
@@ -849,6 +865,11 @@ func is_gliding() -> bool:
 	return _gliding
 
 
+## True while the screen fades after a fall (into water or out of the world).
+func is_in_pit() -> bool:
+	return _in_pit
+
+
 ## True while he is on a ladder.
 func is_climbing() -> bool:
 	return _climbing != null
@@ -857,6 +878,9 @@ func is_climbing() -> bool:
 ## Something that drowns or carries him off (deep water, the river): the
 ## screen fades and he is back at the last shrine, as after a fall.
 func fall_in() -> void:
+	if _in_pit or _dead:
+		return
+	_sinking = true
 	_fell_out_of_world()
 
 
@@ -898,6 +922,8 @@ func respawn_at_checkpoint() -> void:
 	_wall_lock = 0.0
 	_draw_safe = 0.6  # a moment's safety, without the struck look
 	_in_pit = false
+	_sinking = false
+	_puppet.position.y = 0.0
 	respawns += 1
 
 
@@ -913,10 +939,29 @@ func _find_wall() -> void:
 		var hit := get_slide_collision(i)
 		var normal := hit.get_normal()
 		var wall := hit.get_collider() as Node
-		if absf(normal.x) > 0.7 and wall and wall.has_meta(&"climbable"):
+		if absf(normal.x) > 0.7 and _can_cling(wall, normal):
 			_wall_normal = signf(normal.x)
 			_wall_side = _wall_normal
 			_wall_coyote = wall_coyote
+
+
+## Can he cling to this wall? Any solid part of the level will do (Julian:
+## some walls did not let him slide or jump off them), as long as it rises
+## up beside his chest, so the side of a low step or a crate is not one.
+## Walls marked "no_climb" (the level's ends, the ink wall) and anything
+## that is not the level itself (enemies, things to cut) are not.
+func _can_cling(wall: Node, normal: Vector3) -> bool:
+	if wall == null or wall.has_meta(&"no_climb"):
+		return false
+	if wall.has_meta(&"climbable"):
+		return true
+	if not (wall is StaticBody3D) or ((wall as StaticBody3D).collision_layer & 1) == 0:
+		return false
+	var from := global_position + Vector3(0.0, cling_check_height, 0.0)
+	var query := PhysicsRayQueryParameters3D.create(from, from - Vector3(signf(normal.x), 0.0, 0.0) * 0.8, 1)
+	query.exclude = [get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	return not hit.is_empty() and hit["collider"] == wall
 
 
 ## Clinging and sliding. He clings to a wall he has jumped onto as soon as he

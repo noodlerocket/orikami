@@ -189,6 +189,10 @@ the game)**
   rejected). Wind sway: `sway_speed` 2.4 (6, 1.4 and 3 rejected).
 - Husk tell: `PaperHusk.attack_windup` 0.4 s (0.55 too slow).
 - Sword reach 1.9 m (1.6 m a little short).
+- Falling: `fall_gravity_multiplier` 1.0, `max_fall_speed` 17 (1.25 and 22
+  were too fast for paper). In water he sinks out of sight while the screen
+  fades (`sink_speed`, `sink_depth`: only the puppet sinks, his body stays
+  on the bed so nothing in the canals below notices).
 - Deep water, the river or death: the screen fades to sumi black and he is
   back at the last shrine he rested at; no ink, no blink. (The old pit is now
   the Fallen Street's way down.)
@@ -361,10 +365,12 @@ There is no controls line along the bottom of the game screen any more
   dies at once; the Hannya loses `finish_damage`. Bigger burst, longer
   hit-stop, `finish_ink` extra ink.
 - **Dash** (L or Shift): an almost flat lunge, stretched, with speed lines.
-- **Walls:** touching a wall marked `climbable` (meta) while falling, he
-  clings and slides (`wall_slide_speed`); jump springs off; holding back
-  toward it climbs even one wall. Level edges and pit sides are not
-  climbable.
+- **Walls:** touching any solid wall of the level that reaches his chest
+  (`Ronin.cling_check_height`; a low crate or step does not count) while
+  falling, he clings and slides (Julian: some walls did not let him; walls
+  marked `no_climb`: the level's ends, the ink wall, are not)
+  (`wall_slide_speed`); jump springs off; holding back toward it climbs
+  even one wall.
 - **Duck** (hold S on the ground): a deep crouch; his body shrinks to
   `duck_height` (0.85 m), so the Hannya's chest-height glide passes over.
 - **Heal** (hold U, 3 ink for 1 health): he kneels while an ensō is painted
@@ -521,26 +527,33 @@ has its own script, built from `Village._ready`:
   cut off at the street while it is under (`shaders/rain_streak.gdshader`,
   identical above ground); the rain sound is hushed.
 - `river_bridge.gd`: the river, the arched red bridge (smooth convex pieces
-  along `deck_at`), its fallen middle (`GAP` 97 to 103: jump + dash), gusts
-  carrying him west (`Ronin.drift`, `gust_drift` 0.45), the river warehouse
-  with shrine 2.
-- `gatehouse.gd`: the gate under the first wall, barred from the east (cut
-  the bar from there: a shortcut); its west face is sheer. The broken castle
-  road leaves the lookout (scenery).
+  along `deck_at`), its fallen middle (`GAP` 97 to 103: jump + dash), the river
+  warehouse with shrine 2. (Gusts pushing him west over the water were
+  removed: Julian, "slides slowly to the left". Do not bring back.)
+- `gatehouse.gd`: the way under the first wall is always open, its door
+  swung back (Julian: a barred gate there stopped him; he wants to run
+  straight through). (The castle road from the lookout was removed: Julian.)
 - `shrine_steps.gd`: 20 steps (a smooth ramp underfoot; step tops at the
   ramp's middle), stone lanterns (`_build_stone_lantern(at, false)`: NOT the
   courtyard's, which the cutscene snuffs), a cherry, shrine 3 at the foot.
-- `rooftop_road.gd` + `ladder.gd`: drying decks on posts (bell, barrels,
+- `rooftop_road.gd` + `ladder.gd`: drying decks on posts (`POST_Z`: at the
+  BACK only, each standing on what is really under it, `_foot`; Julian:
+  posts ran down through stalls, roofs and the bridge rails) (bell, barrels,
   drying paper), the burnt-out house over the hole, the Crane Glide gap
   (`GLIDE_GAP` 97.6 to 107) over the river; the ladder at the end of Market
   Street is lowered by cutting its cord from the deck, then climbed (he
   turns his back to us: `SamuraiAnimator.climb`).
-- `bamboo_grove.gd`: past the courtyard's far gate (opens when the Hannya
-  falls): paper bamboo, ravines, shrine 4, the altar where he learns the
+- `bamboo_grove.gd`: its OWN place (Julian: not a continuation of the
+  street). Built far off at `BambooGrove.SHIFT` (1000 m) with its own sky,
+  moon and far bamboo; walking through the courtyard's open far gate fades
+  to black and puts him at the grove's west end (`Main._travel`,
+  `travel_fade`), and back through the grove's gate home. Camera limits
+  per place: `Main._set_camera_limits`. Paper bamboo, ravines, shrine 4, the altar where he learns the
   Crane Glide (`Ronin.has_glide`, `glide_*` settings; paper wings on the
   puppet, `_build_wings`).
 - Life: `villager_shadow.gd` (shadows behind lit shoji that sink away as he
-  passes; `Village.SHUTTERS` slide shut instead), `perched_birds.gd`
+  passes; at `Village.SHUTTERS` a bamboo blind unrolls instead: a sliding
+  shutter "looked glitched"), `perched_birds.gd`
   (`Village.PERCHES`), petals stirred by a dash (`Ronin.dashed`), drips,
   water loops placed with `Sound.place_loop`.
 - Enemies (`Village.dog_positions`, `bird_roosts`, `lantern_husk_positions`):
@@ -599,7 +612,8 @@ through:
   mould frame, a drying board, paper bundles; the first **RestShrine**
   (`rest_shrine.gd`) at her door.
 - **RestShrine:** a small hokora with faded vermilion posts and paper
-  streamers. Walk up and stand a moment: he rests (health full, the candle
+  streamers. Passing it is enough (`rest_time` 0; standing a moment was
+  rejected): he rests (health full, the candle
   lights with a flare, the streamers flutter, `shrine_rest` sound) and falls
   and deaths now bring him back there (`Ronin.set_checkpoint`). Being put
   there by a respawn is not resting (else a fall would cost nothing).

@@ -12,6 +12,8 @@ extends Node3D
 @export var pit_fade_in := 0.7
 ## The colour it fades to: sumi ink, not pure black.
 @export var pit_fade_color := Color(0.03, 0.03, 0.06)
+## Seconds to fade out (and back in) walking between the town and the bamboo.
+@export var travel_fade := 0.5
 
 var _fade: ColorRect
 var _cutscene_played := false
@@ -21,6 +23,8 @@ var _boss_bar: BossBar
 var _pause: PauseMenu
 var _smudge: Smudge
 var _explore_clock := 0.0
+var _travelling := false   # fading between the town and the bamboo grove
+var _free_camera := false  # (--zoom: the camera goes anywhere)
 
 @onready var _ronin: Ronin = $Ronin
 @onready var _camera: FollowCamera = $Camera
@@ -36,7 +40,7 @@ func _ready() -> void:
 	# The climbing course and the courtyard's middle (the far end of the
 	# level moves as the village grows).
 	_camera.climb_zone = Vector2(Village.CLIMB_WALLS[0][0] - 0.7, Village.CLIMB_WALLS[1][1] + 1.9)
-	_camera.max_x = (Village.ARENA.x + Village.ARENA.y) * 0.5
+	_set_camera_limits()
 	_camera.snap_to_target()
 	_hud.watch(_ronin)
 	_ronin.slash_landed.connect(_camera.add_shake.bind(0.07))
@@ -69,11 +73,17 @@ func _process(delta: float) -> void:
 				or (_boss != null and is_instance_valid(_boss)))
 	if _warming:
 		return  # (he is moved about during the warm-up: no cutscene, no fight)
-	# Once the courtyard's far gate is open (or he is past it), the camera
-	# may follow him on into the bamboo (it glides there: it never jumps).
 	var village: Village = $Village
-	if village.bamboo.gate_open or _ronin.global_position.x > Village.ARENA.y:
-		_camera.max_x = BambooGrove.EAST_END - 9.0
+	_set_camera_limits()
+	# Through the courtyard's open far gate: fade out, and he is in the
+	# bamboo grove (its own place); back through the grove's gate, the same
+	# way home.
+	if not _travelling and not _ronin.is_in_pit():
+		var x := _ronin.global_position.x
+		if village.bamboo.gate_open and x > BambooGrove.GATE_X + 0.45 and x < BambooGrove.GATE_X + 4.0:
+			_travel(Vector3(BambooGrove.SHIFT + BambooGrove.ARRIVE_X, 1.55, 0.0), 1.0)
+		elif x < BambooGrove.SHIFT + BambooGrove.GATE_X - 0.45 and x > BambooGrove.SHIFT + BambooGrove.GATE_X - 4.0:
+			_travel(Vector3(BambooGrove.RETURN_X, Village.STEPS_TOP + 0.05, 0.0), -1.0)
 	_explore_clock += delta
 	if _explore_clock > 0.4:
 		_explore_clock = 0.0
@@ -94,6 +104,42 @@ func _process(delta: float) -> void:
 	if _boss and is_instance_valid(_boss) and _boss.health > 0:
 		if not _boss.active and in_arena and _ronin.global_position.x > Village.ARENA.x + 2.0:
 			_begin_fight()
+
+
+## Where the camera may go: the town (well to the courtyard's middle), or
+## the bamboo grove (from just inside its gate to its end).
+func _set_camera_limits() -> void:
+	if _free_camera:
+		return
+	if BambooGrove.in_grove(_ronin.global_position.x):
+		_camera.min_x = BambooGrove.SHIFT + BambooGrove.GATE_X + 5.0
+		_camera.max_x = BambooGrove.SHIFT + BambooGrove.EAST_END - 9.0
+	else:
+		_camera.min_x = -7.0
+		_camera.max_x = (Village.ARENA.x + Village.ARENA.y) * 0.5
+		# Once the far gate stands open (after her), the camera may go on far
+		# enough to show it whole.
+		if ($Village as Village).bamboo.gate_open:
+			_camera.max_x = BambooGrove.GATE_X - 5.0
+
+
+## Between the town and the bamboo: the screen fades to sumi black, he is
+## put at the other place walking on, and it fades back up.
+func _travel(to: Vector3, heading: float) -> void:
+	_travelling = true
+	var out := create_tween()
+	out.tween_property(_fade, "modulate:a", 1.0, travel_fade).set_trans(Tween.TRANS_SINE)
+	await out.finished
+	_ronin.global_position = to
+	_ronin.velocity = Vector3.ZERO
+	_ronin.facing = heading
+	_set_camera_limits()
+	_camera.snap_to_target()
+	await get_tree().create_timer(pit_hold).timeout
+	var back := create_tween()
+	back.tween_property(_fade, "modulate:a", 0.0, travel_fade).set_trans(Tween.TRANS_SINE)
+	await back.finished
+	_travelling = false
 
 
 ## After the prologue: he climbs out of the village well, seen from the
@@ -249,6 +295,7 @@ func _warm_up() -> void:
 	_ronin.global_position = _ronin.get("_spawn_position")
 	_ronin.velocity = Vector3.ZERO
 	_ronin.set_physics_process(true)
+	_set_camera_limits()
 	_camera.snap_to_target()
 	_warming = false
 	await get_tree().create_timer(0.4).timeout
@@ -336,6 +383,7 @@ func _on_died() -> void:
 		_boss.reset()
 		_boss_bar.hide_bar()
 		$Village.set_arena_sealed(false)
+	_set_camera_limits()
 	_camera.snap_to_target()
 	await get_tree().create_timer(pit_hold).timeout
 	var back := create_tween()
@@ -352,6 +400,7 @@ func _on_fell_in_pit() -> void:
 	out.tween_property(_fade, "modulate:a", 1.0, pit_fade_out).set_trans(Tween.TRANS_SINE)
 	await out.finished
 	_ronin.respawn_at_checkpoint()
+	_set_camera_limits()
 	_camera.snap_to_target()
 	await get_tree().create_timer(pit_hold).timeout
 	var back := create_tween()
@@ -388,8 +437,9 @@ func _apply_debug_start() -> void:
 			_camera.follow_height = 1.0  # close-ups follow him up onto platforms
 			_camera.climb_zone = Vector2.ZERO  # and keep him centred, climbing or not
 			_camera.under_zone = Vector2.ZERO
-			_camera.min_x = -1000.0
-			_camera.max_x = 1000.0
+			_camera.min_x = -10000.0
+			_camera.max_x = 10000.0
+			_free_camera = true
 			_camera.look_ahead = 0.0
 			_camera.rotation_degrees.x = 0.0
 		elif arg.begins_with("--face="):
@@ -507,6 +557,7 @@ func _continue_from_save() -> void:
 		_smudge.ink = SaveGame.smudge_ink
 		village.add_child(_smudge)
 		_smudge.global_position = SaveGame.smudge_at
+	_set_camera_limits()
 	_camera.snap_to_target()
 
 

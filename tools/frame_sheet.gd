@@ -51,6 +51,11 @@ extends SceneTree
 ##   seal      the ink wall rising at the courtyard entrance, then seen mid-jump
 ##   heal      a real heal, held to the end: the ensō painted on, closing,
 ##             dissolving (use --zoom=5)
+##   grate     the drain grate in Well Square: shut, cut open from below
+##             (it flips over and lands flat), and the hole it leaves
+##   blind     a bamboo blind over a lit window: rolled up, unrolling as he
+##             walks up, down, and rolling up again once he has gone
+##   gates     the gate between the town and the bamboo grove, from both sides
 ##   iai       close-up of the stance: settling, half-way, ready, and the
 ##             pose he ends the draw in (use --zoom=4.6)
 ##
@@ -134,6 +139,12 @@ func _initialize() -> void:
 			sheet = await _cranes()
 		"smudge":
 			sheet = await _smudge()
+		"grate":
+			sheet = await _grate()
+		"blind":
+			sheet = await _blind()
+		"gates":
+			sheet = await _gates()
 		_:
 			push_error("Unknown sheet: " + args[0])
 			quit(1)
@@ -784,15 +795,17 @@ func _cranes() -> Image:
 	_ronin.position = bundle.global_position + Vector3(-1.6, 0.1, 0.0)
 	_main.get_node("Camera").snap_to_target()
 	await create_timer(0.6).timeout
-	var tile := Vector2i(427, 240)
-	var sheet := Image.create(tile.x * 3, tile.y * 3, false, Image.FORMAT_RGB8)
-	sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i.ZERO)
+	# (Run with --zoom=4 for a close look; the whole frame is kept.)
+	var crop := Rect2i(0, 0, 1280, 720)
+	var tile := Vector2i(480, 270)
+	var sheet := Image.create(tile.x * 4, tile.y * 3, false, Image.FORMAT_RGB8)
+	sheet.blit_rect(await _snap(crop, tile), Rect2i(Vector2i.ZERO, tile), Vector2i.ZERO)
 	Input.action_press("move_right")
 	await create_timer(0.2).timeout
 	Input.action_release("move_right")
-	for i in range(1, 9):
-		await create_timer(0.22).timeout
-		sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((i % 3) * tile.x, (i / 3) * tile.y))
+	for i in range(1, 12):
+		await create_timer(0.27).timeout
+		sheet.blit_rect(await _snap(crop, tile), Rect2i(Vector2i.ZERO, tile), Vector2i((i % 4) * tile.x, (i / 4) * tile.y))
 	return sheet
 
 
@@ -833,4 +846,77 @@ func _ending() -> Image:
 		while (Time.get_ticks_msec() - started) / 1000.0 < times[i] + 0.4:
 			await process_frame
 		sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((i % 4) * tile.x, (i / 4) * tile.y))
+	return sheet
+
+
+## The drain grate in Well Square, from the street: shut, opened (called
+## directly, as two cuts from below would), and the hole it leaves.
+func _grate() -> Image:
+	_ronin.set("_draw_safe", 60.0)
+	_ronin.position = Vector3(Village.GRATE_X + 2.2, 0.05, 0.0)
+	_ronin.facing = -1.0
+	_main.get_node("Camera").snap_to_target()
+	await create_timer(0.8).timeout
+	var tile := Vector2i(480, 320)
+	var crop := Rect2i(160, 120, 960, 640)
+	var sheet := Image.create(tile.x * 3, tile.y * 2, false, Image.FORMAT_RGB8)
+	sheet.blit_rect(await _snap(crop, tile), Rect2i(Vector2i.ZERO, tile), Vector2i.ZERO)
+	var canals: Canals = _main.get_node("Village").canals
+	canals.open_grate()
+	var shot := 1
+	for t: float in [0.12, 0.15, 0.2, 0.5, 1.0]:
+		await create_timer(t).timeout
+		sheet.blit_rect(await _snap(crop, tile), Rect2i(Vector2i.ZERO, tile), Vector2i((shot % 3) * tile.x, (shot / 3) * tile.y))
+		shot += 1
+	return sheet
+
+
+## A bamboo blind (Village.SHUTTERS): he walks up to the window and on past
+## it; it unrolls, then rolls up again once he is well away.
+func _blind() -> Image:
+	var x: float = Village.SHUTTERS[0]
+	_ronin.set("_draw_safe", 60.0)
+	_ronin.position = Vector3(x + 7.0, 0.05, 0.0)
+	_main.get_node("Camera").snap_to_target()
+	await create_timer(0.8).timeout
+	var tile := Vector2i(480, 320)
+	var crop := Rect2i(160, 60, 960, 640)
+	var sheet := Image.create(tile.x * 3, tile.y * 2, false, Image.FORMAT_RGB8)
+	sheet.blit_rect(await _snap(crop, tile), Rect2i(Vector2i.ZERO, tile), Vector2i.ZERO)
+	Input.action_press("move_left")
+	var shot := 1
+	for t: float in [0.55, 0.25, 0.25]:
+		await create_timer(t).timeout
+		sheet.blit_rect(await _snap(crop, tile), Rect2i(Vector2i.ZERO, tile), Vector2i((shot % 3) * tile.x, (shot / 3) * tile.y))
+		shot += 1
+	Input.action_release("move_left")
+	# Gone off along the street (the camera held still): it rolls up again.
+	_main.get_node("Camera").set_physics_process(false)
+	_main.get_node("Camera").set_process(false)
+	_ronin.position = Vector3(x - 14.0, 0.05, 0.0)
+	for t: float in [3.0, 8.0]:  # (still down; then, after blind_hold, rolling up)
+		await create_timer(t).timeout
+		sheet.blit_rect(await _snap(crop, tile), Rect2i(Vector2i.ZERO, tile), Vector2i((shot % 3) * tile.x, (shot / 3) * tile.y))
+		shot += 1
+	return sheet
+
+
+## The gate between the town and the bamboo grove, both sides: the
+## courtyard's far gate standing open, then the grove's end of it.
+func _gates() -> Image:
+	_main.set("_cutscene_played", true)
+	var village: Village = _main.get_node("Village")
+	village.bamboo.open_gate(true)
+	_ronin.set("_draw_safe", 60.0)
+	var tile := Vector2i(640, 360)
+	var sheet := Image.create(tile.x * 2, tile.y * 2, false, Image.FORMAT_RGB8)
+	var spots := [Vector3(BambooGrove.GATE_X - 2.4, Village.STEPS_TOP + 0.05, 0.0), Vector3(BambooGrove.GATE_X - 1.0, Village.STEPS_TOP + 0.05, 0.0),
+			Vector3(BambooGrove.SHIFT + BambooGrove.ARRIVE_X + 0.6, 1.55, 0.0), Vector3(BambooGrove.SHIFT + BambooGrove.ARRIVE_X + 4.0, 1.55, 0.0)]
+	for i in spots.size():
+		_ronin.global_position = spots[i]
+		_ronin.facing = 1.0 if i < 2 else -1.0
+		_main.call("_set_camera_limits")
+		_main.get_node("Camera").snap_to_target()
+		await create_timer(0.5).timeout
+		sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((i % 2) * tile.x, (i / 2) * tile.y))
 	return sheet

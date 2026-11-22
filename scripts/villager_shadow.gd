@@ -7,19 +7,20 @@ extends Node3D
 ## Ronin comes near, they shrink down out of sight below the sill (people
 ## keep away from strangers in the Rain); once he has gone they rise again,
 ## slowly, peering first. A window can instead have a wooden storm shutter
-## (amado) that slides across as he comes, and back once he has gone.
+## (a bamboo blind) that unrolls as he comes, and rolls up once he has gone.
 ## Origin: the middle of the window, just in front of its paper.
 
 ## "pace", "kneel", "papermaker"
 @export var activity := "pace"
 @export var window_size := Vector2(1.6, 1.2)
 @export var round_window := false
-## Slide a shutter across instead of hiding.
+## Lower a bamboo blind instead of hiding.
 @export var shutter := false
-## Which side of the window the shutter's box is (1 = right, -1 = left).
-@export var side := 1.0
 ## How near he comes (metres along the street) before they hide.
 @export var shy_distance := 3.5
+## Once lowered, the blind stays down this many seconds after he has gone
+## before it is rolled up again (Julian: not straight back up).
+@export var blind_hold := 9.0
 
 var _figure: Node3D
 var _arms: Node3D
@@ -30,6 +31,7 @@ var _hide := 0.0      # 0 = at ease, 1 = ducked out of sight
 var _ronin: Node3D
 var _shutter: Node3D
 var _closed := 0.0
+var _since_near := 999.0   # seconds since he was last near
 var _seed := 0.0
 
 
@@ -104,10 +106,15 @@ func _process(delta: float) -> void:
 			and _ronin.global_position.y < global_position.y + 2.0
 	if shutter:
 		var before := _closed
-		_closed = move_toward(_closed, 1.0 if near else 0.0, delta / (0.5 if near else 1.6))
+		_since_near = 0.0 if near else _since_near + delta
+		# Down when he comes; kept down a good while after he has gone.
+		var wanted := 1.0 if near or (_closed > 0.0 and _since_near < blind_hold) else 0.0
+		_closed = move_toward(_closed, wanted, delta / (0.5 if wanted > 0.0 else 1.6))
 		if before == 0.0 and _closed > 0.0 or before == 1.0 and _closed < 1.0:
-			Sound.play(self, &"plank_creak", -14.0)
-		_shutter.position.x = lerpf(window_size.x * 1.02 * side, 0.0, smoothstep(0.0, 1.0, _closed))
+			Sound.play(self, &"paper_fold", -12.0)
+		var down := smoothstep(0.0, 1.0, _closed)
+		_shutter.visible = down > 0.01
+		_shutter.scale.y = maxf(down, 0.01)
 		return
 	# Hide quickly, come back slowly (and only once he is well away).
 	var far := absf(_ronin.global_position.x - global_position.x) > shy_distance + 2.0
@@ -140,25 +147,42 @@ func _process(delta: float) -> void:
 	_look.set_shader_parameter(&"fade", 1.0 - _hide * 0.6)
 
 
-## A wooden storm shutter (amado) in its box beside the window, that slides
-## across the window as he comes near.
+## A bamboo blind (sudare) rolled up under a small head rail over the
+## window, that unrolls down over the lit paper as he comes near and rolls
+## back up once he has gone. (A sliding shutter with its box beside the
+## window looked like two dark boxes: Julian, "looks glitched".)
 func _build_shutter(rng: RandomNumberGenerator) -> void:
-	var box := PaperMesh.new(rng.randi())
-	box.color = Scenery.WOOD.darkened(0.35)
-	box.box(Vector3(window_size.x * 1.05 * side, 0.0, 0.08), Vector3(window_size.x * 0.98, window_size.y + 0.25, 0.07))
-	add_child(box.build())
+	var top := window_size.y * 0.5 + 0.06
+	var wide := window_size.x + 0.12
+	var head := PaperMesh.new(rng.randi())
+	head.color = PaperMesh.TIMBER
+	head.box(Vector3(0.0, top + 0.05, 0.08), Vector3(wide + 0.1, 0.07, 0.09))
+	# The cloth band along the top, and the rolled-up blind under it.
+	head.color = Color(0.22, 0.24, 0.36)
+	head.box(Vector3(0.0, top - 0.02, 0.13), Vector3(wide + 0.04, 0.09, 0.02))
+	head.color = Color(0.46, 0.4, 0.28)
+	head.box(Vector3(0.0, top - 0.1, 0.1), Vector3(wide, 0.09, 0.09))
+	# Its two cords, tied.
+	head.color = Color(0.3, 0.2, 0.15)
+	for cx: float in [-wide * 0.3, wide * 0.3]:
+		head.box(Vector3(cx, top - 0.1, 0.152), Vector3(0.025, 0.12, 0.01))
+	add_child(head.build())
 	_shutter = Node3D.new()
-	_shutter.position.x = window_size.x * 1.02 * side
+	_shutter.position = Vector3(0.0, top - 0.12, 0.09)
 	add_child(_shutter)
 	var b := PaperMesh.new(rng.randi())
-	b.shade_jitter = 0.16
-	var x := -window_size.x * 0.5
-	while x < window_size.x * 0.5:
-		var x1 := minf(x + rng.randf_range(0.16, 0.24), window_size.x * 0.5)
-		b.color = Scenery.WOOD.darkened(rng.randf_range(0.15, 0.4))
-		b.box(Vector3((x + x1) * 0.5, 0.0, 0.14), Vector3(x1 - x - 0.015, window_size.y + 0.12, 0.04))
-		x = x1
+	b.shade_jitter = 0.08
+	var length := window_size.y + 0.1
+	var y := 0.0
+	while y > -length:
+		b.color = Color(0.5, 0.43, 0.3).darkened(rng.randf_range(0.0, 0.25))
+		b.box(Vector3(0.0, y - 0.02, 0.0), Vector3(wide, 0.034, 0.012))
+		y -= 0.046
+	b.color = Color(0.3, 0.2, 0.15)
+	for cx: float in [-wide * 0.3, wide * 0.3]:
+		b.box(Vector3(cx, -length * 0.5, 0.012), Vector3(0.018, length, 0.006))
 	b.color = PaperMesh.TIMBER
-	for band: float in [-0.35, 0.35]:
-		b.box(Vector3(0.0, band * window_size.y, 0.17), Vector3(window_size.x, 0.05, 0.02))
+	b.box(Vector3(0.0, -length, 0.0), Vector3(wide, 0.04, 0.03))
 	_shutter.add_child(b.build())
+	_shutter.scale.y = 0.01
+	_shutter.visible = false

@@ -22,6 +22,12 @@ const RUIN := Vector2(70.2, 78.6)
 ## The gap too wide to jump (the Crane Glide gate).
 const GLIDE_GAP := Vector2(97.6, 107.0)
 
+## How far back the deck's posts stand (behind the stalls' awnings, the
+## storehouse's roof and the bridge's back railing).
+const POST_Z := -1.75
+## Shop signs hang out over the street at these x: no post there.
+const KEEP_CLEAR := [47.0, 50.4]
+
 var village: Village
 var ladder: Ladder
 var _rng := RandomNumberGenerator.new()
@@ -46,6 +52,10 @@ func _ready() -> void:
 ## Fallen Street's hole) or the river's bed.
 func _foot(x: float) -> float:
 	if x > Village.FALL_LEFT and x < Village.FALL_RIGHT:
+		# Down in the hole: on a canal walkway if there is one under it.
+		for w: Array in Canals.WALKWAYS:
+			if x > w[0] + 0.1 and x < w[1] - 0.1:
+				return w[2]
 		return Canals.FLOOR
 	if x > Village.RIVER.x and x < Village.RIVER.y:
 		return RiverBridge.BED
@@ -61,40 +71,46 @@ func _deck(left: float, right: float, top: float, kind: String) -> void:
 	while x < right - 0.01:
 		var x1 := minf(x + _rng.randf_range(0.2, 0.3), right)
 		b.color = Scenery.WOOD.darkened(_rng.randf_range(0.1, 0.35))
-		b.box(Vector3((x + x1) * 0.5, top - 0.05, 0.0), Vector3(x1 - x - 0.025, 0.1, 2.3 - _rng.randf_range(0.0, 0.12)))
+		var front := 1.15 - _rng.randf_range(0.0, 0.12)
+		b.box(Vector3((x + x1) * 0.5, top - 0.05, (front + POST_Z - 0.15) * 0.5), Vector3(x1 - x - 0.025, 0.1, front - POST_Z + 0.15))
 		x = x1
 	b.color = PaperMesh.TIMBER
-	for z: float in [1.0, -1.0]:
+	for z: float in [1.0, POST_Z]:
 		b.box(Vector3((left + right) * 0.5, top - 0.2, z), Vector3(right - left + 0.2, 0.18, 0.16))
-	# Posts down to whatever is below, braced; a railing along the back.
-	var posts: Array[float] = [left + 0.15]
-	while posts[posts.size() - 1] + 2.6 < right - 0.6:
-		posts.append(posts[posts.size() - 1] + 2.6)
-	posts.append(right - 0.15)
+	# Posts down to whatever is below, all along the BACK of the deck (so
+	# none stands in the street in front of him or runs through a stall, the
+	# storehouse's roof or the bridge's railings), each stopping on what is
+	# really under it: the street, a canal walkway, the river's bed. They step
+	# aside for the shop signs. Joists carry the deck's front from them, and
+	# knee braces stiffen them along the street.
+	var posts := _post_spots(left, right)
 	for px: float in posts:
 		var foot := _foot(px)
-		# (Over the Fallen Street's hole only the back posts reach down, so
-		# none stands in front of him when he is down in the canals.)
-		for pz: float in ([-1.15] if foot == Canals.FLOOR else [1.15, -1.15]):
-			b.box(Vector3(px, (top - 0.25 + foot) * 0.5, pz), Vector3(0.15, top - 0.25 - foot, 0.15))
-		b.extrude(PackedVector2Array([Vector2(px - 0.06, top - 2.2), Vector2(px + 0.06, top - 2.2),
-				Vector2(px + 0.9, top - 0.3), Vector2(px + 0.78, top - 0.3)]) if px < right - 1.0 else
+		b.color = PaperMesh.TIMBER
+		b.box(Vector3(px, (top - 0.25 + foot) * 0.5, POST_Z), Vector3(0.16, top - 0.25 - foot, 0.16))
+		# A joist from the post out under the front beam.
+		b.box(Vector3(px, top - 0.36, (POST_Z + 1.0) * 0.5), Vector3(0.12, 0.14, 1.0 - POST_Z + 0.1))
+		# A strut up from the post to the joist's front end (seen from the
+		# street as a short dark stroke under the deck).
+		_strut(b, Vector3(px, top - 1.7, POST_Z), Vector3(px, top - 0.42, 0.9), 0.09)
+		var brace := 1.0 if px < right - 1.0 else -1.0
+		b.extrude(PackedVector2Array([Vector2(px - 0.06, top - 2.0), Vector2(px + 0.06, top - 2.0),
+				Vector2(px + brace * 0.9, top - 0.3), Vector2(px + brace * 0.78, top - 0.3)]) if brace > 0.0 else
 				PackedVector2Array([Vector2(px - 0.78, top - 0.3), Vector2(px - 0.9, top - 0.3),
-				Vector2(px - 0.06, top - 2.2), Vector2(px + 0.06, top - 2.2)]), -1.2, -1.1)
+				Vector2(px - 0.06, top - 2.0), Vector2(px + 0.06, top - 2.0)]), POST_Z - 0.05, POST_Z + 0.05)
+		# Where it stands in water it is dark and slick at the waterline.
+		if foot < 0.0:
+			var water := Village.CANAL_WATER if px > Village.FALL_LEFT and px < Village.FALL_RIGHT else RiverBridge.WATER
+			if foot < water:
+				b.color = Canals.SLIME
+				b.box(Vector3(px, water + 0.15, POST_Z), Vector3(0.18, 0.3, 0.18))
 	b.color = PaperMesh.TIMBER.lightened(0.04)
-	b.box(Vector3((left + right) * 0.5, top + 0.85, -1.1), Vector3(right - left, 0.07, 0.07))
-	b.box(Vector3((left + right) * 0.5, top + 0.4, -1.1), Vector3(right - left, 0.05, 0.05))
+	b.box(Vector3((left + right) * 0.5, top + 0.85, POST_Z), Vector3(right - left, 0.07, 0.07))
+	b.box(Vector3((left + right) * 0.5, top + 0.4, POST_Z), Vector3(right - left, 0.05, 0.05))
 	var rail := left + 0.05
 	while rail < right:
-		b.box(Vector3(rail, top + 0.42, -1.1), Vector3(0.05, 0.85, 0.05))
+		b.box(Vector3(rail, top + 0.42, POST_Z), Vector3(0.05, 0.85, 0.05))
 		rail += 0.6
-	# Where the posts stand in water, they are dark and slick at the waterline.
-	if _foot(left + 0.5) < 0.0:
-		b.color = Canals.SLIME
-		var water := Village.CANAL_WATER if _foot(left + 0.5) == Canals.FLOOR else RiverBridge.WATER
-		for px: float in posts:
-			for pz: float in [1.15, -1.15]:
-				b.box(Vector3(px, water + 0.15, pz), Vector3(0.17, 0.3, 0.17))
 	add_child(b.build())
 	match kind:
 		"drying": _drying(left, right, top)
@@ -103,6 +119,32 @@ func _deck(left: float, right: float, top: float, kind: String) -> void:
 		"broken": _broken_end(right, top)
 		"laundry": _cloth(left, right, top)
 		"far": _far_end(left, right, top)
+
+
+## Where the posts go under a deck: at both ends and about every 3 m,
+## nudged aside from the signs.
+func _post_spots(left: float, right: float) -> Array[float]:
+	var count := maxi(2, int(ceil((right - left - 0.3) / 3.0)) + 1)
+	var spots: Array[float] = []
+	for k in count:
+		var px := lerpf(left + 0.15, right - 0.15, float(k) / (count - 1))
+		for sign_x: float in KEEP_CLEAR:
+			if absf(px - sign_x) < 0.5:
+				px = sign_x + (0.5 if px >= sign_x and sign_x + 0.5 < right - 0.1 else -0.5)
+		spots.append(px)
+	return spots
+
+
+## A square timber strut between two points (any direction).
+func _strut(b: PaperMesh, from: Vector3, to: Vector3, width: float) -> void:
+	var along := (to - from).normalized()
+	var side := along.cross(Vector3.RIGHT).normalized() * width * 0.5
+	var across := Vector3.RIGHT * width * 0.5
+	var c := [from - side - across, from + side - across, from + side + across, from - side + across]
+	var d := [to - side - across, to + side - across, to + side + across, to - side + across]
+	for i in 4:
+		var j := (i + 1) % 4
+		b.quad(c[i], c[j], d[j], d[i])
 
 
 ## Sheets of fresh paper pegged on a line along the back, drying; each
@@ -247,7 +289,6 @@ func _far_end(left: float, right: float, top: float) -> void:
 func _ruin() -> void:
 	var left := RUIN.x
 	var right := RUIN.y
-	var foot := Canals.FLOOR
 	var char_wood := Color(0.06, 0.05, 0.06)
 	# Floors he can stand on: [left, right, height].
 	var floors := [[left, left + 2.9, 8.6], [right - 4.0, right, 4.6], [left, left + 2.4, 0.9]]
@@ -275,7 +316,8 @@ func _ruin() -> void:
 	for px: float in [left + 0.1, right - 0.1, (left + right) * 0.5]:
 		for pz: float in [-1.2]:  # (the front of the house has fallen)
 			var top := 9.4 if px != (left + right) * 0.5 else 6.2  # the middle one has burnt through
-			b.box(Vector3(px, (foot + top) * 0.5, pz), Vector3(0.18, top - foot, 0.18))
+			var stand := _foot(px)  # (on the canal walkway under it, not through it)
+			b.box(Vector3(px, (stand + top) * 0.5, pz), Vector3(0.18, top - stand, 0.18))
 	# The roof's skeleton: rafters from the walls up to a ridge, a few tiles.
 	var ridge := Vector2((left + right) * 0.5 - 1.2, 11.0)
 	for k in 6:

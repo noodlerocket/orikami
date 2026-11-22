@@ -334,7 +334,7 @@ func _build_houses() -> void:
 		[17.2, 5.6, 4.6, true, ["noren_indigo", "pots"], 1],
 		[23.4, 5.8, 5.0, false, ["brace", "awning", "shutters", "buckets"], 0],
 		[29.6, 5.4, 4.4, true, ["round", "umbrella"], -1],
-		[35.6, 6.0, 5.2, true, ["brace", "sudare", "pots", "firewood"], 1],
+		[35.6, 6.0, 5.2, true, ["brace", "blind", "pots", "firewood"], 1],
 		[42.0, 5.6, 4.6, false, ["awning", "shutters", "umbrella"], 0],
 		[48.2, 6.2, 5.0, true, ["round", "noren_indigo", "buckets"], 1],
 		[54.6, 5.4, 4.2, true, ["brace", "pots", "umbrella"], -1],
@@ -358,16 +358,13 @@ func _build_houses() -> void:
 			_add_light(window + Vector3(0.0, 0.0, 1.1), lantern_energy * 0.45, lantern_range * 0.7)
 			_add_wet_shine(window.x, ground, 0.6)
 			# Someone at home: their shadow on the shoji (the Paper-Maker at
-			# her vat in her workshop), or a storm shutter that slides shut.
+			# her vat in her workshop), or a bamboo blind that unrolls.
 			var shadow := VillagerShadow.new()
 			var size: Vector2 = house.get_meta("window_size")
 			shadow.window_size = size
 			shadow.round_window = house.get_meta("window_round")
-			var local: Vector3 = house.get_meta("window")
-			var half: float = h[1] * 0.5
 			if x in SHUTTERS and not shadow.round_window:
 				shadow.shutter = true
-				shadow.side = 1.0 if local.x + size.x * 1.6 < half - 0.3 else -1.0
 			elif x == 5.6:
 				shadow.activity = "papermaker"
 			else:
@@ -444,9 +441,11 @@ func _build_ground() -> void:
 			[SHAFT.y, STEPS.x, 0.0, 8.0, false, false],
 			[STEPS.y, ARENA.y + 0.5, STEPS_TOP, 8.0, false, false]]:
 		_build_ground_block(g[0], g[1], g[2], g[3], g[4], g[5])
+	_build_grate_surround()
 	# Invisible walls at both ends of the level.
-	_add_solid(Vector3(-16.5, 10.0, 0.0), Vector3(1.0, 40.0, 4.0))
+	_add_solid(Vector3(-16.5, 10.0, 0.0), Vector3(1.0, 40.0, 4.0)).set_meta(&"no_climb", true)
 	east_wall = _add_solid(Vector3(ARENA.y + 0.5, 10.0, 0.0), Vector3(1.0, 40.0, 4.0))
+	east_wall.set_meta(&"no_climb", true)
 
 
 func _build_ground_block(left: float, right: float, top: float, thick: float = 8.0,
@@ -518,6 +517,48 @@ func _build_ground_block(left: float, right: float, top: float, thick: float = 8
 			tuft.append(Vector2(mx, top - 0.07) + Vector2(cos(angle) * _rng.randf_range(0.15, 0.36), sin(angle) * 0.055) * _rng.randf_range(0.6, 1.1))
 		front.polygon(tuft, STREET_FRONT + 0.083)
 		mx += _rng.randf_range(2.0, 5.5)
+	var cliff := front.build()
+	cliff.cast_shadow = OFF
+	add_child(cliff)
+
+
+## The street around the drain grate in Well Square. The ground there is
+## left out only where the grate itself lies (its own width and depth, a
+## stone-lined opening down into the chamber); in front of and behind it
+## the paving, the earth and the street's torn front edge carry on. (It used
+## to be a slot cut right across the street, which looked wrong once the
+## grate was open.)
+func _build_grate_surround() -> void:
+	var gl := GRATE_X - GRATE_WIDTH * 0.5
+	var gr := GRATE_X + GRATE_WIDTH * 0.5
+	var half := 1.12
+	_lay_paving(gl, gr, 0.0, STREET_BACK, -half)
+	_lay_paving(gl, gr, 0.0, half, STREET_FRONT)
+	var b := PaperMesh.new(_rng.randi())
+	b.shade_jitter = 0.05
+	b.color = EARTH
+	b.box(Vector3(GRATE_X, -CHAMBER_SLAB * 0.5 - 0.02, (STREET_BACK - half) * 0.5), Vector3(GRATE_WIDTH, CHAMBER_SLAB, -half - STREET_BACK))
+	b.box(Vector3(GRATE_X, -CHAMBER_SLAB * 0.5 - 0.02, (STREET_FRONT - 0.15 + half) * 0.5), Vector3(GRATE_WIDTH, CHAMBER_SLAB, STREET_FRONT - 0.15 - half))
+	# The opening's stone sides (a dressed curb), going down to the chamber.
+	b.color = Color(0.17, 0.18, 0.26)
+	for z: float in [-half - 0.04, half + 0.04]:
+		b.box(Vector3(GRATE_X, -0.2, z), Vector3(GRATE_WIDTH + 0.16, 0.4, 0.08))
+	for x: float in [gl - 0.04, gr + 0.04]:
+		b.box(Vector3(x, -0.2, 0.0), Vector3(0.08, 0.4, half * 2.0 + 0.16))
+	# A pale worn lip round it, where feet and carts have rubbed the stone.
+	b.color = Color(0.3, 0.32, 0.42)
+	for z: float in [-half - 0.04, half + 0.04]:
+		b.box(Vector3(GRATE_X, 0.005, z), Vector3(GRATE_WIDTH + 0.16, 0.02, 0.1))
+	for x: float in [gl - 0.04, gr + 0.04]:
+		b.box(Vector3(x, 0.005, 0.0), Vector3(0.1, 0.02, half * 2.0 + 0.16))
+	add_child(b.build())
+	# The street's torn front edge, across the grate's width too.
+	var front := PaperMesh.new(_rng.randi())
+	front.shade_jitter = 0.04
+	front.color = Color(0.23, 0.245, 0.34)
+	front.torn_sheet(PaperMesh.tear(PackedVector2Array([Vector2(gl - 0.05, 0.0), Vector2(gr + 0.05, 0.0),
+			Vector2(gr + 0.05, -CHAMBER_SLAB - 0.05), Vector2(gl - 0.05, -CHAMBER_SLAB - 0.05)]), 0.25, 0.02, _rng), STREET_FRONT - 0.004,
+			Color(0.5, 0.54, 0.68), 0.03)
 	var cliff := front.build()
 	cliff.cast_shadow = OFF
 	add_child(cliff)
@@ -802,6 +843,7 @@ func set_arena_sealed(on: bool) -> void:
 	var ground := _street_height(ARENA.x)
 	if on and not _seal_wall:
 		_seal_wall = _add_solid(Vector3(ARENA.x - 0.5, 8.0, 0.0), Vector3(1.0, 16.0, 4.0))
+		_seal_wall.set_meta(&"no_climb", true)
 		_seal_pool = InkPool.new()
 		_seal_pool.size = 2.8
 		add_child(_seal_pool)

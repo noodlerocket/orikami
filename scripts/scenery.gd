@@ -480,19 +480,25 @@ static func _lived_in(root: Node3D, rng: RandomNumberGenerator, extras: Array, h
 			bx += rng.randf_range(0.18, 0.26)
 		b.color = PaperMesh.TIMBER
 		b.rect(window_at + Vector2(0.0, rng.randf_range(-0.15, 0.15)), Vector2(window_size.x + 0.2, 0.07), 0.125)
-	elif "sudare" in extras:
-		# A bamboo blind, let down part way over the window.
+	elif "sudare" in extras or "blind" in extras:
+		# A bamboo blind, let down part way over the window. ("blind": the
+		# window has one that rolls down as he passes, VillagerShadow, so
+		# none is drawn here; the random draw is still made, so the houses
+		# after it do not change.)
 		var drop := window_size.y * rng.randf_range(0.35, 0.75)
-		var top_y := window_at.y + window_size.y * 0.5 + 0.06
-		var wide := window_size.x + 0.16
-		b.color = Color(0.5, 0.44, 0.32)
-		b.rect(Vector2(window_at.x, top_y - drop * 0.5), Vector2(wide, drop), 0.13)
-		b.color = Color(0.37, 0.31, 0.22)
-		var y := top_y - 0.05
-		while y > top_y - drop:
-			b.rect(Vector2(window_at.x, y), Vector2(wide, 0.012), 0.135)
-			y -= 0.055
-		b.box(Vector3(window_at.x, top_y - drop, 0.15), Vector3(wide + 0.04, 0.05, 0.05))
+		if "blind" in extras:
+			drop = 0.0
+		if drop > 0.0:
+			var top_y := window_at.y + window_size.y * 0.5 + 0.06
+			var wide := window_size.x + 0.16
+			b.color = Color(0.5, 0.44, 0.32)
+			b.rect(Vector2(window_at.x, top_y - drop * 0.5), Vector2(wide, drop), 0.13)
+			b.color = Color(0.37, 0.31, 0.22)
+			var y := top_y - 0.05
+			while y > top_y - drop:
+				b.rect(Vector2(window_at.x, y), Vector2(wide, 0.012), 0.135)
+				y -= 0.055
+			b.box(Vector3(window_at.x, top_y - drop, 0.15), Vector3(wide + 0.04, 0.05, 0.05))
 	if "pots" in extras:
 		var x: float = spot.call(1.0)
 		if not is_nan(x):

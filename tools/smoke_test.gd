@@ -264,6 +264,45 @@ func _run(main: Node) -> void:
 	var rest_spot: Vector3 = ronin.get("_spawn_position")
 	_check("resting at a shrine heals him (%d/%d)" % [ronin.health, ronin.max_health], ronin.health == ronin.max_health)
 	_check("and he will come back there (%.1f m from it)" % absf(rest_spot.x - shrine.global_position.x), absf(rest_spot.x - shrine.global_position.x) < 0.1)
+	# Running straight past a shrine, without stopping, is enough (Julian).
+	ronin.position = Vector3(shrine.global_position.x + 20.0, 0.1, 0.0)
+	await _frames(20)
+	ronin.set_checkpoint(Vector3(-10.0, 0.0, 0.0))
+	ronin.health = ronin.max_health - 1
+	ronin.position = Vector3(shrine.global_position.x - 3.5, 0.1, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(10)
+	Input.action_press("move_right")
+	while ronin.global_position.x < shrine.global_position.x + 2.5:
+		await physics_frame
+	Input.action_release("move_right")
+	rest_spot = ronin.get("_spawn_position")
+	_check("running past a shrine without stopping rests there (%d/%d)" % [ronin.health, ronin.max_health],
+			ronin.health == ronin.max_health and absf(rest_spot.x - shrine.global_position.x) < 0.1)
+
+	# Any tall wall can be clung to, not only the ones marked climbable: the
+	# storehouse's east wall in Market Street.
+	var store_wall := MarketStreet.SECRET_X + 3.6 + 0.2
+	ronin.position = Vector3(store_wall + 0.34, 2.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	Input.action_press("move_left")
+	var clung := false
+	for f in 40:
+		await physics_frame
+		clung = clung or ronin.get("_sliding")
+	Input.action_release("move_left")
+	_check("he wall-slides on an unmarked wall (the storehouse)", clung)
+	# ...but not on something as low as a step or a crate.
+	ronin.position = Vector3(MarketStreet.SECRET_X + 5.15 + 0.8, 0.5, 0.0)
+	ronin.velocity = Vector3.ZERO
+	Input.action_press("move_left")
+	clung = false
+	for f in 12:  # (any longer and he is over the crate and at the storehouse)
+		await physics_frame
+		clung = clung or (f > 1 and ronin.get("_sliding"))  # (the first frame still holds the last wall)
+	Input.action_release("move_left")
+	_check("but not on a low crate", not clung)
+	await _frames(20)
 
 	for other: Node in main.get_node("Village").get_children():
 		if other is LanternHusk or other is PaperCritter:
@@ -275,7 +314,11 @@ func _run(main: Node) -> void:
 	before = ronin.health
 	ronin.position = Vector3((Canals.DEEP.x + Canals.DEEP.y) * 0.5, -4.0, 0.0)
 	ronin.velocity = Vector3.ZERO
-	await _frames(150)
+	var lowest := 0.0
+	for f in 150:
+		await process_frame
+		lowest = minf(lowest, (ronin.get_node("Puppet") as Node3D).position.y)
+	_check("in deep water he sinks out of sight (%.1f m)" % lowest, lowest < -1.6)
 	_check("deep water carries him back to the last shrine (%.1f m away)" % ronin.position.distance_to(spawn), ronin.position.distance_to(spawn) < 1.0)
 	_check("and costs one health (%d -> %d)" % [before, ronin.health], ronin.health == before - 1 or (before == 1 and ronin.health == ronin.max_health))
 
@@ -465,9 +508,39 @@ func _run(main: Node) -> void:
 		var grove: BambooGrove = main.get_node("Village").bamboo
 		_check("it can be skipped, and the gate to the bamboo is open", grove.gate_open and ronin.is_physics_processing()
 				and not is_instance_valid(ending))
+		# Walking out through the open gate: the screen fades and he is in the
+		# bamboo grove (its own place, far off); back through its gate, home.
+		ronin.set("_draw_safe", 0.0)
+		ronin.position = Vector3(BambooGrove.GATE_X - 1.2, Village.STEPS_TOP + 0.05, 0.0)
+		ronin.velocity = Vector3.ZERO
+		await _frames(10)
+		Input.action_press("move_right")
+		var arrived := false
+		for f in 200:
+			await physics_frame
+			if BambooGrove.in_grove(ronin.global_position.x):
+				arrived = true
+				break
+		Input.action_release("move_right")
+		var faded: float = (main.get("_fade") as ColorRect).modulate.a
+		_check("walking out through the gate fades into the bamboo grove (x %.1f, fade %.2f)" % [ronin.global_position.x, faded],
+				arrived and faded > 0.9 and absf(ronin.global_position.x - BambooGrove.SHIFT - BambooGrove.ARRIVE_X) < 0.5)
+		await _frames(90)
+		_check("the camera is in the grove with him", BambooGrove.in_grove(cam.global_position.x))
+		Input.action_press("move_left")
+		var home := false
+		for f in 300:
+			await physics_frame
+			if not BambooGrove.in_grove(ronin.global_position.x):
+				home = true
+				break
+		Input.action_release("move_left")
+		await _frames(90)
+		_check("and walking back through the grove's gate takes him home to the courtyard (x %.1f)" % ronin.global_position.x,
+				home and absf(ronin.global_position.x - BambooGrove.RETURN_X) < 1.5 and not BambooGrove.in_grove(cam.global_position.x))
 		# The Crane Glide carries him over the first ravine.
 		ronin.has_glide = true
-		ronin.position = Vector3(BambooGrove.GROUND[0][1] - 0.6, BambooGrove.GROUND[0][2] + 0.05, 0.0)
+		ronin.position = Vector3(BambooGrove.SHIFT + BambooGrove.GROUND[0][1] - 0.6, BambooGrove.GROUND[0][2] + 0.05, 0.0)
 		ronin.velocity = Vector3.ZERO
 		await _frames(10)
 		Input.action_press("move_right")
@@ -480,7 +553,7 @@ func _run(main: Node) -> void:
 		Input.action_release("move_right")
 		await _frames(20)
 		_check("gliding carries him over the bamboo ravine (x %.1f)" % ronin.global_position.x,
-				glided and ronin.global_position.x > BambooGrove.GROUND[1][0] and ronin.global_position.y > 1.0)
+				glided and ronin.global_position.x > BambooGrove.SHIFT + BambooGrove.GROUND[1][0] and ronin.global_position.y > 1.0)
 		# ...and over the Rooftop Road's gap above the river (the first Crane
 		# Glide gate), even against the gusts.
 		ronin.position = Vector3(RooftopRoad.GLIDE_GAP.x - 0.3, 6.7, 0.0)
@@ -684,39 +757,25 @@ func _expanded_village(main: Node, ronin: Ronin) -> void:
 		Input.action_release("aim_up")
 		await _frames(30)
 	_check("two cuts from below open the drain grate", village.canals.grate_open)
-	# Out over the river the gusts push him west; falling in, the river
-	# carries him off, back to the shrine.
+	# Over the river nothing pushes him any more (the gusts were taken out);
+	# falling in, the river carries him off, back to the shrine.
 	var spawn: Vector3 = ronin.get("_spawn_position")
 	ronin.position = Vector3((RiverBridge.GAP.x + RiverBridge.GAP.y) * 0.5, 3.0, 0.0)
 	ronin.velocity = Vector3.ZERO
 	await _frames(14)
-	_check("a gust over the river pushes him (%.2f m/s)" % ronin.velocity.x, ronin.velocity.x < -0.15)
+	_check("nothing pushes him sideways over the river (%.2f m/s)" % ronin.velocity.x, absf(ronin.velocity.x) < 0.05)
 	await _frames(150)
 	_check("the river carries him back to the shrine (%.1f m away)" % ronin.global_position.distance_to(spawn), ronin.global_position.distance_to(spawn) < 1.0)
-	# The gate: barred from the far side.
-	var gate := village.gatehouse
+	# The way under the first wall is open: he runs straight through.
 	var wall: Array = Village.CLIMB_WALLS[0]
-	ronin.position = Vector3(wall[0] - 1.0, 0.05, 0.0)
+	ronin.position = Vector3(wall[0] - 1.5, 0.05, 0.0)
 	ronin.velocity = Vector3.ZERO
 	ronin.facing = 1.0
 	await _frames(10)
-	Input.action_press("slash")
-	await _frames(2)
-	Input.action_release("slash")
-	await _frames(30)
-	_check("from the west, the gate stays barred", not gate.opened)
-	ronin.position = Vector3(wall[1] + 1.2, 0.05, 0.0)
-	ronin.velocity = Vector3.ZERO
-	ronin.facing = -1.0
-	await _frames(10)
-	Input.action_press("slash")
-	await _frames(2)
-	Input.action_release("slash")
-	await _frames(30)
-	Input.action_press("move_left")
-	await _frames(50)
-	Input.action_release("move_left")
-	_check("from the east, a cut unbars it and the way west is open (x %.1f)" % ronin.global_position.x, gate.opened and ronin.global_position.x < wall[0])
+	Input.action_press("move_right")
+	await _frames(45)
+	Input.action_release("move_right")
+	_check("he runs straight through under the first wall (x %.1f)" % ronin.global_position.x, ronin.global_position.x > wall[1] + 0.5)
 	# The ladder at the end of Market Street: drawn up until he cuts its cord
 	# from the deck above; then he climbs it from the street.
 	var steps_up: Ladder = village.rooftops.ladder

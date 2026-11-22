@@ -12,10 +12,11 @@ signal rested
 ## This shrine's name in the save.
 @export var shrine_id := "shrine"
 
-## How close (metres along the street) he must stand.
+## How close (metres along the street) he must pass.
 @export var reach := 1.0
-## Seconds he must stand there before he rests.
-@export var rest_time := 0.35
+## Seconds he must be there before he rests (0: as he passes; 0.35 was
+## Julian's "stand in front of it", rejected).
+@export var rest_time := 0.0
 
 var ronin: Ronin
 var lit := false
@@ -130,12 +131,13 @@ func _physics_process(delta: float) -> void:
 			return
 	# Put here (respawned after a fall or a death) rather than walking up:
 	# that is not resting. He rests when he next walks up to it.
-	if (absf(ronin.global_position.x - _last_x) > 3.0 or ronin.respawns != _respawns) 			and absf(ronin.global_position.x - global_position.x) < reach + 1.0:
+	if (absf(ronin.global_position.x - _last_x) > 3.0 or ronin.respawns != _respawns) and absf(ronin.global_position.x - global_position.x) < reach + 1.0:
 		_rested_here = true
 	_respawns = ronin.respawns
 	_last_x = ronin.global_position.x
-	var near := absf(ronin.global_position.x - global_position.x) < reach \
-			and absf(ronin.global_position.y - global_position.y) < 0.6 and ronin.is_on_floor()
+	# Passing it is enough, running or jumping by (Julian: it should not
+	# wait for him to stand in front of it).
+	var near := absf(ronin.global_position.x - global_position.x) < reach and ronin.global_position.y - global_position.y > -0.6 and ronin.global_position.y - global_position.y < 2.8
 	if not near:
 		_standing = 0.0
 		if absf(ronin.global_position.x - global_position.x) > reach + 2.0:
@@ -158,10 +160,18 @@ func _physics_process(delta: float) -> void:
 func _rest() -> void:
 	_rested_here = true
 	_standing = 0.0
-	ronin.set_checkpoint(Vector3(global_position.x, global_position.y, 0.0))
+	var here := Vector3(global_position.x, global_position.y, 0.0)
+	# Already the shrine he is saved at: passing again only makes him whole,
+	# quietly (Julian: no sound, no "Rested and saved" every time).
+	var again: bool = lit and SaveGame.last_shrine == shrine_id and (ronin.get("_spawn_position") as Vector3).distance_to(here) < 0.1
+	ronin.set_checkpoint(here)
 	if ronin.health < ronin.max_health:
 		ronin.health = ronin.max_health
 		ronin.health_changed.emit(ronin.health, ronin.max_health)
+	if again:
+		SaveGame.ink_absorbed = ronin.ink_absorbed
+		SaveGame.write()
+		return
 	_flutter = 1.0
 	Sound.play(self, &"shrine_rest")
 	SaveGame.last_shrine = shrine_id

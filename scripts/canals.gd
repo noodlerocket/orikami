@@ -27,6 +27,10 @@ const WALKWAYS := [
 const SLUICES := [88.0, 106.0]
 ## The deep water (no floor): between these x.
 const DEEP := Vector2(116.5, 123.0)
+## How far down the deep water's shaft is drawn.
+const DEEP_BOTTOM := -11.0
+## The old timber tower by the river's west bank (to wall-jump up between).
+const TOWER := Vector2(77.0, 77.6)
 ## The crawlspace in the drain pipe, and how low its ceiling comes.
 const CRAWL := Vector2(47.5, 51.5)
 const CRAWL_TOP := -3.62
@@ -63,6 +67,7 @@ func _ready() -> void:
 	process_physics_priority = -5  # before the Ronin moves: the water pushes him
 	_rng.seed = 5501
 	_build_solids()
+	_build_tower()
 	_build_back_wall()
 	_build_ceiling()
 	_build_walkways()
@@ -124,7 +129,7 @@ func _build_solids() -> void:
 	# both sides of the shaft out at the east end.
 	_climb(Vector2(Village.FALL_LEFT - 0.05, Village.FALL_LEFT + 0.03), Vector2(-1.5, 0.0))
 	_climb(Vector2(Village.FALL_RIGHT - 0.03, Village.FALL_RIGHT + 0.05), Vector2(-2.2, 0.0))
-	_climb(Vector2(77.0, 77.6), Vector2(-4.2, -0.5))
+	_climb(TOWER, Vector2(-4.2, -0.5))
 	_climb(Vector2(Village.SHAFT.x - 0.05, Village.SHAFT.x + 0.03), Vector2(-1.5, 0.0))
 	_climb(Vector2(Village.CANAL.y - 0.03, Village.CANAL.y + 0.05), Vector2(FLOOR, 0.0))
 	# Crates stacked under the end of Market Street: a way back up.
@@ -146,6 +151,43 @@ func _climb(span: Vector2, heights: Vector2) -> void:
 
 
 # --- How it looks -----------------------------------------------------------------
+
+## The old timber tower beside the river's west bank: four weathered posts
+## standing on the boardwalk, boards nailed across its face, an X brace, a
+## cap. It is solid and climbable (before, only its collision was there: an
+## invisible wall).
+func _build_tower() -> void:
+	var b := PaperMesh.new(_rng.randi())
+	b.shade_jitter = 0.18
+	var bottom := -4.2
+	var top := -0.5
+	b.color = PaperMesh.TIMBER
+	for px: float in [TOWER.x + 0.07, TOWER.y - 0.07]:
+		for pz: float in [0.9, -0.9]:
+			b.box(Vector3(px, (bottom + top) * 0.5, pz), Vector3(0.14, top - bottom, 0.14))
+	# Boards across the front and back, uneven, a few missing.
+	var y := bottom + 0.25
+	while y < top - 0.1:
+		for pz: float in [0.98, -0.98]:
+			if _rng.randf() < 0.85:
+				b.color = Scenery.WOOD.darkened(_rng.randf_range(0.15, 0.4))
+				b.box(Vector3((TOWER.x + TOWER.y) * 0.5 + _rng.randf_range(-0.02, 0.02), y, pz),
+						Vector3(TOWER.y - TOWER.x + 0.1, 0.12, 0.04))
+		y += _rng.randf_range(0.42, 0.55)
+	# The sides, planked full height so it reads as solid from the side.
+	b.color = Scenery.WOOD.darkened(0.45)
+	for px: float in [TOWER.x + 0.02, TOWER.y - 0.02]:
+		b.box(Vector3(px, (bottom + top) * 0.5, 0.0), Vector3(0.04, top - bottom - 0.1, 1.8))
+	# A cap of boards and a few nails' rust streaks.
+	b.color = PaperMesh.TIMBER.lightened(0.05)
+	b.box(Vector3((TOWER.x + TOWER.y) * 0.5, top + 0.05, 0.0), Vector3(TOWER.y - TOWER.x + 0.3, 0.1, 2.1))
+	b.color = Color(0.2, 0.12, 0.08)
+	for k in 5:
+		var sx := _rng.randf_range(TOWER.x + 0.1, TOWER.y - 0.1)
+		var sy := _rng.randf_range(bottom + 0.4, top - 0.4)
+		b.stroke(Vector2(sx, sy), Vector2(sx + 0.01, sy - _rng.randf_range(0.15, 0.3)), 0.025, 0.005, 1.01)
+	add_child(b.build())
+
 
 const STONE := Color(0.13, 0.14, 0.21)
 const STONE_JOINT := Color(0.06, 0.065, 0.11)
@@ -407,7 +449,8 @@ func _build_water() -> void:
 func _build_front() -> void:
 	var b := PaperMesh.new(_rng.randi())
 	b.shade_jitter = 0.04
-	for span: Array in [[Village.CHAMBER.x, Village.CANAL.x, Village.PIPE_FLOOR], [Village.CANAL.x, Village.CANAL.y, Village.CANAL_WATER - 0.04]]:
+	for span: Array in [[Village.CHAMBER.x, Village.CANAL.x, Village.PIPE_FLOOR], [Village.CANAL.x, DEEP.x, Village.CANAL_WATER - 0.04],
+			[DEEP.y, Village.CANAL.y, Village.CANAL_WATER - 0.04], [DEEP.x, DEEP.y, DEEP_BOTTOM]]:
 		var left: float = span[0]
 		var right: float = span[1]
 		var top: float = span[2]
@@ -427,6 +470,7 @@ func _build_front() -> void:
 	var cut := b.build()
 	cut.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(cut)
+	_build_deep_shaft()
 	# Dark foreground below, framing the bottom of the view underground.
 	var near := PaperMesh.new(_rng.randi())
 	near.shade_jitter = 0.0
@@ -449,31 +493,72 @@ func _build_front() -> void:
 	add_child(dark)
 
 
+## The deep water seen in the cut-away: where the canal's floor falls away,
+## the cut front of the ground breaks off (its torn edges on either side),
+## and the water below the surface fades quickly into black: a pit, not one
+## more puddle. (A first try with stone walls inside it, a pale waterline and
+## bubbles was "too much": Julian.)
+func _build_deep_shaft() -> void:
+	var w := PaperMesh.new(3)
+	w.shade_jitter = 0.0
+	w.texture_scale = 0.0
+	var dark := Color(0.0, 0.0, 0.015)
+	w.fade_quad(Vector3(DEEP.x, Village.CANAL_WATER, FRONT_Z - 0.02), Vector3(DEEP.y, Village.CANAL_WATER, FRONT_Z - 0.02),
+			Vector3(DEEP.y, Village.CANAL_WATER - 1.6, FRONT_Z - 0.02), Vector3(DEEP.x, Village.CANAL_WATER - 1.6, FRONT_Z - 0.02),
+			Color(0.02, 0.035, 0.08, 0.72), Color(dark.r, dark.g, dark.b, 1.0))
+	w.fade_quad(Vector3(DEEP.x, Village.CANAL_WATER - 1.6, FRONT_Z - 0.02), Vector3(DEEP.y, Village.CANAL_WATER - 1.6, FRONT_Z - 0.02),
+			Vector3(DEEP.y, DEEP_BOTTOM - 0.5, FRONT_Z - 0.02), Vector3(DEEP.x, DEEP_BOTTOM - 0.5, FRONT_Z - 0.02),
+			Color(dark.r, dark.g, dark.b, 1.0), Color(dark.r, dark.g, dark.b, 1.0))
+	var water := w.build_veil()
+	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(water)
+
+
 ## The drain pipe: a low brick-lined culvert, with the collapsed stretch
 ## (the crawlspace) where the roof has slumped in a heap of stones and a
 ## broken beam.
 func _build_pipe_details() -> void:
 	var b := PaperMesh.new(_rng.randi())
 	b.shade_jitter = 0.18
-	# The slumped roof of the crawlspace: a ragged mass of stones hanging down.
-	b.color = STONE
-	b.box(Vector3((CRAWL.x + CRAWL.y) * 0.5, (CRAWL_TOP + Village.PIPE_TOP) * 0.5, (BACK_Z + FRONT_Z) * 0.5),
-			Vector3(CRAWL.y - CRAWL.x, Village.PIPE_TOP - CRAWL_TOP, FRONT_Z - BACK_Z))
+	# The slumped roof of the crawlspace: the vault's stones have dropped
+	# out of place and hang in a heap, each block its own, jutting and
+	# tilted, lowest in the middle (where he must crawl) and tapering up
+	# into the pipe's roof at both ends.
+	var reach := 0.9
+	var y := Village.PIPE_TOP
+	var row := 0
+	while y > CRAWL_TOP + 0.02:
+		var y0 := maxf(y - _rng.randf_range(0.22, 0.3), CRAWL_TOP)
+		var x := CRAWL.x - reach
+		if row % 2 == 1:
+			x += _rng.randf_range(0.1, 0.25)
+		while x < CRAWL.y + reach:
+			var x1 := minf(x + _rng.randf_range(0.32, 0.55), CRAWL.y + reach)
+			var mid := (x + x1) * 0.5
+			# How far down the heap reaches here.
+			var low := CRAWL_TOP
+			if mid < CRAWL.x:
+				low = lerpf(CRAWL_TOP, Village.PIPE_TOP, (CRAWL.x - mid) / reach)
+			elif mid > CRAWL.y:
+				low = lerpf(CRAWL_TOP, Village.PIPE_TOP, (mid - CRAWL.y) / reach)
+			if y0 >= low - 0.05 or y > low + 0.12:
+				var bottom := maxf(y0, low)
+				b.color = STONE.lerp(STONE.lightened(0.2), _rng.randf()).darkened(_rng.randf_range(0.0, 0.25))
+				var jut := _rng.randf_range(-0.12, 0.1)
+				b.box(Vector3(mid, (y + bottom) * 0.5 + _rng.randf_range(-0.03, 0.03), (BACK_Z + FRONT_Z + jut) * 0.5),
+						Vector3(x1 - x - 0.04, y - bottom - 0.03, FRONT_Z - BACK_Z + jut))
+			x = x1
+		y = y0
+		row += 1
+	# Grit and earth trickled down between the stones, a dark seam behind.
+	b.color = Color(0.06, 0.065, 0.1)
+	b.box(Vector3((CRAWL.x + CRAWL.y) * 0.5, (CRAWL_TOP + Village.PIPE_TOP) * 0.5 + 0.05, (BACK_Z + FRONT_Z) * 0.5 - 0.05),
+			Vector3(CRAWL.y - CRAWL.x - 0.1, Village.PIPE_TOP - CRAWL_TOP - 0.1, FRONT_Z - BACK_Z - 0.2))
 	for k in 9:
 		b.color = STONE * _rng.randf_range(0.8, 1.3)
 		var sx := _rng.randf_range(CRAWL.x - 0.2, CRAWL.y + 0.2)
-		b.box(Vector3(sx, CRAWL_TOP + _rng.randf_range(-0.04, 0.1), _rng.randf_range(-1.5, 1.2)),
-				Vector3(_rng.randf_range(0.3, 0.6), _rng.randf_range(0.15, 0.3), _rng.randf_range(0.3, 0.6)))
-	# Its front face: rough stones and earth.
-	var face := PackedVector2Array()
-	face.append(Vector2(CRAWL.x - 0.3, Village.PIPE_TOP))
-	face.append(Vector2(CRAWL.y + 0.3, Village.PIPE_TOP))
-	var fx := CRAWL.y + 0.2
-	while fx > CRAWL.x - 0.2:
-		face.append(Vector2(fx, CRAWL_TOP + _rng.randf_range(-0.12, 0.05)))
-		fx -= _rng.randf_range(0.25, 0.5)
-	b.color = Color(0.11, 0.115, 0.18)
-	b.torn_sheet(face, FRONT_Z + 0.04, Color(0.26, 0.28, 0.4), 0.025)
+		b.box(Vector3(sx, CRAWL_TOP + _rng.randf_range(-0.04, 0.08), _rng.randf_range(-1.5, 1.2)),
+				Vector3(_rng.randf_range(0.25, 0.45), _rng.randf_range(0.12, 0.22), _rng.randf_range(0.3, 0.6)))
 	# A broken roof beam, fallen at a slant across the heap.
 	b.color = PaperMesh.TIMBER
 	b.extrude(PackedVector2Array([Vector2(CRAWL.x - 0.6, CRAWL_TOP - 0.02), Vector2(CRAWL.x - 0.45, CRAWL_TOP - 0.1),
@@ -582,16 +667,17 @@ func open_grate(at_once: bool = false) -> void:
 		_grate_solid.queue_free()
 		_grate_solid = null
 	if at_once:
-		_grate.rotation.z = deg_to_rad(172.0)
-		_grate.position.y = 0.06
+		_grate.rotation.z = PI
+		_grate.position.y = 0.0
 		return
 	_grit(Vector3(Village.GRATE_X, -0.35, 0.0), 26)
 	var flip := create_tween()
 	flip.tween_property(_grate, "rotation:z", deg_to_rad(120.0), 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	flip.tween_property(_grate, "rotation:z", deg_to_rad(176.0), 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	flip.parallel().tween_property(_grate, "position:y", 0.06, 0.3)
-	flip.tween_property(_grate, "rotation:z", deg_to_rad(170.0), 0.08)
-	flip.tween_property(_grate, "rotation:z", deg_to_rad(172.0), 0.12)
+	flip.tween_property(_grate, "rotation:z", PI, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	flip.parallel().tween_property(_grate, "position:y", 0.0, 0.3)
+	# (It lands flat on the stones beside the hole, with a small bounce.)
+	flip.tween_property(_grate, "rotation:z", PI - 0.06, 0.08)
+	flip.tween_property(_grate, "rotation:z", PI, 0.12)
 	flip.tween_callback(Sound.play.bind(self, &"grate_clank", -2.0))
 	shortcut_opened.emit(&"grate")
 

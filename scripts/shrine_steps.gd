@@ -100,12 +100,17 @@ func _build_lanterns() -> void:
 		village._build_stone_lantern(Vector3(x, village._street_height(x), -2.3), false)
 
 
+## The cherry's depth: in front of the houses' eaves (at -3.4 its trunk ran
+## up through a roof).
+const TREE_Z := -2.75
+
+
 func _build_tree() -> void:
 	var tree := Scenery.sakura_tree(_rng, 7.6, -0.6, 28, 0.42)
-	tree.position = Vector3(Village.STEPS.x + 4.4, village._street_height(Village.STEPS.x + 4.4), -3.4)
+	tree.position = Vector3(Village.STEPS.x + 4.4, village._street_height(Village.STEPS.x + 4.4), TREE_Z)
 	add_child(tree)
 	var crown: Vector2 = tree.get_meta(&"crown")
-	village._add_falling_petals(Vector2(tree.position.x + crown.x, tree.position.y + crown.y), -3.4)
+	village._add_falling_petals(Vector2(tree.position.x + crown.x, tree.position.y + crown.y), TREE_Z)
 	# Petals fallen on the steps.
 	var petals := PaperMesh.new(_rng.randi())
 	petals.texture_scale = 0.0
