@@ -28,15 +28,22 @@ const HOUSE_Z := -4.3
 ## The well he climbs out of after the prologue (main.gd, well_cutscene.gd).
 const WELL_X := -8.0
 const WELL_Z := -1.5
-const PIT_LEFT := 10.0
-const PIT_RIGHT := 13.0
+## The expanded village is built area by area (docs/village_map.png). Its
+## far end (the raised street, the climbing course, the torii and the
+## shrine courtyard) is shifted this far right to make room for the areas
+## before it; it grows as areas are added.
+const EAST := 44.0
+## The pit, for now at the end of Market Street: where the Fallen Street
+## (the way down into the canals) will be.
+const PIT_LEFT := 64.0
+const PIT_RIGHT := 67.0
 const PIT_BACK := -3.2
 ## The shrine courtyard past the torii, where the Kasa-obake waits: its left
 ## and right x. (The level's right end is its right side.)
-const ARENA := Vector2(47.0, 63.5)
+const ARENA := Vector2(47.0 + EAST, 63.5 + EAST)
 ## The torii at the courtyard's entrance (clear of the tall climbing wall,
 ## which used to hide its left side).
-const TORII_X := 46.0
+const TORII_X := 46.0 + EAST
 
 const STREET := Color(0.21, 0.225, 0.31)
 const STREET_JOINT := Color(0.08, 0.09, 0.17)
@@ -84,7 +91,7 @@ const MOSS := Color(0.3, 0.34, 0.18)
 @export_group("Layout")
 ## Change this to reshuffle the random details (torn edges, drips, tiles).
 @export var layout_seed := 7
-@export var enemy_positions: Array[Vector2] = [Vector2(19.0, 0.1), Vector2(24.5, 0.1), Vector2(37.0, 1.6)]
+@export var enemy_positions: Array[Vector2] = [Vector2(27.5, 0.1), Vector2(44.0, 0.1), Vector2(37.0 + EAST, 1.6)]
 
 var _rng := RandomNumberGenerator.new()
 ## The Hannya's shrine hall in the courtyard (built by _build_arena).
@@ -112,6 +119,13 @@ func _ready() -> void:
 	_build_props()
 	_build_climb_course()
 	_build_arena()
+	# The areas of the expanded village (docs/village_map.png).
+	var yard := PaperMakerYard.new()
+	yard.position = Vector3(1.0, 0.0, 0.0)
+	add_child(yard)
+	var market := MarketStreet.new()
+	market.village = self
+	add_child(market)
 	_build_foreground()
 	for spot: Vector2 in enemy_positions:
 		var husk: Node3D = HUSK_SCENE.instantiate()
@@ -151,7 +165,7 @@ func _process(_delta: float) -> void:
 
 ## Height of the street at a given x (ignoring the pit).
 func _street_height(x: float) -> float:
-	return 1.5 if x >= 30.0 else 0.0
+	return 1.5 if x >= 30.0 + EAST else 0.0
 
 
 # --- Light, fog and glow ----------------------------------------------------
@@ -194,13 +208,23 @@ func _build_light_and_air() -> void:
 func _build_houses() -> void:
 	# [x, width, wall height, window lit?, extras, which side the lantern hangs (-1, 0 = none, 1)]
 	var street := [
+		# Well Square, and the Paper-Maker's workshop (wide, low, lit).
 		[-13.0, 6.5, 4.3, true, ["noren", "brace"], 1],
 		[-4.5, 6.0, 5.2, true, ["round"], 1],
-		[3.5, 5.2, 4.0, false, ["brace", "awning"], 0],
-		[16.5, 6.5, 5.0, true, ["brace"], -1],
-		[24.5, 5.5, 4.2, true, ["awning"], 1],
-		[34.5, 6.5, 4.6, true, ["round", "noren"], 1],
-		[40.3, 4.4, 4.0, false, ["brace"], 0],
+		[5.6, 9.2, 4.4, true, ["awning", "brace", "sudare", "firewood"], 1],
+		# Market Street: shops, some with tea-house curtains.
+		[17.2, 5.6, 4.6, true, ["noren_indigo", "pots"], 1],
+		[23.4, 5.8, 5.0, false, ["brace", "awning", "shutters", "buckets"], 0],
+		[29.6, 5.4, 4.4, true, ["round", "umbrella"], -1],
+		[35.6, 6.0, 5.2, true, ["brace", "sudare", "pots", "firewood"], 1],
+		[42.0, 5.6, 4.6, false, ["awning", "shutters", "umbrella"], 0],
+		[48.2, 6.2, 5.0, true, ["round", "noren_indigo", "buckets"], 1],
+		[54.6, 5.4, 4.2, true, ["brace", "pots", "umbrella"], -1],
+		[60.6, 5.8, 4.8, false, ["awning", "firewood"], 1],
+		# By the pit, and the raised street.
+		[70.6, 5.2, 4.4, true, ["brace"], -1],
+		[34.5 + EAST, 6.5, 4.6, true, ["round", "noren"], 1],
+		[40.3 + EAST, 4.4, 4.0, false, ["brace"], 0],
 	]
 	for h: Array in street:
 		var x: float = h[0]
@@ -268,11 +292,8 @@ func _add_wet_shine(x: float, ground: float, strength: float) -> void:
 
 func _build_ground() -> void:
 	# [left edge, right edge, height of the top surface]
-	for g: Array in [[-17.0, PIT_LEFT, 0.0], [PIT_RIGHT, 30.0, 0.0], [30.0, ARENA.y + 0.5, 1.5]]:
+	for g: Array in [[-17.0, PIT_LEFT, 0.0], [PIT_RIGHT, 30.0 + EAST, 0.0], [30.0 + EAST, ARENA.y + 0.5, 1.5]]:
 		_build_ground_block(g[0], g[1], g[2])
-	# [centre x, top height, width]
-	for p: Array in [[4.5, 1.9, 3.0], [8.0, 3.6, 2.6], [16.5, 2.1, 3.6], [22.0, 3.9, 3.0]]:
-		_build_platform(p[0], p[1], p[2])
 	_build_pit()
 	# Invisible walls at both ends of the level.
 	for x: float in [-16.5, ARENA.y]:
@@ -486,7 +507,7 @@ func _build_platform(center_x: float, top: float, width: float) -> void:
 ## The first is raised on timber posts like a gatehouse, so you walk under it
 ## into the gap between the two; wall jumping zig-zags up the gap; the taller
 ## one has a lookout ledge on top.
-const CLIMB_WALLS := [[37.9, 39.2, 8.5, 2.5, true], [41.6, 42.7, 11.5, 0.0, false]]
+const CLIMB_WALLS := [[37.9 + EAST, 39.2 + EAST, 8.5, 2.5, true], [41.6 + EAST, 42.7 + EAST, 11.5, 0.0, false]]
 ## How far above a wall's top its little roof's ridge reaches. The solid part
 ## of the wall goes up this far too, so you stand ON the ridge, not in the tiles.
 const CLIMB_ROOF := 0.62
@@ -790,21 +811,19 @@ func _build_props() -> void:
 	add_child(well)
 	_hang_lantern(Vector3(-9.45, 2.75, WELL_Z + 0.15), 0.25, 0.8)
 
-	_build_shoji_screen(Vector3(27.4, 0.0, -2.2))  # clear of the step up at x 30
-
 	var gate := Scenery.torii(_rng, PaperMesh.VERMILION)
 	gate.position = Vector3(TORII_X, 1.5, -1.3)
 	add_child(gate)
 	_hang_lantern(Vector3(TORII_X, 4.75, -1.0), 0.2, 0.8)
 
 	var flag := Scenery.banner(_rng, 5.2)
-	flag.position = Vector3(31.95, 1.5, -2.4)
+	flag.position = Vector3(31.95 + EAST, 1.5, -2.4)
 	add_child(flag)
 
 	# Clutter along the street: [what, x, depth, size, turn]
-	for prop: Array in [["barrel", -1.2, -2.6, 1.0, 0.0], ["crate", -0.2, -2.9, 0.8, 0.3], ["barrel", 0.5, -2.3, 0.8, 0.0],
-			["crate", 20.6, -2.8, 0.9, -0.2], ["crate", 21.0, -2.75, 0.6, 0.5], ["barrel", 14.3, -2.5, 1.0, 0.0],
-			["barrel", 38.6, -2.6, 1.0, 0.0], ["crate", 39.4, -2.9, 0.8, 0.2]]:
+	for prop: Array in [["barrel", -1.2, -2.6, 1.0, 0.0], ["crate", -0.2, -2.9, 0.8, 0.3], ["barrel", 0.3, -2.3, 0.8, 0.0],
+			["crate", 38.6, -2.9, 0.9, -0.2], ["crate", 39.0, -2.85, 0.6, 0.5], ["barrel", 14.3, -2.5, 1.0, 0.0],
+			["barrel", 62.4, -2.5, 1.0, 0.0], ["barrel", 38.6 + EAST, -2.6, 1.0, 0.0], ["crate", 39.4 + EAST, -2.9, 0.8, 0.2]]:
 		var thing: Node3D = Scenery.barrel(_rng, prop[3]) if prop[0] == "barrel" else Scenery.crate(_rng, prop[3])
 		thing.position = Vector3(prop[1], _street_height(prop[1]), prop[2])
 		thing.rotation.y = prop[4]
@@ -813,7 +832,7 @@ func _build_props() -> void:
 		add_child(thing)
 
 	# Broken fences either side of the pit.
-	for f: Array in [[6.3, 3.4, -3.0], [13.3, 2.6, -3.0]]:
+	for f: Array in [[PIT_LEFT - 3.7, 3.4, -3.0], [PIT_RIGHT + 0.3, 2.6, -3.0]]:
 		var rails := Scenery.fence(_rng, f[1])
 		rails.position = Vector3(f[0], _street_height(f[0] + 0.1), f[2])
 		add_child(rails)
@@ -889,12 +908,12 @@ func _build_foreground() -> void:
 			[4.2, -0.32, Color(0.018, 0.02, 0.05), Color(0.07, 0.085, 0.17)]]:
 		var line := PackedVector2Array()
 		var x := -34.0
-		while x < 66.0:
-			var ground := lerpf(0.0, 1.5, smoothstep(33.5, 38.0, x))
+		while x < ARENA.y + 3.0:
+			var ground := lerpf(0.0, 1.5, smoothstep(33.5 + EAST, 38.0 + EAST, x))
 			line.append(Vector2(x, ground + layer[1] + _rng.randf_range(-0.16, 0.16)))
 			x += _rng.randf_range(0.8, 2.2)
 		var outline := PaperMesh.tear(line, 0.3, 0.05, _rng, false)
-		outline.append(Vector2(66.0, -14.0))
+		outline.append(Vector2(ARENA.y + 3.0, -14.0))
 		outline.append(Vector2(-34.0, -14.0))
 		near.color = layer[2]
 		near.torn_sheet(outline, layer[0], layer[3], 0.03)
@@ -902,8 +921,8 @@ func _build_foreground() -> void:
 	# Rocks and clumps of grass poking up from the dark.
 	near.color = Color(0.03, 0.035, 0.08)
 	var gx := -30.0
-	while gx < 62.0:
-		var ground := lerpf(0.0, 1.5, smoothstep(33.5, 38.0, gx))
+	while gx < ARENA.y - 1.0:
+		var ground := lerpf(0.0, 1.5, smoothstep(33.5 + EAST, 38.0 + EAST, gx))
 		if _rng.randf() < 0.3:
 			var rock := PackedVector2Array()
 			var wide := _rng.randf_range(0.7, 1.6)
@@ -937,7 +956,7 @@ func _build_foreground() -> void:
 	# Cherry trees. One stands in the foreground at the start, its trunk at
 	# the left of the view; the others stand on the street behind the Ronin.
 	# [x, depth, height, lean, blossoms left, how much of it is bare trunk]
-	for t: Array in [[-14.2, 2.6, 10.5, 0.9, 40, 0.56], [20.3, -2.0, 7.6, 0.8, 30, 0.42], [38.2, -2.0, 7.2, -0.7, 26, 0.42]]:
+	for t: Array in [[-14.2, 2.6, 10.5, 0.9, 40, 0.56], [13.4, -2.0, 7.6, 0.8, 30, 0.42], [38.2 + EAST, -2.0, 7.2, -0.7, 26, 0.42]]:
 		var x: float = t[0]
 		var tree := Scenery.sakura_tree(_rng, t[2], t[3], t[4], t[5])
 		tree.position = Vector3(x, (_street_height(x) if t[1] < 0.0 else -0.9), t[1])

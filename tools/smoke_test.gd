@@ -34,7 +34,7 @@ func _run(main: Node) -> void:
 	_check("the camera settles back to its level after a jump (%.3f m off)" % absf(camera.position.y - camera_before), absf(camera.position.y - camera_before) < 0.03)
 	# High up (on a platform, say), his middle is kept at or below the
 	# middle of the screen.
-	ronin.position = Vector3(8.0, 3.7, 0.0)
+	ronin.position = Vector3((MarketStreet.GALLERIES[0][0] + MarketStreet.GALLERIES[0][1]) * 0.5, 5.8, 0.0)
 	ronin.velocity = Vector3.ZERO
 	await _frames(90)
 	await process_frame
@@ -206,10 +206,69 @@ func _run(main: Node) -> void:
 	_check("wall jumps climb the wall (%.2f m higher)" % (ronin.position.y - start_y), ronin.position.y - start_y > 2.0)
 	ronin.set("_draw_safe", 0.0)
 
+	# Wall jumps: a tap springs off the ordinary distance; holding jump
+	# while sliding and letting go springs off further. (Off the tall wall's
+	# open right side: on its left the gatehouse wall is too close.)
+	var wall_right: float = walls[1][1]
+	var reach := []
+	for hold: int in [40, 3]:
+		ronin.set("_draw_safe", 30.0)
+		ronin.position = Vector3(wall_right + 0.6, 7.5, 0.0)
+		ronin.velocity = Vector3.ZERO
+		Input.action_press("move_left")
+		await _frames(30)
+		Input.action_release("move_left")
+		await _frames(4)
+		Input.action_press("jump")
+		await _frames(hold)
+		Input.action_release("jump")
+		var from_x := wall_right
+		await _frames(22)
+		reach.append(ronin.position.x - from_x)
+	_check("a held wall jump springs further than a tap (%.2f m held, %.2f m tapped)" % [reach[0], reach[1]],
+			reach[0] > reach[1] + 0.6)
+	_check("a tapped wall jump is the ordinary one (%.2f m)" % reach[1], reach[1] > 1.3 and reach[1] < 3.0)
+	ronin.set("_draw_safe", 0.0)
+
+	# A market stall's awning is solid from below: jumping up under it, he
+	# does not pass through onto its top.
+	var stall: MarketStall = main.get_node("Village").find_children("*", "MarketStall", true, false)[0]
+	ronin.position = Vector3(stall.global_position.x, 0.05, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(5)
+	Input.action_press("jump")
+	await _frames(30)
+	Input.action_release("jump")
+	_check("an awning cannot be jumped up through (%.2f m, awning %.2f m)" % [ronin.position.y, stall.top], ronin.position.y < stall.top - 0.5)
+	# Landing on it from a height throws him back up (a bounce).
+	ronin.position = Vector3(stall.global_position.x, stall.top + 3.0, 0.0)
+	ronin.velocity = Vector3.ZERO
+	var rise := -99.0
+	for f in 60:
+		await process_frame
+		rise = maxf(rise, ronin.velocity.y)
+	_check("landing on an awning from high up bounces him (%.1f m/s up)" % rise, rise > 8.0)
+
+	# Resting at the Paper-Maker's shrine: whole again, and a fall now brings
+	# him back to the shrine.
+	var shrine: RestShrine = main.get_node("Village").find_children("*", "RestShrine", true, false)[0]
+	ronin.health = ronin.max_health - 2
+	ronin.position = Vector3(shrine.global_position.x - 3.5, 0.1, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(10)
+	Input.action_press("move_right")
+	while ronin.global_position.x < shrine.global_position.x - 0.3:
+		await process_frame
+	Input.action_release("move_right")
+	await _frames(45)
+	var rest_spot: Vector3 = ronin.get("_spawn_position")
+	_check("resting at a shrine heals him (%d/%d)" % [ronin.health, ronin.max_health], ronin.health == ronin.max_health)
+	_check("and he will come back there (%.1f m from it)" % absf(rest_spot.x - shrine.global_position.x), absf(rest_spot.x - shrine.global_position.x) < 0.1)
+
 	# Falling in the pit: the screen fades and he is back at the start.
 	var spawn: Vector3 = ronin.get("_spawn_position")
 	before = ronin.health
-	ronin.position = Vector3(11.5, 1.0, 0.0)
+	ronin.position = Vector3((Village.PIT_LEFT + Village.PIT_RIGHT) * 0.5, 1.0, 0.0)
 	ronin.velocity = Vector3.ZERO
 	await _frames(150)
 	_check("a fall into the pit puts him back at the start (%.1f m away)" % ronin.position.distance_to(spawn), ronin.position.distance_to(spawn) < 1.0)
@@ -222,7 +281,7 @@ func _run(main: Node) -> void:
 	# holding jump skips it, and the fight begins.
 	ronin.set("_draw_safe", 0.0)
 	ronin.health = ronin.max_health
-	ronin.position = Vector3(47.9, 1.6, 0.0)
+	ronin.position = Vector3(Village.ARENA.x + 0.9, 1.6, 0.0)
 	ronin.velocity = Vector3.ZERO
 	await _frames(10)
 	Input.action_press("jump")
@@ -367,7 +426,7 @@ func _run(main: Node) -> void:
 		main.get_node("Village").set_arena_sealed(false)
 		var cam: Camera3D = main.get_node("Camera")
 		ronin.set("_draw_safe", 30.0)
-		ronin.position = Vector3(50.0, 1.6, 0.0)
+		ronin.position = Vector3(Village.ARENA.x + 3.0, 1.6, 0.0)
 		ronin.velocity = Vector3.ZERO
 		await _frames(90)
 		var biggest := 0.0

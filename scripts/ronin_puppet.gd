@@ -1543,7 +1543,7 @@ func _update_ready_cue(delta: float) -> void:
 	if ready and not _was_ready:
 		_glint_clock = 0.0
 		_ready_flash = 1.0
-		Sound.play(self, &"draw_ready")
+		Sound.play(self, &"draw_gleam")
 	_was_ready = ready
 	_ready_flash = maxf(_ready_flash - delta * 2.5, 0.0)
 	var breathe := 0.0

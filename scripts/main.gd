@@ -29,6 +29,10 @@ func _ready() -> void:
 	UiStyle.load_settings()
 	_apply_debug_start()
 	_camera.target = _ronin
+	# The climbing course and the courtyard's middle (the far end of the
+	# level moves as the village grows).
+	_camera.climb_zone = Vector2(Village.CLIMB_WALLS[0][0] - 0.7, Village.CLIMB_WALLS[1][1] + 1.9)
+	_camera.max_x = (Village.ARENA.x + Village.ARENA.y) * 0.5
 	_camera.snap_to_target()
 	_hud.watch(_ronin)
 	_ronin.slash_landed.connect(_camera.add_shake.bind(0.07))
@@ -121,10 +125,10 @@ func _warm_up() -> void:
 	var village: Village = $Village
 	var puppet: RoninPuppet = _ronin.get_node("Puppet")
 	var stops: Array[Vector3] = []
-	for x in range(-8, 58, 6):
+	for x in range(-8, int(Village.ARENA.y) - 5, 6):
 		stops.append(Vector3(x, 4.2, _camera.distance))
-	stops.append(Vector3(40.9, 9.0, _camera.distance))  # up the climbing walls
-	stops.append(Vector3(40.9, 13.0, _camera.distance))
+	stops.append(Vector3(Village.CLIMB_WALLS[1][0] - 0.7, 9.0, _camera.distance))  # up the climbing walls
+	stops.append(Vector3(Village.CLIMB_WALLS[1][0] - 0.7, 13.0, _camera.distance))
 	var total := stops.size() + 14
 	var done := 0
 	# 1. The level, from end to end.
@@ -134,8 +138,8 @@ func _warm_up() -> void:
 		done += 1
 		cover.progress = float(done) / total
 	# 2. Every effect, once, in front of the camera at the courtyard.
-	var here := Vector3(52.0, 1.5, 0.0)
-	_camera.global_position = Vector3(52.0, 4.2, _camera.distance)
+	var here := Vector3(Village.ARENA.x + 5.0, 1.5, 0.0)
+	_camera.global_position = Vector3(Village.ARENA.x + 5.0, 4.2, _camera.distance)
 	_ronin.global_position = here
 	var effects: Array[Callable] = [
 		func() -> void: puppet.play_slash(Vector2(1, 0)),

@@ -18,6 +18,8 @@ screen, but Begin there offers the downloads instead of starting.
 - The lore, in story order, and the chapter plan: `docs/lore.md` (parts
   marked "proposed" still wait for Julian). The game is built in story
   order: title, the well, the village, the Hannya, what comes after her.
+- **Now in progress: the expanded village** (`docs/village_map.png`, see
+  "The expanded village" below).
 - What it looks like: `docs/screenshots/` (frame sheets of every move)
 
 **Before changing anything, read "Working with Julian" and "What Julian
@@ -25,8 +27,10 @@ likes".** They were learned the slow way and save rounds of rework.
 
 ## Where the game stands (2026-11-21)
 
-One level, Kamiyama Village at night in the rain, from the well to a shrine
-courtyard, with:
+Title screen (Julian's looping video), a 45 s pop-up-book prologue, the
+cutscene of him leaping out of the well, a tutorial, then one level:
+Kamiyama Village at night in the rain, about 75 m from the well to the
+shrine courtyard, with:
 - the Blank Ronin: run, jump, dash, wall slide and wall jump, duck, a 4-way
   iaijutsu cut with pogo, parry (gold) and block, the charged iaijutsu draw,
   healing with ink, ink marks that build up on his paper, shredding death;
@@ -34,13 +38,14 @@ courtyard, with:
 - a climbing course, a pit, wind, rain, sound and music;
 - the first boss, **the Weeping Hannya**, with a 40-second shadow-puppet
   cutscene and a full fight.
+Pause, settings and controls pages share one UI style. Downloads for
+Windows and Mac carry Julian's icon.
 
-Since then: a title screen on Julian's looping video, a pause screen, and
-settings and controls pages, in one UI style.
-
-Not built yet (the likely next steps): the opening in the well, an ending
-after the Hannya, saving (and shrines to save at), the Smudge on death, the
-Bamboo of Folded Wind region and the Crane Glide, a map. See Milestones.
+**Next (Julian chose it, 2026-11-21): expand the village** from a
+prototype-sized street into a real first region, about 230 m on three
+layers, built to feel alive. The plan is `docs/village_map.png`; the rules
+are in "The expanded village". After that: an ending after the Hannya, the
+Smudge on death, the Bamboo of Folded Wind and the Crane Glide.
 
 ## Working with Julian
 
@@ -111,6 +116,22 @@ Bamboo of Folded Wind region and the Crane Glide, a map. See Milestones.
   Menus must look like a finished game's: crisp text, soft shading, no hard
   boxes or stripes.
 
+**Alive (Julian, 2026-11-21: the most important rule for building
+the game)**
+- Everything must feel real, natural and alive. Nothing is static set
+  dressing if it could plausibly move or answer him: lanterns and banners
+  sway, awnings and planks give under his weight, water runs and splashes,
+  birds scatter, shutters close as he passes, petals stir when he dashes.
+- Every new thing gets its small touches: a reaction when he touches it,
+  a sound, an idle motion, an anticipation before it acts, a settle after.
+- Movement gets quality-of-life care (Hollow Knight standard): coyote time
+  and jump buffering already exist (`coyote_time`, `jump_buffer_time`,
+  `wall_coyote`); add the rest as levels need them: ledge forgiveness
+  (nudging round a corner he just clips), camera look-ahead, quick returns
+  to the last shrine, clear tells before anything that hurts.
+- Small animation features count as much as big ones: a turn, a skid on
+  a sharp stop, a look up at a high ledge, shaking water off.
+
 **Motion**
 - Natural, never mechanical. Rejected: a fast small jitter, a slow pendulum,
   swaying stepped at 12 fps. Wind motion is smooth (every frame), wide, at a
@@ -127,6 +148,13 @@ Bamboo of Folded Wind region and the Crane Glide, a map. See Milestones.
   ("they don't look samurai at all"); all movement is posed by hand.
 - Wall slide: his BACK to the wall, feet braced behind him flat on it, one
   hand pressed back on it. (Facing the wall was rejected.)
+- Charged wall jump: while sliding down a wall, HOLD Space: he braces
+  (slides at `wall_charge_slide` 0.5 speed); LET GO and he springs off
+  further, more the longer he held (full after `wall_charge_time` 0.45 s,
+  `wall_jump_charged_push` 9.5 against the ordinary `wall_jump_push` 7.5:
+  2.65 m out against 1.7 m). A tap (let go within `wall_tap_time` 0.12 s) is
+  the ordinary jump. Pushing into the wall, a jump goes at once (climbing).
+  Rejected: holding Space AFTER the jump to be carried further ("wrong").
 - Walking into a scene: he creeps on tiptoe with short steps (big run steps
   at a walking speed were rejected).
 
@@ -144,7 +172,11 @@ Bamboo of Folded Wind region and the Crane Glide, a map. See Milestones.
 - Real-sounding, generated with ElevenLabs. The cut is ONE airy whoosh (no
   metallic draw, no second variant, no sheathing click). A hit sounds like
   scissors through paper. Cues that must be heard are bells, not sword
-  clicks (the draw's "ready" chime is a small temple bell).
+  clicks. Each cue its own sound (Julian: the draw's ready bell was "the
+  same sound for many other things"): the draw's ready cue is now a bright
+  airy shimmer (`draw_gleam`); resting at a shrine a warm singing bowl
+  (`shrine_rest`); the small temple bell (`draw_ready`) is for menus and
+  the tutorial's seal.
 - A sound that "pops" is wrong. Check every new sound by measurement.
 
 **Specific settings he has judged** (do not change without being asked)
@@ -160,7 +192,7 @@ Bamboo of Folded Wind region and the Crane Glide, a map. See Milestones.
 A single screenshot cannot show motion, and sound cannot be heard. Use these,
 and always say plainly what was checked this way and what only he can judge.
 
-- **The automated check** (`tools/smoke_test.gd`, 52 checks): movement,
+- **The automated check** (`tools/smoke_test.gd`, about 60 checks): movement,
   combat, walls, pit, death, husks and the whole Hannya fight. Must print
   ALL PASSED after every change. It proves rules work, nothing about looks.
   When fixing a bug, add a check that fails without the fix (and, when in
@@ -452,6 +484,103 @@ There is no controls line along the bottom of the game screen any more
   ripples, a landing splash) and Julian had it all undone: "I liked the
   ground before better". Leave the ground as it is.
 
+### The expanded village (planned, `docs/village_map.png`)
+Drawn by `tools/village_map.py` (Python + Pillow: edit its lists, re-run).
+Julian has seen this plan; build it area by area, with screenshots and
+frame sheets as each one comes together. About 230 m (today: 75 m), on
+three layers joined in several places, so there is more than one way
+through:
+- **Areas, left to right:** 1 Well Square (the start, the Paper-Maker's
+  workshop and the first shrine); 2 Market Street (stalls with paper
+  awnings that sag and bounce, lantern strings to pogo up to the roofs,
+  swinging shop signs, a shoji wall to cut through to a back room);
+  3 Fallen Street (the street has fallen into the canals: soggy planks that
+  give way; the old pit becomes this way DOWN instead of a death); 4 River
+  and Red Bridge (the bridge's middle has fallen: jump and dash; gusts over
+  the water); 5 Gatehouse (today's climbing course, moved here; a shrine in
+  the river warehouse); 6 Shrine Steps (stone lanterns, the shrine before
+  the boss); 7 Shrine Courtyard (the Hannya).
+- **The Rooftop Road** over areas 2 to 4: ridges, a ruined house to drop
+  through, paper birds; a gap too wide to jump is the first Crane Glide
+  gate.
+- **The Canals** under areas 3 and 4: walkways over water, sluices of
+  falling water that press him down (water weighs him down, from the
+  lore), paper dogs, a crawlspace, deep water (falling in = back to the
+  last shrine), a climb out by the gatehouse; a drain pipe back west whose
+  grate opens into Well Square (a shortcut).
+- **Shortcuts, opened from the far side:** a ladder kicked down from the
+  roofs into Market Street; the drain grate; the gatehouse gate unbarred.
+- **Opens later:** the rooftop gap and the castle road from the lookout
+  (Crane Glide); the road to the Bamboo past the courtyard (after the
+  Hannya).
+- **Shrines** (save, heal, return here when you fall): the Paper-Maker's
+  door, the river warehouse, the foot of the shrine steps.
+- **Paper cranes** hidden in bundles (rooftops, back rooms, canals, the
+  lookout): the first of the 1,000 for the true ending.
+- **New enemies:** the paper dog (inu-hariko, fast and low), paper birds
+  (also something to pogo off), the lantern husk (throws burning paper).
+- No browser speed limit any more (the game is not played on the web), but
+  keep the desktop smooth: build long things in short lengths (the
+  8-lights-per-mesh limit still applies).
+
+**Built so far (2026-11-21): areas 1 and 2.** The far end of the level
+(raised street, climbing course, torii, courtyard, the Hannya) is shifted
+right by `Village.EAST` (44 m now; it grows as areas go in between, and
+everything that used fixed positions there follows it: camera, cutscene,
+smoke test). The pit sits at the end of Market Street (`PIT_LEFT` 64) until
+the Fallen Street replaces it.
+- **Well Square:** the Paper-Maker's workshop (`paper_maker_yard.gd`):
+  sheets drying on two lines (each sways on its own), the vat with its
+  mould frame, a drying board, paper bundles; the first **RestShrine**
+  (`rest_shrine.gd`) at her door.
+- **RestShrine:** a small hokora with faded vermilion posts and paper
+  streamers. Walk up and stand a moment: he rests (health full, the candle
+  lights with a flare, the streamers flutter, `shrine_rest` sound) and falls
+  and deaths now bring him back there (`Ronin.set_checkpoint`). Being put
+  there by a respawn is not resting (else a fall would cost nothing).
+- **Market Street** (`market_street.gd`; edit its lists to move things):
+  - **MarketStall** (`market_stall.gd`): each has a trade, `kind`:
+    "produce" (baskets, radishes, dried persimmons on strings), "noodles"
+    (pot, bowls, a lantern, STEAM), "fish" (tray, tub, dried fish swinging).
+    The awning is SOLID (Julian: jumping up through it from below was
+    no-clipping); awnings sit at 2.2 to 2.3 m, under his 2.5 m jump, so he
+    hops onto them from the side. Landing sags them; landing from high
+    (falling over `bounce_from` 7 m/s) throws him up (`bounce_speed` 16.5).
+    The front fringe is separate tassels, each swaying on its own (one strip
+    turning as a whole see-sawed: Julian).
+  - **Galleries** (`_build_gallery`): an upper storey on posts you walk
+    under, dark boards, a band of lit shoji (one slid open, one torn), a
+    balcony rail, a walkable tiled roof, climbable walls. Each has its own
+    balcony: "laundry" (a real kimono shape: hung through its sleeves on a
+    bamboo pole, seigaiha waves, overlap, collar; a towel) or "garden"
+    (potted plants, a half-lowered bamboo blind). A plain cloth there was
+    "way too basic".
+  - **LanternString** (`lantern_string.gd`): lanterns between the two
+    gallery roofs (tied to short posts on the roofs; tall poles went through
+    the roofs). Cut down onto them in the air to pogo across.
+  - **HangingSign** (`hanging_sign.gd`): from the shops' porch beams (posts
+    in the street crossed windows), each with its own mark (`mark`: ring,
+    character, sake gourd); swings when cut or brushed.
+  - **SecretRoom** (`secret_room.gd`): a storehouse (namako tiled base,
+    plaster, small barred window). A lit shoji door at the front's left
+    end: two cuts tear it open; inside, the front wall fades; a lantern and
+    a bundle of cranes on the shelf (collecting them is not built yet).
+    The beams stop at the door's frame (a beam across it was a fault).
+- **PropTarget** (`prop_target.gd`): anything in the scenery the sword can
+  strike (lanterns, signs, the shoji door). It is on the enemies' layer so
+  the cut finds it; the cut bounces and recoils as usual but gives NO ink
+  (`Ronin._on_slash_connected(…, inky)`).
+- **Houses have personality** (`Scenery.house` extras, each put at its own
+  spot along the front, never two alike): "sudare", "pots", "umbrella",
+  "firewood", "shutters", "buckets", and "noren_indigo" (an indigo shop
+  curtain with a snake's-eye crest; 茶 on every shop was too repetitive).
+  Torn-paper holes are never cut over a window any more.
+- **Roof back slopes** (`Scenery.tiled_roof`): their tiles used to face
+  DOWN, so a low roof seen from above showed a bare blue board. Fixed for
+  every roof.
+- Not built yet in Market Street: the ladder shortcut from the roofs, the
+  paper birds, collecting cranes.
+
 ### Skipping cutscenes
 - `skip_prompt.gd` (`SkipPrompt`, drawn by `UiStyle.skip_prompt`) in all
   three cutscenes: top right (clear of the lines at the bottom), a key cap
@@ -652,6 +781,7 @@ There is no controls line along the bottom of the game screen any more
 | `tools/frame_sheet.gd` | Frame sheets |
 | `tools/setup_input.gd` | Writes the controls into `project.godot` |
 | `tools/render_lettering.gd` | Renders brush lettering into `textures/` |
+| `tools/village_map.py` | Draws the expanded village plan (`docs/village_map.png`) |
 | `tools/model_look.gd` | Photographs an unrigged model from three sides |
 | `tools/make_title_video.gd` | Turns frames into the title video (`video/title_loop.ogv`) |
 | `scripts/title_screen.gd`, `title_menu.gd`, `pause_menu.gd`, `ink_menu.gd`, `ui_style.gd` | Title screen, pause screen, the shared menu and UI style |
@@ -700,7 +830,8 @@ frame sheet when the change can be seen.
       iaijutsu draw with the parry-then-draw combo.
 - [x] **Movement:** wall slide and wall jump, climbing course, duck, pit fade.
 - [x] **M4 First boss:** the Weeping Hannya, her cutscene and fight.
-- [x] **Online:** web page with a loading warm-up; Windows and Mac downloads.
+- [x] **Online:** Windows and Mac downloads; the web page shows the title
+      and offers them.
 - [ ] **M3 Ink:** ink marks (first version done; not saved), Refold heal
       polish, the Smudge on death, shrines.
 - [x] **Title and pause:** title screen on Julian's looping video, pause
@@ -709,8 +840,11 @@ frame sheet when the change can be seen.
       own music, ending in the well (2026-11-21; not yet watched by Julian)
 - [x] **The well:** a cutscene of him jumping out of it, seen from the
       street, the camera gliding into the game view
-- [ ] **Finish the slice:** the Paper-Maker, an ending after the Hannya,
-      saving at shrines.
+- [x] **Tutorial, icon, download page** (2026-11-21)
+- [ ] **The expanded village** (in progress): three layers, seven areas,
+      shrines and saving, the Paper-Maker, new enemies, shortcuts, cranes;
+      everything alive. Plan: `docs/village_map.png`.
+- [ ] **Finish the slice:** an ending after the Hannya.
 - [ ] **M5:** the Bamboo of Folded Wind region and the Crane Glide.
 - [ ] **M6:** vertical slice polish: audio balance, map.
 
@@ -731,3 +865,7 @@ frame sheet when the change can be seen.
 - Nothing is saved between sessions (ink marks reset).
 - The husk's model has no wind cloth.
 - `docs/design.md` still names the Kasa-obake as the first boss.
+- The check "the husk shoves when touching hurts him" fails now and then
+  (it looks at the husk at one instant); run again before suspecting it.
+- One foreground rock near the climbing course cannot be filled (a warning
+  in the log, "could not triangulate"): that rock is simply missing.

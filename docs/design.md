@@ -165,7 +165,7 @@ Each ability is an origami fold you learn.
 
 | # | Region | Mood | Notes |
 | --- | --- | --- | --- |
-| 1 | **Kamiyama Village** (hub) | Crumpled rooftops, steady drizzle | A few surviving villagers and the well you woke in. The Rain is heaviest here. |
+| 1 | **Kamiyama Village** (hub) | Crumpled rooftops, steady drizzle | A few surviving villagers and the well you woke in. The Rain is heaviest here. Three layers: the Rooftop Road, the street (Well Square, Market Street, Fallen Street, River and Red Bridge, Gatehouse, Shrine Steps, Shrine Courtyard) and the Canals beneath. Plan: `docs/village_map.png`. |
 | 2 | **Bamboo of Folded Wind** | Calm, airy, dangerous | Towering green paper strips that sway. Crane Glide is learned here. |
 | 3 | **The Lantern Market** | Warm and colorful | An underground night market glowing with *chōchin* lanterns. Home of Hōshō, the Gilded General. |
 | 4 | **Sumi Marsh** | Oppressive and dark | Bled ink pools into black swamps. Home of Shimeri, the Sodden General. Wax Coat is essential. |
@@ -177,6 +177,8 @@ Each ability is an origami fold you learn.
 | 10 | **Shiro, the Paper Castle** | Grand, flooding | The final ascent. The higher you climb, the louder the weeping. |
 
 Each region gets one dominant tone, with vermilion reserved for things that matter.
+
+**Every region must feel alive** (Julian): things sway, give under the Ronin's weight, splash, scatter and react as he passes. Movement has quality-of-life care in the Hollow Knight tradition: forgiving jumps, clear tells, quick returns to the last shrine.
 
 ## Bosses: Paper Yōkai
 
@@ -224,8 +226,8 @@ Hollow Knight took a team of three people years to make, so start small. The fir
 - [ ] Kamiyama Village and the well
 - [ ] Bamboo of Folded Wind
 - [ ] Crane Glide ability
-- [ ] Parry, slash and iaijutsu draw
-- [ ] First version of the ink-marking system on the Ronin
-- [ ] Kasa-obake boss fight
+- [x] Parry, slash and iaijutsu draw
+- [x] First version of the ink-marking system on the Ronin
+- [x] First boss fight (the Weeping Hannya, replacing the Kasa-obake)
 
 If that slice feels good, everything else is just more of it.

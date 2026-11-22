@@ -143,7 +143,12 @@ starts, and where he must go.
    the village's old creases have been relaxing for a hundred years. She is
    the first to notice when ink starts to mark him.
 3. **The village.** Husks in the street. He learns to cut, parry, draw and
-   heal, climbs the gatehouse walls, and reaches the torii.
+   heal, climbs the gatehouse walls, and reaches the torii. The village is
+   being expanded (`docs/village_map.png`): the market street, the rooftops,
+   the flooded canals under the fallen street, the river and its red bridge,
+   then the shrine steps. Villagers hide behind their shutters; paper dogs
+   run the canals. Shrines along the way are where he rests (the first at
+   the Paper-Maker's door).
 4. **The Weeping Hannya.** Her shadow on the shoji, the paper rips, the
    fight.
 5. **After her (proposed).** Her mask cracks and falls. For a moment Shizu's

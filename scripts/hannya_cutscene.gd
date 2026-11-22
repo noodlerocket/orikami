@@ -24,8 +24,8 @@ signal finished
 
 const LENGTH := 40.0
 ## Where the Ronin starts creeping in, and where he stops, facing the shrine.
-const SNEAK_FROM := 45.0
-const RONIN_STOP := 48.6
+const SNEAK_FROM := Village.ARENA.x - 2.0
+const RONIN_STOP := Village.ARENA.x + 1.6
 ## His creeping pace: strides (two short steps) a second. Each step is about
 ## a third of a metre.
 const SNEAK_STRIDES := 1.15
@@ -118,8 +118,9 @@ func _plan_shots() -> void:
 	var g := _origin.y
 	# 1. Low on the wet stones by the torii as his sandals pass, craning up and
 	#    back to show the courtyard ahead.
-	_shot(0.0, 5.0, Vector3(45.0, g + 0.35, 2.2), Vector3(47.2, g + 2.4, 7.5),
-			Vector3(46.2, g + 0.45, 0.0), Vector3(51.0, g + 1.6, -1.0), Vector2(38, 46), Vector2(2, 0), 0.015, 0.8)
+	var a := Village.ARENA.x
+	_shot(0.0, 5.0, Vector3(a - 2.0, g + 0.35, 2.2), Vector3(a + 0.2, g + 2.4, 7.5),
+			Vector3(a - 0.8, g + 0.45, 0.0), Vector3(a + 4.0, g + 1.6, -1.0), Vector2(38, 46), Vector2(2, 0), 0.015, 0.8)
 	# 2. Wide on the courtyard, pushing gently in as the lanterns go out.
 	_shot(5.0, 10.0, _at(-1.6, 2.6, 13.5), _at(-0.8, 2.5, 11.5), _at(-0.5, 2.0, -0.5), _at(0.0, 2.1, -0.5),
 			Vector2(46, 44), Vector2.ZERO, 0.01)

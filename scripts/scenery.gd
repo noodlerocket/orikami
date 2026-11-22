@@ -172,6 +172,8 @@ static func tiled_roof(rng: RandomNumberGenerator, left: float, right: float, ea
 	var slope := Vector3(0.0, ridge.x - eave.x, ridge.y - eave.y)
 	var along := slope.normalized()
 	var up := Vector3(0.0, -along.z, along.y)
+	if up.y < 0.0:
+		up = -up  # (a back slope: its tiles must face up too, or from above it shows a bare board)
 	for r in rows:
 		var low := start + slope * (float(r) / rows) + up * 0.075
 		var high := start + slope * minf(float(r + 1) / rows + 0.05, 1.0)
@@ -217,7 +219,13 @@ static func tiled_roof(rng: RandomNumberGenerator, left: float, right: float, ea
 
 ## One street house, origin on the ground at the middle of its front wall.
 ## `extras` can contain: "round" (a round window), "noren" (a tea-house
-## banner), "brace" (a diagonal timber), "awning" (a small lower roof).
+## banner), "noren_indigo" (a dyed curtain with a crest), "brace" (a diagonal
+## timber), "awning" (a small lower roof), and lived-in details, each put in
+## its own place along the front: "sudare" (a bamboo blind half down over the
+## window), "pots" (potted plants by the wall), "umbrella" (a closed paper
+## umbrella leaning on the wall), "firewood" (a stack of split logs),
+## "shutters" (the window closed with wooden storm shutters), "buckets"
+## (a pyramid of fire buckets with a water tub).
 ## The lit window's position is stored as the meta value "window".
 static func house(rng: RandomNumberGenerator, width: float, height: float, lit: bool, window_glow: float,
 		extras: Array = []) -> Node3D:
@@ -262,23 +270,21 @@ static func house(rng: RandomNumberGenerator, width: float, height: float, lit: 
 			var angle := TAU * k / 8.0
 			stain.append(c + Vector2(cos(angle) * 0.7, sin(angle) * 0.9) * rng.randf_range(0.5, 1.2))
 		paper.polygon(PaperMesh.tear(stain, 0.2, 0.05, rng), 0.05)
+	var holes: Array[PackedVector2Array] = []
 	for i in rng.randi_range(1, 2):
 		var hole := PackedVector2Array()
 		var c := Vector2(rng.randf_range(-half * 0.7, half * 0.7), rng.randf_range(height * 0.55, height * 0.85))
 		for k in 7:
 			var angle := TAU * k / 7.0
 			hole.append(c + Vector2(cos(angle) * 0.6, sin(angle) * 0.4) * rng.randf_range(0.5, 1.2))
-		paper.color = WALL_DARK.darkened(0.15)
-		paper.torn_sheet(PaperMesh.tear(hole, 0.16, 0.04, rng), 0.06, WALL_PAPER_RIM, 0.035)
+		holes.append(PaperMesh.tear(hole, 0.16, 0.04, rng))
 	# Ink running down the paper.
 	paper.color = INK_DRIP
 	for i in int(width * 1.6):
 		var from := Vector2(rng.randf_range(-half + 0.3, half - 0.3), rng.randf_range(height * 0.5, height - 0.1))
 		paper.stroke(from, from + Vector2(rng.randf_range(-0.03, 0.03), -rng.randf_range(0.5, 1.7)),
 				rng.randf_range(0.03, 0.07), 0.008, 0.07)
-	var paper_mesh := paper.build()
-	paper_mesh.cast_shadow = OFF
-	root.add_child(paper_mesh)
+	# (The holes are cut and the paper built once the window is placed: see 4.)
 
 	# 3. Timber frame, a little proud of the wall so it catches light.
 	var frame := PaperMesh.new(rng.randi())
@@ -302,6 +308,20 @@ static func house(rng: RandomNumberGenerator, width: float, height: float, lit: 
 	var window_at := Vector2(rng.randf_range(-half * 0.45, half * 0.2), beam_y + (height - beam_y) * 0.47)
 	var window_size := Vector2(minf(1.7, width * 0.34), minf(1.35, (height - beam_y) * 0.62))
 	var is_round := "round" in extras
+	# Now the holes: only those clear of the window (and its frame), and of
+	# the wall's corner posts.
+	var keep_clear := Rect2(window_at - window_size * 0.5 - Vector2(0.35, 0.3), window_size + Vector2(0.7, 0.6))
+	for hole: PackedVector2Array in holes:
+		var bounds := Rect2(hole[0], Vector2.ZERO)
+		for point: Vector2 in hole:
+			bounds = bounds.expand(point)
+		if bounds.intersects(keep_clear) or bounds.position.x < -half + 0.3 or bounds.end.x > half - 0.3:
+			continue
+		paper.color = WALL_DARK.darkened(0.15)
+		paper.torn_sheet(hole, 0.06, WALL_PAPER_RIM, 0.035)
+	var paper_mesh := paper.build()
+	paper_mesh.cast_shadow = OFF
+	root.add_child(paper_mesh)
 	var pane := PaperMesh.new(rng.randi())
 	pane.shade_jitter = 0.07
 	if is_round:
@@ -420,17 +440,115 @@ static func house(rng: RandomNumberGenerator, width: float, height: float, lit: 
 		var low_roof := tiled_roof(rng, -half * 0.2, half + 0.3, Vector2(beam_y - 0.2, 1.3),
 				Vector2(beam_y + 0.55, 0.15), 3, false)
 		root.add_child(low_roof)
-	if "noren" in extras:
-		var cloth := noren(rng, 1.25, 1.5)
+	_lived_in(root, rng, extras, half, height, beam_y, window_at, window_size, is_round)
+	if "noren" in extras or "noren_indigo" in extras:
+		var cloth := noren(rng, 1.25, 1.5, "noren_indigo" in extras)
 		cloth.position = Vector3(-half * 0.45, beam_y - 0.08, 0.5)
 		root.add_child(cloth)
 	return root
 
 
+## The small things that make a house someone's: each one asked for in
+## `extras`, placed at a random spot along the front that is clear of the
+## others, so no two houses keep them in the same place.
+static func _lived_in(root: Node3D, rng: RandomNumberGenerator, extras: Array, half: float, height: float,
+		beam_y: float, window_at: Vector2, window_size: Vector2, is_round: bool) -> void:
+	var b := PaperMesh.new(rng.randi())
+	b.shade_jitter = 0.2
+	var taken: Array[Vector2] = []  # spans along the front already used
+	var spot := func(wide: float) -> float:
+		for attempt in 12:
+			var x := rng.randf_range(-half + 0.4 + wide * 0.5, half - 0.4 - wide * 0.5)
+			var clear := true
+			for span: Vector2 in taken:
+				if x + wide * 0.5 > span.x - 0.15 and x - wide * 0.5 < span.y + 0.15:
+					clear = false
+			if clear:
+				taken.append(Vector2(x - wide * 0.5, x + wide * 0.5))
+				return x
+		return NAN
+	if "shutters" in extras and not is_round:
+		# Storm shutters: weathered boards over the window, a bar across.
+		b.color = Color(0.2, 0.17, 0.18)
+		b.rect(window_at, window_size + Vector2(0.12, 0.12), 0.115)
+		b.color = Color(0.14, 0.12, 0.13)
+		var bx := window_at.x - window_size.x * 0.5 + 0.18
+		while bx < window_at.x + window_size.x * 0.5:
+			b.rect(Vector2(bx, window_at.y), Vector2(0.02, window_size.y + 0.1), 0.12)
+			bx += rng.randf_range(0.18, 0.26)
+		b.color = PaperMesh.TIMBER
+		b.rect(window_at + Vector2(0.0, rng.randf_range(-0.15, 0.15)), Vector2(window_size.x + 0.2, 0.07), 0.125)
+	elif "sudare" in extras:
+		# A bamboo blind, let down part way over the window.
+		var drop := window_size.y * rng.randf_range(0.35, 0.75)
+		var top_y := window_at.y + window_size.y * 0.5 + 0.06
+		var wide := window_size.x + 0.16
+		b.color = Color(0.5, 0.44, 0.32)
+		b.rect(Vector2(window_at.x, top_y - drop * 0.5), Vector2(wide, drop), 0.13)
+		b.color = Color(0.37, 0.31, 0.22)
+		var y := top_y - 0.05
+		while y > top_y - drop:
+			b.rect(Vector2(window_at.x, y), Vector2(wide, 0.012), 0.135)
+			y -= 0.055
+		b.box(Vector3(window_at.x, top_y - drop, 0.15), Vector3(wide + 0.04, 0.05, 0.05))
+	if "pots" in extras:
+		var x: float = spot.call(1.0)
+		if not is_nan(x):
+			for k in rng.randi_range(2, 3):
+				var px := x - 0.35 + k * 0.36
+				var size := rng.randf_range(0.8, 1.2)
+				b.color = [Color(0.36, 0.24, 0.18), Color(0.3, 0.3, 0.34), Color(0.42, 0.36, 0.3)][rng.randi() % 3]
+				b.frustum(8, Vector2(0.11, 0.11) * size, Vector2(0.14, 0.14) * size, 0.2 * size, Vector3(px, 0.0, 0.45))
+				b.color = Color(0.2, 0.28, 0.2) * rng.randf_range(0.8, 1.15)
+				for leaf in 5:
+					b.ellipse(Vector2(px + rng.randf_range(-0.12, 0.12), 0.25 * size + rng.randf_range(0.0, 0.25)),
+							Vector2(0.08, 0.045), 6, 0.47 + leaf * 0.003, 0.2)
+	if "umbrella" in extras:
+		var x: float = spot.call(0.4)
+		if not is_nan(x):
+			# A closed wagasa: a long slim cone of oiled paper, its handle down.
+			var lean := rng.randf_range(0.12, 0.22) * (1.0 if rng.randf() < 0.5 else -1.0)
+			var tint: Color = [Color(0.5, 0.36, 0.22), Color(0.26, 0.28, 0.4), Color(0.4, 0.38, 0.34)][rng.randi() % 3]
+			b.color = tint
+			b.polygon(PackedVector2Array([Vector2(x, 0.25), Vector2(x + lean + 0.07, 1.25), Vector2(x + lean * 1.06, 1.42),
+					Vector2(x + lean - 0.07, 1.25)]), 0.3)
+			b.color = PaperMesh.TIMBER
+			b.stroke(Vector2(x - lean * 0.2, 0.02), Vector2(x, 0.3), 0.025, 0.025, 0.31)
+			b.color = tint.darkened(0.3)
+			b.stroke(Vector2(x + lean * 0.5, 0.82), Vector2(x + lean * 0.55, 0.9), 0.1, 0.1, 0.32)
+	if "firewood" in extras:
+		var x: float = spot.call(1.1)
+		if not is_nan(x):
+			for row in 3:
+				for k in 4 - row:
+					var at := Vector2(x - 0.45 + row * 0.13 + k * 0.27, 0.11 + row * 0.2)
+					b.color = Color(0.36, 0.28, 0.22) * rng.randf_range(0.8, 1.1)
+					b.ellipse(at, Vector2(0.12, 0.1), 7, 0.55, 0.1)
+					b.color = Color(0.5, 0.42, 0.32) * rng.randf_range(0.85, 1.05)
+					b.ellipse(at, Vector2(0.07, 0.06), 6, 0.56, 0.1)
+			b.color = Color(0.24, 0.2, 0.18)
+			b.box(Vector3(x, 0.4, 0.35), Vector3(1.2, 0.8, 0.4))
+	if "buckets" in extras:
+		var x: float = spot.call(0.9)
+		if not is_nan(x):
+			# Fire buckets stacked in a pyramid on a stand, a tub of water by it.
+			b.color = Scenery.WOOD
+			b.box(Vector3(x, 0.35, 0.45), Vector3(0.7, 0.04, 0.4))
+			for row in 3:
+				for k in 3 - row:
+					b.color = Color(0.32, 0.25, 0.2) * rng.randf_range(0.85, 1.1)
+					b.frustum(8, Vector2(0.09, 0.09), Vector2(0.11, 0.11), 0.17,
+							Vector3(x - 0.22 + row * 0.11 + k * 0.22, 0.37 + row * 0.17, 0.45))
+			b.color = Scenery.WOOD.darkened(0.2)
+			b.frustum(10, Vector2(0.24, 0.24), Vector2(0.27, 0.27), 0.34, Vector3(x + 0.55, 0.0, 0.5))
+	root.add_child(b.build())
+
+
 ## A hanging shop curtain with the character 茶 (tea) brushed on it in ink.
 ## Like a real noren it is slit into strips, and each strip swings in the
 ## wind on its own. Origin: the middle of its top edge.
-static func noren(rng: RandomNumberGenerator, width: float, height: float) -> Node3D:
+## `indigo`: a dyed indigo curtain with a pale ring crest instead.
+static func noren(rng: RandomNumberGenerator, width: float, height: float, indigo: bool = false) -> Node3D:
 	var root := Node3D.new()
 	var half := width * 0.5
 	var rail := PaperMesh.new(rng.randi())
@@ -449,15 +567,25 @@ static func noren(rng: RandomNumberGenerator, width: float, height: float) -> No
 		root.add_child(hinge)
 		var b := PaperMesh.new(rng.randi())
 		b.texture_world = false
-		b.color = Color(0.74, 0.71, 0.68)
+		b.color = Color(0.2, 0.23, 0.38) if indigo else Color(0.74, 0.71, 0.68)
 		var outline := PackedVector2Array([Vector2(-wide * 0.5, 0.0), Vector2(-wide * 0.5, -height * 0.9)])
 		var teeth := maxi(2, roundi(wide / 0.2))
 		for i in teeth:
 			outline.append(Vector2(lerpf(-wide * 0.5, wide * 0.5, (i + 0.5) / teeth), -height * rng.randf_range(0.82, 1.08)))
 		outline.append(Vector2(wide * 0.5, -height * 0.92))
 		outline.append(Vector2(wide * 0.5, 0.0))
-		b.torn_sheet(PaperMesh.tear(outline, 0.15, 0.025, rng), 0.0, Color(0.92, 0.9, 0.88), 0.03)
-		if wide > width * 0.4:
+		b.torn_sheet(PaperMesh.tear(outline, 0.15, 0.025, rng), 0.0, Color(0.42, 0.45, 0.6) if indigo else Color(0.92, 0.9, 0.88), 0.03)
+		if indigo and wide > width * 0.4:
+			# A pale crest: a thick ring round a dot (the "snake's eye" crest).
+			b.color = Color(0.78, 0.76, 0.72)
+			var o := Vector2(0.0, -height * 0.44)
+			var radius := wide * 0.28
+			for k in 20:
+				var a0 := TAU * k / 20.0
+				var a1 := TAU * (k + 1.05) / 20.0
+				b.stroke(o + Vector2(cos(a0), sin(a0)) * radius, o + Vector2(cos(a1), sin(a1)) * radius, wide * 0.1, wide * 0.1, 0.015)
+			b.ellipse(o, Vector2.ONE * wide * 0.09, 12, 0.015)
+		elif wide > width * 0.4:
 			# 茶, stroke by stroke, on the wide middle strip.
 			b.color = PaperMesh.SUMI
 			var size := wide * 0.9
