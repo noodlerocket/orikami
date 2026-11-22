@@ -148,13 +148,10 @@ the game)**
   ("they don't look samurai at all"); all movement is posed by hand.
 - Wall slide: his BACK to the wall, feet braced behind him flat on it, one
   hand pressed back on it. (Facing the wall was rejected.)
-- Charged wall jump: while sliding down a wall, HOLD Space: he braces
-  (slides at `wall_charge_slide` 0.5 speed); LET GO and he springs off
-  further, more the longer he held (full after `wall_charge_time` 0.45 s,
-  `wall_jump_charged_push` 9.5 against the ordinary `wall_jump_push` 7.5:
-  2.65 m out against 1.7 m). A tap (let go within `wall_tap_time` 0.12 s) is
-  the ordinary jump. Pushing into the wall, a jump goes at once (climbing).
-  Rejected: holding Space AFTER the jump to be carried further ("wrong").
+- Wall jump: the original one (a jump off the wall on pressing Space;
+  holding it only makes it higher, like any jump). Julian tried and
+  rejected both "hold Space after the jump to be carried further" and
+  "hold Space on the wall to charge a further jump": keep the original.
 - Walking into a scene: he creeps on tiptoe with short steps (big run steps
   at a walking speed were rejected).
 

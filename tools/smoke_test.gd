@@ -206,30 +206,6 @@ func _run(main: Node) -> void:
 	_check("wall jumps climb the wall (%.2f m higher)" % (ronin.position.y - start_y), ronin.position.y - start_y > 2.0)
 	ronin.set("_draw_safe", 0.0)
 
-	# Wall jumps: a tap springs off the ordinary distance; holding jump
-	# while sliding and letting go springs off further. (Off the tall wall's
-	# open right side: on its left the gatehouse wall is too close.)
-	var wall_right: float = walls[1][1]
-	var reach := []
-	for hold: int in [40, 3]:
-		ronin.set("_draw_safe", 30.0)
-		ronin.position = Vector3(wall_right + 0.6, 7.5, 0.0)
-		ronin.velocity = Vector3.ZERO
-		Input.action_press("move_left")
-		await _frames(30)
-		Input.action_release("move_left")
-		await _frames(4)
-		Input.action_press("jump")
-		await _frames(hold)
-		Input.action_release("jump")
-		var from_x := wall_right
-		await _frames(22)
-		reach.append(ronin.position.x - from_x)
-	_check("a held wall jump springs further than a tap (%.2f m held, %.2f m tapped)" % [reach[0], reach[1]],
-			reach[0] > reach[1] + 0.6)
-	_check("a tapped wall jump is the ordinary one (%.2f m)" % reach[1], reach[1] > 1.3 and reach[1] < 3.0)
-	ronin.set("_draw_safe", 0.0)
-
 	# A market stall's awning is solid from below: jumping up under it, he
 	# does not pass through onto its top.
 	var stall: MarketStall = main.get_node("Village").find_children("*", "MarketStall", true, false)[0]

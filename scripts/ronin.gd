@@ -75,17 +75,6 @@ signal died
 ## For this long after a wall jump the push is not overridden by the stick,
 ## so the jump carries him out before you can steer back.
 @export var wall_jump_lock := 0.14
-## A charged wall jump: while sliding down a wall, HOLD jump and he braces
-## (sliding slower); let go and he springs off further than a tapped jump.
-## A tap (let go within `wall_tap_time`) is the ordinary wall jump.
-@export var wall_tap_time := 0.12
-## Seconds of holding (after the tap time) to reach the full charge.
-@export var wall_charge_time := 0.45
-## How hard a fully charged jump throws him out (an ordinary one:
-## `wall_jump_push`). Between the two, by how long it was held.
-@export var wall_jump_charged_push := 9.5
-## While charging, he slides down this much slower (0.5 = half speed).
-@export var wall_charge_slide := 0.5
 ## A jump pressed this long after leaving the wall still counts as a wall jump.
 @export var wall_coyote := 0.1
 ## Holding away from the wall this long lets go of it.
@@ -220,8 +209,6 @@ var _wall_normal := 0.0     # +1 = a wall on his left (it pushes right), -1 = on
 var _wall_coyote := 0.0     # time left in which a jump still counts as a wall jump
 var _wall_side := 0.0       # the side of the last wall he touched
 var _wall_lock := 0.0       # time left in a wall jump's push
-var _wall_charging := false  # holding jump while sliding, to spring off further
-var _wall_held := 0.0       # how long it has been held
 var _wall_away := 0.0       # how long he has held away from the wall
 var _sliding := false       # clinging to a wall and sliding down it
 var _in_pit := false        # falling into a pit; waiting for the screen to fade
@@ -345,17 +332,8 @@ func _physics_process(delta: float) -> void:
 				facing = signf(move)
 		_apply_gravity(delta, grounded)
 		_update_wall(delta, grounded, move)
-		if _wall_charging:
-			_update_wall_charge(delta, grounded)
-		elif _jump_buffer > 0.0 and _wall_coyote > 0.0 and not grounded and _coyote <= 0.0:
-			if _sliding and Input.is_action_pressed("jump") and move != -_wall_normal:
-				# On the wall: wait to see if it is a tap or a hold. (Not while
-				# pushing into the wall: that is climbing, and jumps at once.)
-				_wall_charging = true
-				_wall_held = 0.0
-				_jump_buffer = 0.0
-			else:
-				_wall_jump()
+		if _jump_buffer > 0.0 and _wall_coyote > 0.0 and not grounded and _coyote <= 0.0:
+			_wall_jump()
 		elif _jump_buffer > 0.0 and _coyote > 0.0:
 			velocity.y = jump_velocity
 			Sound.play(self, &"jump")
@@ -743,41 +721,22 @@ func _update_wall(delta: float, grounded: bool, move: float) -> void:
 	else:
 		_wall_away = 0.0
 		velocity.x = -_wall_normal * 1.5  # a light press, to keep touching it
-	velocity.y = maxf(velocity.y, -wall_slide_speed * (wall_charge_slide if _wall_charging and _wall_held > wall_tap_time else 1.0))
+	velocity.y = maxf(velocity.y, -wall_slide_speed)
 	facing = _wall_normal  # back to the wall, looking out, feet braced on it
 	_can_dash = true
 	if not was_sliding:
 		Sound.play(self, &"land", -6.0)
 
 
-## Jump is held while he slides down a wall. Let go: a tap is an ordinary
-## wall jump; a hold springs him off further, more the longer it was held.
-## Landing, or leaving the wall for good, while holding calls it off.
-func _update_wall_charge(delta: float, grounded: bool) -> void:
-	if grounded or (not _sliding and _wall_coyote <= 0.0):
-		_wall_charging = false
-		return
-	if Input.is_action_pressed("jump"):
-		_wall_held += delta
-		return
-	_wall_charging = false
-	var charge := clampf((_wall_held - wall_tap_time) / maxf(wall_charge_time, 0.01), 0.0, 1.0)
-	_wall_jump(charge)
-
-
-## `charge` 0 is an ordinary wall jump, 1 a fully charged one. A jump made
-## on letting go (tapped or charged) gets its full height: the button is
-## already up, so it must not be cut short.
-func _wall_jump(charge: float = -1.0) -> void:
+func _wall_jump() -> void:
 	var away := _wall_side
-	var push := lerpf(wall_jump_push, wall_jump_charged_push, maxf(charge, 0.0))
-	velocity = Vector3(away * push, wall_jump_velocity, 0.0)
+	velocity = Vector3(away * wall_jump_push, wall_jump_velocity, 0.0)
 	facing = away
-	_wall_lock = wall_jump_lock * (1.0 + maxf(charge, 0.0) * 0.4)
+	_wall_lock = wall_jump_lock
 	_wall_coyote = 0.0
 	_jump_buffer = 0.0
 	_sliding = false
-	_jumping = charge < 0.0
+	_jumping = true
 	_can_dash = true
 	Sound.play(self, &"jump")
 	_puppet.play_wall_jump()

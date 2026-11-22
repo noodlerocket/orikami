@@ -38,7 +38,7 @@ const SOUNDS := {
 	&"draw_ready": {"files": ["draw_ready.mp3"], "volume": -9.0, "vary": 0.0},
 	&"draw_gleam": {"files": ["draw_gleam.mp3"], "volume": -8.0, "vary": 0.03},
 	&"shrine_rest": {"files": ["shrine_rest.mp3"], "volume": -7.0, "vary": 0.0},
-	&"hannya_sob_short": {"files": ["hannya_sob.mp3"], "volume": -6.0, "vary": 0.06},
+	&"hannya_sob_short": {"files": ["hannya_sob_short.mp3"], "volume": -6.0, "vary": 0.06},
 	# The prologue: each pop-up folding up off the page.
 	&"paper_fold": {"files": ["paper_fold.mp3"], "volume": -6.0, "vary": 0.12},
 }

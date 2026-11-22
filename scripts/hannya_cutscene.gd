@@ -263,7 +263,8 @@ func _animate_actors(_delta: float) -> void:
 
 func _start_sob() -> void:
 	_sob = AudioStreamPlayer.new()
-	var stream: AudioStreamMP3 = load("res://audio/hannya_sob.mp3")
+	# (OGG: it loops without a gap.)
+	var stream: AudioStreamOggVorbis = load("res://audio/hannya_sob.ogg")
 	stream.loop = true
 	_sob.stream = stream
 	Sound.follow_level(_sob, -4.0, &"sounds")
