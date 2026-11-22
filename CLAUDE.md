@@ -461,9 +461,11 @@ the controls line in `scripts/hud.gd`.
 
 ### Title and pause
 - `scenes/title.tscn` is the main scene. `title_screen.gd` plays Julian's
-  looping video `video/title_loop.ogv` (1280x720, 30 fps, 4.7 s, 3 MB; its
-  last 1.2 s are blended into its start so it loops without a jump), with
-  the village music and rain. A still from it (`textures/title_backdrop.jpg`)
+  looping video `video/title_loop.ogv` (1280x720, 30 fps, 5.9 s, 3.9 MB),
+  with the village music and rain. It loops with a plain cut: his clip is
+  nearly a loop already (at the cut only the scarf, a few petals and the
+  grass jump). A 1.2 s blend at the seam was tried; he found the "morph"
+  weird. A still from it (`textures/title_backdrop.jpg`)
   stands in if the video is missing. **The ffmpeg on this computer writes
   broken Theora files** (coloured blocks); make .ogv with Godot's Movie
   Maker instead: `tools/make_title_video.gd` has the steps.

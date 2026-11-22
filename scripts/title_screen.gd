@@ -5,8 +5,9 @@ extends Control
 ## logo, "Press any key", the menu).
 ##
 ## The video was made by Julian from his title picture; it is 1280x720, 30
-## frames a second, and its last 1.2 s were blended into its start so it
-## loops without a jump (tools/make_title_video.gd says how it was made).
+## frames a second, 5.9 s, and loops with a plain cut (his clip as it is:
+## a blended seam was tried and he did not like it). tools/make_title_video.gd
+## says how the file was made.
 ## If the video is missing, a still from it (textures/title_backdrop.jpg) is
 ## shown instead.
 ##
