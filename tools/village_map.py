@@ -1,4 +1,4 @@
-"""Draws the planned layout of the expanded Kamiyama Village as a side-on
+"""Draws the layout (as built, 2026-11-22) of the expanded Kamiyama Village as a side-on
 cut-away map (docs/village_map.png). A planning picture for Julian: the
 three layers (rooftops, street, canals), the areas, obstacles, enemies,
 shrines, hidden cranes, shortcuts and the paths that open later.
@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 FONT = str(ROOT / "art_source" / "fonts" / "YujiSyuku-Regular.ttf")
 OUT = ROOT / "docs" / "village_map.png"
 
-W, H = 2720, 1450
+W, H = 3200, 1450
 rng = random.Random(4)
 
 # Colours (the game's palette).
@@ -284,17 +284,22 @@ shrine(24, 0, "")
 note(19.0, 0, "Shrine: the Paper-Maker's door", dy=-74, colour=WASHI, size=16)
 shrine(140, 0, "")
 note(136.5, 0, "Shrine: river warehouse", dy=-74, colour=WASHI, size=16)
-shrine(184, 2.4, "")
-note(178, 2.4, "Shrine before the Hannya", dy=-74, colour=WASHI, size=16)
+shrine(172.4, 0, "")
+note(166, 0, "Shrine at the foot of the steps", dy=-74, colour=WASHI, size=16)
+shrine(218, 3.3, "")
+note(214, 3.3, "Shrine in the bamboo", dy=-74, colour=WASHI, size=16)
 
 # Hidden paper cranes (bundles).
-for cx, cy in [(22, 7.6), (74, 2.0), (90.5, 10.2), (113, -1.0), (131, -5.4), (155.5, 12.2), (154, -2.0)]:
+# (As built: the gallery roof, the back room, the chamber under the grate,
+# the burnt house, a canal ledge, the lookout, the canal's east end, and the
+# deck beyond the Crane Glide gap.)
+for cx, cy in [(48, 8.0), (75, 2.0), (10.6, -3.4), (88.4, 10.2), (131, -5.4), (150.5, 12.2), (152, -5.6), (133.6, 10.0)]:
     crane(cx, cy)
 
 # Enemies.
-for ex, ey, k in [(42, 0, "husk"), (58, 0, "husk"), (68, 9.0, "bird"), (84, -6.0, "dog"), (108, -6.4, "dog"),
-                  (124, -5.0, "dog"), (100, 0.6, "husk"), (128, 0.6, "lantern"), (101, 10.6, "bird"), (144, 0, "husk"),
-                  (165, 0, "lantern")]:
+for ex, ey, k in [(43.5, 0, "husk"), (60, 0, "husk"), (68, 11.0, "bird"), (92, -5.4, "dog"), (110, -6.4, "dog"),
+                  (145, -6.0, "dog"), (103, 0.6, "husk"), (127, 0.6, "lantern"), (86.5, 12.0, "bird"), (159, 0, "husk"),
+                  (164, 0, "lantern"), (106, 11.0, "bird")]:
     enemy(ex, ey, k)
 
 # Obstacles and ways round, labelled where they are.
@@ -317,7 +322,7 @@ note(152.5, 11.6, "lookout", dy=-30)
 note(170.5, 0.0, "the steps", dy=12)
 
 # Shortcuts (opened from the far side).
-shortcut(34, 7.6, 34, 0.2, "kick the ladder down")
+shortcut(76.4, 8.4, 76.4, 0.2, "kick the ladder down")
 shortcut(60, -4.0, 9, -4.0, "the drain pipe: a grate opens into Well Square")
 shortcut(150.5, 1.0, 145, 1.0, "unbar the gate", ldy=40)
 
@@ -325,9 +330,23 @@ shortcut(150.5, 1.0, 145, 1.0, "unbar the gate", ldy=40)
 locked(116.5, 10.4, "too wide: Crane Glide")
 locked(157.0, 13.6, "the castle road: Crane Glide", left=True)
 d.line([(X(158), Y(11.6)), (X(170), Y(14.0))], fill=(*LOCKED, 160), width=2)
-locked(229.5, 4.4, "")
-note(213.5, 2.6, "the road to the Bamboo:", dy=10, colour=LOCKED)
+note(213.5, 2.6, "the gate to the Bamboo:", dy=10, colour=LOCKED)
 note(213.5, 2.6, "opens when the Hannya falls", dy=30, colour=LOCKED)
+
+# 8: the Bamboo of Folded Wind (its first stretch), past the courtyard's gate.
+for a, b, h in [(213, 235, 3.3), (243.5, 256, 3.3), (264, 280, 3.9)]:
+    d.rectangle((X(a), Y(h), X(b), Y(-0.7)), fill=STONE_DARK)
+for k in range(46):
+    bx = 214 + k * 1.45 + rng.uniform(-0.4, 0.4)
+    top = rng.uniform(11.0, 15.0)
+    d.line([(X(bx), Y(3.3)), (X(bx + rng.uniform(-0.6, 0.6)), Y(top))], fill=(70, 110, 80), width=3)
+d.text((X(213) + 10, 160), "8  Bamboo of Folded Wind", font=font(22), fill=WASHI)
+d.text((X(213) + 10, 190), "the Crane Glide is learned here", font=font(15), fill=WASHI_DIM)
+d.line([(X(213), 196), (X(213), H - 340)], fill=(*WASHI, 28), width=1)
+crane(228, 4.6)
+note(224, 4.6, "the great crane: Crane Glide", dy=-110, colour=WASHI)
+note(235.5, 3.3, "ravines: glide", dy=26)
+note(254, 3.9, "the road goes on (not built)", dy=-140, colour=LOCKED)
 
 # The Ronin's main route, faint, so the shape of the level reads.
 route = [(8, 0.4), (32, 0.4), (78, 0.4), (80, -1.0), (84, -5.6), (98, -4.8), (112, -6.0), (126, -4.6), (140, -5.6),
@@ -339,12 +358,12 @@ for (a, ha), (b, hb) in zip(route, route[1:]):
 d.line([(X(-8), Y(-11.2)), (X(64), Y(-11.2))], fill=(*WASHI_DIM, 160), width=2)
 d.line([(X(-8), Y(-11.0)), (X(-8), Y(-11.4))], fill=WASHI_DIM, width=2)
 d.line([(X(64), Y(-11.0)), (X(64), Y(-11.4))], fill=WASHI_DIM, width=2)
-d.text((X(-6), Y(-11.3)), "the village today (75 m)", font=font(16), fill=WASHI_DIM)
-d.text((X(70), Y(-11.3)), "planned: about 230 m, in three layers", font=font(16), fill=WASHI_DIM)
+d.text((X(-6), Y(-11.3)), "the first prototype street (75 m)", font=font(16), fill=WASHI_DIM)
+d.text((X(70), Y(-11.3)), "as built: about 275 m, in three layers, and the first of the bamboo", font=font(16), fill=WASHI_DIM)
 
 # Title and legend.
 d.text((60, 40), "KAMIYAMA VILLAGE", font=font(52), fill=WASHI)
-d.text((64, 108), "the expanded first region: a plan, seen from the side", font=font(22), fill=WASHI_DIM)
+d.text((64, 108), "the expanded first region, as built, seen from the side", font=font(22), fill=WASHI_DIM)
 d.rectangle((1200, 52, 1236, 88), fill=VERMILION)
 d.text((1206, 52), "神", font=font(26), fill=WASHI)
 
