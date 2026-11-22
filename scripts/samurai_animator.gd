@@ -591,3 +591,18 @@ static func duck(time: float) -> Dictionary:
 		"foot_r": Vector3(-0.14, 0.0, 0.22), "toe_r": 0.0,
 		"foot_l": Vector3(0.14, 0.04, -0.3), "toe_l": 72.0,
 	})
+
+
+## Shuffling along ducked (through a crawlspace): the duck, with the feet
+## taking short sliding steps in turn and the body rocking a little over
+## them. `phase` 0 to 1 over two steps.
+static func crawl(phase: float, time: float) -> Dictionary:
+	var pose := duck(time)
+	var rock := sin(phase * TAU)
+	var lift_r := maxf(sin(phase * TAU), 0.0)
+	var lift_l := maxf(-sin(phase * TAU), 0.0)
+	pose["hips"] = (pose["hips"] as Vector3) + Vector3(0.0, absf(rock) * 0.02, 0.0)
+	pose["hips_rot"] = (pose["hips_rot"] as Vector3) + Vector3(0.0, rock * 4.0, 0.0)
+	pose["foot_r"] = Vector3(-0.14, lift_r * 0.06, 0.22 - cos(phase * TAU) * 0.12)
+	pose["foot_l"] = Vector3(0.14, 0.04 + lift_l * 0.05, -0.3 + cos(phase * TAU) * 0.1)
+	return pose

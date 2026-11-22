@@ -35,6 +35,17 @@ extends Camera3D
 ## In the climbing course the camera rises no higher than this.
 @export var climb_max_y := 13.0
 
+## Underground (the canals and the drain pipe, between these x positions):
+## once he is below street level the camera goes down with him, so the
+## tunnels are seen from inside. It blends in as he drops, so it never jumps.
+@export var under_zone := Vector2(-1000.0, -1000.0)
+## Underground: how far above his feet the camera sits.
+@export var under_height := 3.1
+## The blend into following him down starts when his feet are this far
+## below the street, and is complete this far below it.
+@export var under_from := -0.4
+@export var under_full := -2.6
+
 
 ## Never let his middle rise above the middle of the screen: when he jumps
 ## or climbs high enough that it would, the camera rises with him, exactly.
@@ -111,6 +122,9 @@ func _wanted_lead() -> float:
 func _goal() -> Vector3:
 	var at := target.global_position
 	var y := maxf(lerpf(level_height, at.y, follow_height) + height_offset, min_y)
+	if at.x > under_zone.x and at.x < under_zone.y and at.y < under_from:
+		var down := smoothstep(under_from, under_full, at.y)
+		y = lerpf(y, at.y + under_height, down)
 	if at.x > climb_zone.x and at.x < climb_zone.y:
 		# Climbing: follow him up, but never lower than the usual view and
 		# never above the top of the course.

@@ -121,6 +121,13 @@ signal died
 ## Holding down (S) on the ground: he crouches low and his body shrinks to
 ## this height (metres), under the Hannya's glide.
 @export var duck_height := 0.85
+## Ducked, he can shuffle along this fast (metres per second), to get
+## through a crawlspace. Under a low ceiling he stays ducked until he is out.
+@export var crawl_speed := 2.0
+
+@export_group("Water")
+## Wading in shallow water: his run is this fraction of its usual speed.
+@export var wading_speed := 0.6
 
 @export_group("Block")
 ## Holding parry keeps his guard up after the parry window: a blow from the
@@ -152,7 +159,7 @@ signal died
 @export var heal_hold_time := 0.9
 ## Falling below this height (into a pit) fades the screen out and puts him
 ## back at the start of the level.
-@export var fall_limit_y := -1.6
+@export var fall_limit_y := -11.0
 ## Health lost for falling in.
 @export var pit_damage := 1
 ## Seconds between shredding and the screen starting to fade.
@@ -216,6 +223,17 @@ var _dead := false
 var _grounded_time := 0.0
 var _safe_position := Vector3.ZERO
 var _spawn_position := Vector3.ZERO
+## Pushes from the world for this frame (metres per second, per second): a
+## sluice pressing him down, a gust over the river. Whatever pushes sets it
+## each frame before he moves; it is used up by the move.
+var push := Vector3.ZERO
+## A wind carrying him sideways this frame (metres per second): his running
+## and steering aim for this speed instead of standing still. Set each frame
+## by whatever blows (the gusts over the river); used up by the move.
+var drift := 0.0
+## True while he stands in shallow water (set each frame by the water).
+var wading := false
+var _crawling := false
 
 @onready var _puppet: RoninPuppet = $Puppet
 
@@ -278,11 +296,18 @@ func _physics_process(delta: float) -> void:
 	var duck := (grounded and Input.is_action_pressed("aim_down") and not busy and _dash_time <= 0.0
 			and _slash_time <= 0.0 and not _iai and _drawing <= 0.0 and _parrying <= 0.0
 			and not Input.is_action_pressed("parry"))
+	# Under a low ceiling he cannot stand up again (a crawlspace).
+	if _ducking and not duck and grounded and _low_ceiling():
+		duck = true
 	_set_ducking(duck)
+	_crawling = false
 	if _ducking:
 		if move != 0.0:
 			facing = signf(move)
-		move = 0.0
+			_crawling = true
+		move *= crawl_speed / run_speed
+	elif wading:
+		move *= wading_speed
 	# Holding parry keeps the guard up (after the parry stance).
 	_guarding = (Input.is_action_pressed("parry") and not busy and _dash_time <= 0.0
 			and not _iai and _drawing <= 0.0 and _slash_time <= 0.0)
@@ -327,7 +352,7 @@ func _physics_process(delta: float) -> void:
 			var rate := air_acceleration
 			if grounded:
 				rate = ground_acceleration if move != 0.0 else ground_deceleration
-			velocity.x = move_toward(velocity.x, move * run_speed, rate * delta)
+			velocity.x = move_toward(velocity.x, move * run_speed + drift, rate * delta)
 			if move != 0.0 and _slash_time <= 0.0:
 				facing = signf(move)
 		_apply_gravity(delta, grounded)
@@ -346,7 +371,11 @@ func _physics_process(delta: float) -> void:
 			_jumping = false
 		if velocity.y <= 0.0:
 			_jumping = false
+		velocity += push * get_physics_process_delta_time()
+		velocity.y = maxf(velocity.y, -max_fall_speed * 1.4)
 
+	push = Vector3.ZERO
+	drift = 0.0
 	move_and_slide()
 	position.z = 0.0  # Gameplay stays on a single plane.
 	_find_wall()
@@ -662,6 +691,29 @@ func _fell_out_of_world() -> void:
 	fell_in_pit.emit()
 
 
+## Something that drowns or carries him off (deep water, the river): the
+## screen fades and he is back at the last shrine, as after a fall.
+func fall_in() -> void:
+	_fell_out_of_world()
+
+
+## Is there something solid just over his head, too low to stand up under?
+func _low_ceiling() -> bool:
+	var from := global_position + Vector3(0.0, duck_height * 0.6, 0.0)
+	var query := PhysicsRayQueryParameters3D.create(from, from + Vector3.UP * (_stand_height - duck_height * 0.6 + 0.05), 1)
+	for offset: float in [-0.25, 0.0, 0.25]:
+		query.from = from + Vector3(offset, 0.0, 0.0)
+		query.to = query.from + Vector3.UP * (_stand_height - duck_height * 0.6 + 0.05)
+		if not get_world_3d().direct_space_state.intersect_ray(query).is_empty():
+			return true
+	return false
+
+
+## True while he shuffles along ducked (in a crawlspace).
+func is_crawling() -> bool:
+	return _crawling
+
+
 ## A shrine he rested at: falls and deaths bring him back here.
 func set_checkpoint(at: Vector3) -> void:
 	_spawn_position = at
@@ -794,7 +846,7 @@ func _update_puppet() -> void:
 	elif _sliding:
 		_puppet.state = &"wall"
 	elif _ducking:
-		_puppet.state = &"duck"
+		_puppet.state = &"crawl" if _crawling else &"duck"
 	elif _iai:
 		_puppet.state = &"iai"
 	elif _dash_time > 0.0:

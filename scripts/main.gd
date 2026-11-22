@@ -33,6 +33,8 @@ func _ready() -> void:
 	# level moves as the village grows).
 	_camera.climb_zone = Vector2(Village.CLIMB_WALLS[0][0] - 0.7, Village.CLIMB_WALLS[1][1] + 1.9)
 	_camera.max_x = (Village.ARENA.x + Village.ARENA.y) * 0.5
+	# Underground (the drain pipe and the canals) the camera goes down with him.
+	_camera.under_zone = Vector2(Village.CHAMBER.x - 1.0, Village.CANAL.y + 0.5)
 	_camera.snap_to_target()
 	_hud.watch(_ronin)
 	_ronin.slash_landed.connect(_camera.add_shake.bind(0.07))
@@ -307,6 +309,7 @@ func _on_fell_in_pit() -> void:
 # --- Developer tools -------------------------------------------------------
 # Optional launch arguments, written after a "--" on the command line:
 #   --x=20                 start the Ronin at x = 20
+#   --y=-4                 ...and at this height (after --x; e.g. down in the canals)
 #   --screenshot=shot.png  save a picture after a moment, then quit
 #   --zoom=4               put the camera this close, for a look at the Ronin
 #   --face=-1              start facing left
@@ -322,6 +325,8 @@ func _apply_debug_start() -> void:
 		if arg.begins_with("--x="):
 			_ronin.position.x = float(arg.trim_prefix("--x="))
 			_ronin.position.y += 3.0
+		elif arg.begins_with("--y="):
+			_ronin.position.y = float(arg.trim_prefix("--y="))
 		elif arg.begins_with("--zoom="):
 			_camera.distance = float(arg.trim_prefix("--zoom="))
 			_camera.height_offset = 0.95
@@ -339,7 +344,7 @@ func _apply_debug_start() -> void:
 			_ronin.ink_absorbed = roundi(amount * _ronin.marks_full_at)
 			_ronin.get_node("Puppet").set_marks_now(amount)
 		elif arg == "--cutscene":
-			_ronin.position = Vector3(43.2, 1.6, 0.0)
+			_ronin.position = Vector3(Village.ARENA.x - 3.8, 1.6, 0.0)
 			play_hannya_cutscene.call_deferred()
 		elif arg == "--tutorial":
 			_start_tutorial.call_deferred()

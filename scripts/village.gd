@@ -23,26 +23,49 @@ const STREET_FRONT := 1.5
 const STREET_BACK := -8.0
 ## Depth of the house walls.
 const HOUSE_Z := -4.3
-## The pit: a hole in the street between these two x positions, reaching
-## back from the front edge to PIT_BACK. Behind it the street carries on.
 ## The well he climbs out of after the prologue (main.gd, well_cutscene.gd).
 const WELL_X := -8.0
 const WELL_Z := -1.5
-## The expanded village is built area by area (docs/village_map.png). Its
-## far end (the raised street, the climbing course, the torii and the
-## shrine courtyard) is shifted this far right to make room for the areas
-## before it; it grows as areas are added.
-const EAST := 44.0
-## The pit, for now at the end of Market Street: where the Fallen Street
-## (the way down into the canals) will be.
-const PIT_LEFT := 64.0
-const PIT_RIGHT := 67.0
-const PIT_BACK := -3.2
-## The shrine courtyard past the torii, where the Kasa-obake waits: its left
-## and right x. (The level's right end is its right side.)
+## The expanded village (docs/village_map.png), left to right, in game x
+## (plan metres - 16): Well Square and Market Street (-17 to 62), the Fallen
+## Street (62 to 82), the River and the red bridge (82 to 120), the Gatehouse
+## (120 to 158), the Shrine Steps (158 to 172), the shrine courtyard.
+## The far end of the old level (the torii and the shrine courtyard) is
+## shifted this far right.
+const EAST := 127.0
+## The Fallen Street: the street has caved in between these x positions,
+## down into the canals, from the front edge back to FALL_BACK. Behind it
+## the street (and its houses) carry on.
+const FALL_LEFT := 62.0
+const FALL_RIGHT := 80.0
+const FALL_BACK := -2.8
+## The river crosses the street between these x positions.
+const RIVER := Vector2(82.0, 120.0)
+## The drain pipe under Well Square and Market Street: its left and right
+## ends, its floor and its ceiling. The grate in the street over its left
+## end opens from below (a shortcut back to the canals).
+const PIPE := Vector2(-6.0, 54.0)
+const PIPE_FLOOR := -4.6
+const PIPE_TOP := -2.4
+const GRATE_X := -3.6
+const GRATE_WIDTH := 1.2
+## At its left end the pipe opens into a low chamber just under the street
+## (between these x positions), with steps up to the grate.
+const CHAMBER := Vector2(-6.0, -1.5)
+const CHAMBER_SLAB := 0.3
+## The canal hall under the Fallen Street and the river, and its water.
+const CANAL := Vector2(54.0, 136.8)
+const CANAL_WATER := -6.4
+## The shaft he climbs out of the canals by, east of the gatehouse.
+const SHAFT := Vector2(134.4, 136.8)
+## The Shrine Steps rise from the street (0) at the first x to the
+## courtyard's height (1.5) at the second.
+const STEPS := Vector2(158.0, 171.0)
+const STEPS_TOP := 1.5
+## The shrine courtyard past the torii, where the Weeping Hannya waits: its
+## left and right x. (The level's right end is its right side.)
 const ARENA := Vector2(47.0 + EAST, 63.5 + EAST)
-## The torii at the courtyard's entrance (clear of the tall climbing wall,
-## which used to hide its left side).
+## The torii at the courtyard's entrance, at the top of the steps.
 const TORII_X := 46.0 + EAST
 
 const STREET := Color(0.21, 0.225, 0.31)
@@ -91,7 +114,7 @@ const MOSS := Color(0.3, 0.34, 0.18)
 @export_group("Layout")
 ## Change this to reshuffle the random details (torn edges, drips, tiles).
 @export var layout_seed := 7
-@export var enemy_positions: Array[Vector2] = [Vector2(27.5, 0.1), Vector2(44.0, 0.1), Vector2(37.0 + EAST, 1.6)]
+@export var enemy_positions: Array[Vector2] = [Vector2(27.5, 0.1), Vector2(44.0, 0.1), Vector2(143.0, 0.1)]
 
 var _rng := RandomNumberGenerator.new()
 ## The Hannya's shrine hall in the courtyard (built by _build_arena).
@@ -104,6 +127,15 @@ var _seal_pool: InkPool
 var _seal_jets: CPUParticles3D
 var _lanterns: Array[Node3D] = []
 var _bead_picture: GradientTexture2D
+## The dark foreground strips and grass: lowered out of the way when the
+## camera goes down into the canals (see _process).
+var _near: Node3D
+## The areas of the expanded village (built in _ready).
+var canals: Canals
+var river: RiverBridge
+var gatehouse: Gatehouse
+var steps: ShrineSteps
+var fallen: FallenStreet
 
 
 func _ready() -> void:
@@ -126,6 +158,21 @@ func _ready() -> void:
 	var market := MarketStreet.new()
 	market.village = self
 	add_child(market)
+	fallen = FallenStreet.new()
+	fallen.village = self
+	add_child(fallen)
+	canals = Canals.new()
+	canals.village = self
+	add_child(canals)
+	river = RiverBridge.new()
+	river.village = self
+	add_child(river)
+	gatehouse = Gatehouse.new()
+	gatehouse.village = self
+	add_child(gatehouse)
+	steps = ShrineSteps.new()
+	steps.village = self
+	add_child(steps)
 	_build_foreground()
 	for spot: Vector2 in enemy_positions:
 		var husk: Node3D = HUSK_SCENE.instantiate()
@@ -161,11 +208,28 @@ func _process(_delta: float) -> void:
 	# Falling petals are carried further in a gust.
 	for drift: CPUParticles3D in get_tree().get_nodes_in_group(&"petal_drift"):
 		drift.gravity.x = -0.1 - Wind.speed_at(drift.global_position.x) * 0.22
+	# The dark foreground strips sink out of the way when the camera goes
+	# down into the canals (a little faster than the camera, so they slide
+	# off the bottom of the view like scenery being lowered on a stage).
+	var camera := get_viewport().get_camera_3d()
+	if _near and camera:
+		_near.position.y = minf(camera.global_position.y - 4.2, 0.0) * 1.6
 
 
-## Height of the street at a given x (ignoring the pit).
+## Height of the street at a given x (ignoring holes): level, then up the
+## Shrine Steps to the courtyard.
 func _street_height(x: float) -> float:
-	return 1.5 if x >= 30.0 + EAST else 0.0
+	if x <= STEPS.x:
+		return 0.0
+	if x >= STEPS.y:
+		return STEPS_TOP
+	return STEPS_TOP * (x - STEPS.x) / (STEPS.y - STEPS.x)
+
+
+## True where there is a hole in the street at x (the Fallen Street, the
+## river, the shaft out of the canals, the drain grate when open).
+static func is_hole(x: float) -> bool:
+	return (x > FALL_LEFT and x < FALL_RIGHT) or (x > RIVER.x and x < RIVER.y) or (x > SHAFT.x and x < SHAFT.y)
 
 
 # --- Light, fog and glow ----------------------------------------------------
@@ -221,10 +285,13 @@ func _build_houses() -> void:
 		[48.2, 6.2, 5.0, true, ["round", "noren_indigo", "buckets"], 1],
 		[54.6, 5.4, 4.2, true, ["brace", "pots", "umbrella"], -1],
 		[60.6, 5.8, 4.8, false, ["awning", "firewood"], 1],
-		# By the pit, and the raised street.
-		[70.6, 5.2, 4.4, true, ["brace"], -1],
-		[34.5 + EAST, 6.5, 4.6, true, ["round", "noren"], 1],
-		[40.3 + EAST, 4.4, 4.0, false, ["brace"], 0],
+		# Behind the Fallen Street (on the strip of street that still stands
+		# at the back), past the river, and along the road to the steps.
+		[66.0, 5.4, 4.2, false, ["brace", "shutters"], 0],
+		[80.6, 2.4, 4.0, false, ["pots"], 0],
+		[139.6, 5.6, 4.6, true, ["round", "noren", "umbrella"], 1],
+		[145.6, 5.2, 4.2, false, ["brace", "firewood", "buckets"], 0],
+		[151.6, 5.8, 5.0, true, ["sudare", "pots"], -1],
 	]
 	for h: Array in street:
 		var x: float = h[0]
@@ -275,14 +342,15 @@ func _add_wet_shine(x: float, ground: float, strength: float) -> void:
 		return
 	var left := x - 1.1
 	var right := x + 1.1
-	if ground == 0.0 and right > PIT_LEFT and left < PIT_RIGHT:
-		# Keep the piece that is on solid street.
-		if x < (PIT_LEFT + PIT_RIGHT) * 0.5:
-			right = PIT_LEFT - 0.05
-		else:
-			left = PIT_RIGHT + 0.05
-		if right - left < 0.4:
-			return
+	for hole: Vector2 in [Vector2(FALL_LEFT, FALL_RIGHT), RIVER, SHAFT]:
+		if ground == 0.0 and right > hole.x and left < hole.y:
+			# Keep the piece that is on solid street.
+			if x < (hole.x + hole.y) * 0.5:
+				right = minf(right, hole.x - 0.05)
+			else:
+				left = maxf(left, hole.y + 0.05)
+	if right - left < 0.4:
+		return
 	var shine := Scenery.reflection(Vector2(right - left, 9.0), Color(1.0, 0.6, 0.28, wet_shine * strength))
 	shine.position = Vector3((left + right) * 0.5, ground + 0.015, -1.6)
 	add_child(shine)
@@ -291,64 +359,44 @@ func _add_wet_shine(x: float, ground: float, strength: float) -> void:
 # --- Ground and platforms (the parts you can stand on) ----------------------
 
 func _build_ground() -> void:
-	# [left edge, right edge, height of the top surface]
-	for g: Array in [[-17.0, PIT_LEFT, 0.0], [PIT_RIGHT, 30.0 + EAST, 0.0], [30.0 + EAST, ARENA.y + 0.5, 1.5]]:
-		_build_ground_block(g[0], g[1], g[2])
-	_build_pit()
+	# [left edge, right edge, height of the top surface, how thick it is (8 =
+	# solid all the way down; thinner where a tunnel runs underneath),
+	# crumbled left end?, crumbled right end?]
+	for g: Array in [
+			[-17.0, CHAMBER.x, 0.0, 8.0, false, false],
+			[CHAMBER.x, GRATE_X - GRATE_WIDTH * 0.5, 0.0, CHAMBER_SLAB, false, false],
+			[GRATE_X + GRATE_WIDTH * 0.5, CHAMBER.y, 0.0, CHAMBER_SLAB, false, false],
+			[CHAMBER.y, CANAL.x, 0.0, -PIPE_TOP, false, false],
+			[CANAL.x, FALL_LEFT, 0.0, 1.5, false, true],
+			[FALL_RIGHT, RIVER.x, 0.0, 2.2, true, false],
+			[RIVER.y, SHAFT.x, 0.0, 1.5, false, false],
+			[SHAFT.y, STEPS.x, 0.0, 8.0, false, false],
+			[STEPS.y, ARENA.y + 0.5, STEPS_TOP, 8.0, false, false]]:
+		_build_ground_block(g[0], g[1], g[2], g[3], g[4], g[5])
 	# Invisible walls at both ends of the level.
 	for x: float in [-16.5, ARENA.y]:
 		_add_solid(Vector3(x, 10.0, 0.0), Vector3(1.0, 40.0, 4.0))
 
 
-## The pit: a hole in the street, not a cut right through it. The street
-## carries on behind it; its broken back edge, the earth walls either side
-## and black water at the bottom are all you see inside.
-func _build_pit() -> void:
-	var width := PIT_RIGHT - PIT_LEFT
-	var middle := (PIT_LEFT + PIT_RIGHT) * 0.5
-	# The earth under the street behind the pit. Its face is the back wall.
-	var earth := PaperMesh.new(_rng.randi())
-	earth.shade_jitter = 0.05
-	earth.color = EARTH
-	earth.box(Vector3(middle, -5.02, (PIT_BACK + STREET_BACK) * 0.5), Vector3(width, 10.0, PIT_BACK - STREET_BACK))
-	add_child(earth.build())
-	# Paving on top of it, matching the street either side.
-	_lay_paving(PIT_LEFT, PIT_RIGHT, 0.0, STREET_BACK, PIT_BACK)
-	# Its broken edge: torn sheets on the back wall, stepping down, like the
-	# front of the street.
-	var lip := PaperMesh.new(_rng.randi())
-	lip.shade_jitter = 0.04
-	lip.color = Color(0.17, 0.185, 0.27)
-	lip.torn_sheet(_torn_band(PIT_LEFT, PIT_RIGHT, 0.0, -1.0, 0.0), PIT_BACK + 0.02, Color(0.36, 0.39, 0.52), 0.03)
-	lip.color = Color(0.08, 0.087, 0.155)
-	lip.torn_sheet(_torn_band(PIT_LEFT, PIT_RIGHT, -0.35, -6.0, 0.13), PIT_BACK + 0.06, Color(0.16, 0.18, 0.28), 0.03)
-	var back := lip.build()
-	back.cast_shadow = OFF
-	add_child(back)
-	# Black water at the bottom.
-	var water := PaperMesh.new(_rng.randi())
-	water.shade_jitter = 0.0
-	water.color = Color(0.02, 0.022, 0.05)
-	water.quad(Vector3(PIT_LEFT - 0.1, -3.0, PIT_BACK), Vector3(PIT_RIGHT + 0.1, -3.0, PIT_BACK),
-			Vector3(PIT_RIGHT + 0.1, -3.0, STREET_FRONT + 0.3), Vector3(PIT_LEFT - 0.1, -3.0, STREET_FRONT + 0.3), Vector3.UP)
-	var pool := water.build(Color.WHITE, 0.0, true)
-	pool.cast_shadow = OFF
-	add_child(pool)
-
-
-func _build_ground_block(left: float, right: float, top: float) -> void:
+func _build_ground_block(left: float, right: float, top: float, thick: float = 8.0,
+		broken_left: bool = false, broken_right: bool = false) -> void:
 	var width := right - left
 	var middle := (left + right) * 0.5
-	_add_solid(Vector3(middle, top - 4.0, -1.5), Vector3(width, 8.0, 6.0))
+	var solid := _add_solid(Vector3(middle, top - thick * 0.5, -1.5), Vector3(width, thick, 6.0))
+	if thick < 8.0:
+		solid.set_meta(&"slab", true)
+	# How far down the earth and the torn front reach (a slab over a tunnel
+	# stops at the tunnel's ceiling).
+	var deep := 10.0 if thick >= 8.0 else thick
 
-	# The earth under the street (you only see its sides, in the pit).
+	# The earth under the street (you only see its sides, at holes).
 	var earth := PaperMesh.new(_rng.randi())
 	earth.shade_jitter = 0.05
 	earth.color = EARTH
 	# (It stops a little short of the front edge, so its face does not sit
 	# at exactly the same depth as the torn sheets there and flicker.)
-	earth.box(Vector3(middle, top - 5.02, (STREET_FRONT - 0.15 + STREET_BACK) * 0.5),
-			Vector3(width, 10.0, STREET_FRONT - 0.15 - STREET_BACK))
+	earth.box(Vector3(middle, top - deep * 0.5 - 0.02, (STREET_FRONT - 0.15 + STREET_BACK) * 0.5),
+			Vector3(width, deep, STREET_FRONT - 0.15 - STREET_BACK))
 	add_child(earth.build())
 
 	_lay_paving(left, right, top, STREET_BACK, STREET_FRONT)
@@ -359,15 +407,16 @@ func _build_ground_block(left: float, right: float, top: float) -> void:
 	var front := PaperMesh.new(_rng.randi())
 	front.shade_jitter = 0.04
 	front.color = Color(0.23, 0.245, 0.34)
-	# Where the street breaks off at the pit, the ends crumble too, each layer
-	# a little differently, instead of stopping in a straight cut.
-	var broken_left := left == PIT_RIGHT
-	var broken_right := right == PIT_LEFT
-	front.torn_sheet(_torn_band(left, right, top, top - 1.2, 0.0, broken_left, broken_right), STREET_FRONT, Color(0.5, 0.54, 0.68), 0.03)
+	# Where the street breaks off at a hole, the ends crumble too, each layer
+	# a little differently, instead of stopping in a straight cut. Over a
+	# tunnel the torn layers stop at the tunnel's ceiling.
+	var bottom := top - (12.0 if thick >= 8.0 else thick)
+	front.torn_sheet(_torn_band(left, right, top, maxf(top - 1.2, bottom), 0.0, broken_left, broken_right), STREET_FRONT, Color(0.5, 0.54, 0.68), 0.03)
 	front.color = Color(0.125, 0.135, 0.22)
-	front.torn_sheet(_torn_band(left, right, top - 0.3, top - 12.0, 0.13, broken_left, broken_right), STREET_FRONT + 0.1, Color(0.24, 0.265, 0.39), 0.03)
+	front.torn_sheet(_torn_band(left, right, top - 0.3, bottom, 0.13, broken_left, broken_right), STREET_FRONT + 0.1, Color(0.24, 0.265, 0.39), 0.03)
 	front.color = Color(0.07, 0.076, 0.14)
-	front.torn_sheet(_torn_band(left, right, top - 0.82, top - 12.0, 0.22, broken_left, broken_right), STREET_FRONT + 0.2, Color(0.15, 0.165, 0.27), 0.03)
+	if top - 0.82 > bottom + 0.2:
+		front.torn_sheet(_torn_band(left, right, top - 0.82, bottom, 0.22, broken_left, broken_right), STREET_FRONT + 0.2, Color(0.15, 0.165, 0.27), 0.03)
 	# Loose chunks of stone in the broken edge, on each of the three layers.
 	# Each chunk gets its own depth, a few millimetres from its neighbours:
 	# two sheets at exactly the same depth flicker where they overlap.
@@ -375,7 +424,7 @@ func _build_ground_block(left: float, right: float, top: float) -> void:
 	var cx := left + 0.5
 	while cx < right - 0.7:
 		var layer := _rng.randi_range(0, 2)
-		var drop: float = [0.17, 0.62, 1.15][layer]
+		var drop: float = maxf(minf([0.17, 0.62, 1.15][layer], thick - 0.45), 0.08)
 		var tone: Color = [Color(0.19, 0.2, 0.29), Color(0.1, 0.11, 0.185), Color(0.055, 0.06, 0.115)][layer]
 		var rim: Color = [Color(0.4, 0.43, 0.56), Color(0.2, 0.22, 0.33), Color(0.12, 0.135, 0.22)][layer]
 		var wide := _rng.randf_range(0.3, 0.8)
@@ -507,7 +556,9 @@ func _build_platform(center_x: float, top: float, width: float) -> void:
 ## The first is raised on timber posts like a gatehouse, so you walk under it
 ## into the gap between the two; wall jumping zig-zags up the gap; the taller
 ## one has a lookout ledge on top.
-const CLIMB_WALLS := [[37.9 + EAST, 39.2 + EAST, 8.5, 2.5, true], [41.6 + EAST, 42.7 + EAST, 11.5, 0.0, false]]
+## (The Gatehouse, area 5: the first wall is the gatehouse itself, with the
+## barred gate under it; the second is a tall tower you also walk under.)
+const CLIMB_WALLS := [[128.5, 129.8, 8.5, 2.5, true], [132.2, 133.3, 11.5, 2.5, false]]
 ## How far above a wall's top its little roof's ridge reaches. The solid part
 ## of the wall goes up this far too, so you stand ON the ridge, not in the tiles.
 const CLIMB_ROOF := 0.62
@@ -561,6 +612,15 @@ func _build_climb_wall(left: float, right: float, street: float, top: float, ope
 	var solid_top := top + (CLIMB_ROOF if roofed else 0.0)
 	var wall := _add_solid(Vector3(middle, (ground + solid_top) * 0.5, 0.0), Vector3(width, solid_top - ground, 2.2))
 	wall.set_meta(&"climbable", true)
+	if left == CLIMB_WALLS[0][0]:
+		# The gatehouse: its outer (west) face is sheer, so the barred gate
+		# cannot just be climbed over from outside; inside the course (its
+		# east face) it climbs like the others.
+		wall.queue_free()
+		var outer := _add_solid(Vector3(left + width * 0.25, (ground + solid_top) * 0.5, 0.0), Vector3(width * 0.5, solid_top - ground, 2.2))
+		outer.set_meta(&"sheer", true)
+		var inner := _add_solid(Vector3(left + width * 0.75, (ground + solid_top) * 0.5, 0.0), Vector3(width * 0.5, solid_top - ground, 2.2))
+		inner.set_meta(&"climbable", true)
 	if opening > 0.0:
 		var frame := PaperMesh.new(_rng.randi())
 		frame.shade_jitter = 0.18
@@ -772,7 +832,8 @@ func relight_arena_lanterns() -> void:
 
 ## A stone lantern (toro): a foot, a post, a lit fire box with paper
 ## windows, and a cap. It gives off a real, low light.
-func _build_stone_lantern(at: Vector3) -> void:
+## `arena`: one of the courtyard's (the Hannya cutscene puts those out).
+func _build_stone_lantern(at: Vector3, arena: bool = true) -> void:
 	var stone := Color(0.32, 0.33, 0.41)
 	var b := PaperMesh.new(_rng.randi())
 	b.shade_jitter = 0.15
@@ -797,6 +858,8 @@ func _build_stone_lantern(at: Vector3) -> void:
 	_add_wet_shine(at.x, at.y, 0.5)
 	var shine: Node = get_child(get_child_count() - 1) if get_child_count() > before else null
 	var fire_material := flame.material_override as StandardMaterial3D
+	if not arena:
+		return
 	arena_lanterns.append({"light": light, "fire": fire_material, "shine": shine,
 			"energy": light.light_energy, "glow": fire_material.emission_energy_multiplier})
 
@@ -817,13 +880,14 @@ func _build_props() -> void:
 	_hang_lantern(Vector3(TORII_X, 4.75, -1.0), 0.2, 0.8)
 
 	var flag := Scenery.banner(_rng, 5.2)
-	flag.position = Vector3(31.95 + EAST, 1.5, -2.4)
+	flag.position = Vector3(155.2, 0.0, -2.4)
 	add_child(flag)
 
 	# Clutter along the street: [what, x, depth, size, turn]
 	for prop: Array in [["barrel", -1.2, -2.6, 1.0, 0.0], ["crate", -0.2, -2.9, 0.8, 0.3], ["barrel", 0.3, -2.3, 0.8, 0.0],
 			["crate", 38.6, -2.9, 0.9, -0.2], ["crate", 39.0, -2.85, 0.6, 0.5], ["barrel", 14.3, -2.5, 1.0, 0.0],
-			["barrel", 62.4, -2.5, 1.0, 0.0], ["barrel", 38.6 + EAST, -2.6, 1.0, 0.0], ["crate", 39.4 + EAST, -2.9, 0.8, 0.2]]:
+			["barrel", 61.0, -2.5, 1.0, 0.0], ["barrel", 142.6, -2.6, 1.0, 0.0], ["crate", 143.4, -2.9, 0.8, 0.2],
+			["crate", 126.0, -2.9, 0.9, 0.4], ["barrel", 81.2, -2.6, 0.8, 0.0]]:
 		var thing: Node3D = Scenery.barrel(_rng, prop[3]) if prop[0] == "barrel" else Scenery.crate(_rng, prop[3])
 		thing.position = Vector3(prop[1], _street_height(prop[1]), prop[2])
 		thing.rotation.y = prop[4]
@@ -831,11 +895,6 @@ func _build_props() -> void:
 			thing.position.y += 0.9  # the small crate sits on the big one
 		add_child(thing)
 
-	# Broken fences either side of the pit.
-	for f: Array in [[PIT_LEFT - 3.7, 3.4, -3.0], [PIT_RIGHT + 0.3, 2.6, -3.0]]:
-		var rails := Scenery.fence(_rng, f[1])
-		rails.position = Vector3(f[0], _street_height(f[0] + 0.1), f[2])
-		add_child(rails)
 
 	# Fallen petals on the stones near the well.
 	var petals := PaperMesh.new(_rng.randi())
@@ -899,6 +958,8 @@ func _build_shoji_screen(at: Vector3) -> void:
 # --- Foreground: dark shapes between the camera and the action ---------------
 
 func _build_foreground() -> void:
+	_near = Node3D.new()
+	add_child(_near)
 	# Two near-black torn strips along the bottom of the view. They follow the
 	# height of the street so they never cover the Ronin's feet.
 	var near := PaperMesh.new(_rng.randi())
@@ -909,7 +970,7 @@ func _build_foreground() -> void:
 		var line := PackedVector2Array()
 		var x := -34.0
 		while x < ARENA.y + 3.0:
-			var ground := lerpf(0.0, 1.5, smoothstep(33.5 + EAST, 38.0 + EAST, x))
+			var ground := lerpf(0.0, STEPS_TOP, smoothstep(STEPS.x - 1.0, STEPS.y + 1.0, x))
 			line.append(Vector2(x, ground + layer[1] + _rng.randf_range(-0.16, 0.16)))
 			x += _rng.randf_range(0.8, 2.2)
 		var outline := PaperMesh.tear(line, 0.3, 0.05, _rng, false)
@@ -922,7 +983,7 @@ func _build_foreground() -> void:
 	near.color = Color(0.03, 0.035, 0.08)
 	var gx := -30.0
 	while gx < ARENA.y - 1.0:
-		var ground := lerpf(0.0, 1.5, smoothstep(33.5 + EAST, 38.0 + EAST, gx))
+		var ground := lerpf(0.0, STEPS_TOP, smoothstep(STEPS.x - 1.0, STEPS.y + 1.0, gx))
 		if _rng.randf() < 0.3:
 			var rock := PackedVector2Array()
 			var wide := _rng.randf_range(0.7, 1.6)
@@ -944,19 +1005,19 @@ func _build_foreground() -> void:
 			(grass.material_override as StandardMaterial3D).disable_fog = true
 			grass.cast_shadow = OFF
 			grass.position = Vector3(gx, ground - 0.8, 3.5)
-			add_child(grass)
+			_near.add_child(grass)
 			Scenery.windswept(grass, -0.03, _rng)
 		gx += _rng.randf_range(1.5, 4.5)
 	var dark := near.build(Color.WHITE, 0.0, true)
 	(dark.material_override as StandardMaterial3D).disable_fog = true
 	dark.cast_shadow = OFF
-	add_child(dark)
+	_near.add_child(dark)
 
 
 	# Cherry trees. One stands in the foreground at the start, its trunk at
 	# the left of the view; the others stand on the street behind the Ronin.
 	# [x, depth, height, lean, blossoms left, how much of it is bare trunk]
-	for t: Array in [[-14.2, 2.6, 10.5, 0.9, 40, 0.56], [13.4, -2.0, 7.6, 0.8, 30, 0.42], [38.2 + EAST, -2.0, 7.2, -0.7, 26, 0.42]]:
+	for t: Array in [[-14.2, 2.6, 10.5, 0.9, 40, 0.56], [13.4, -2.0, 7.6, 0.8, 30, 0.42]]:
 		var x: float = t[0]
 		var tree := Scenery.sakura_tree(_rng, t[2], t[3], t[4], t[5])
 		tree.position = Vector3(x, (_street_height(x) if t[1] < 0.0 else -0.9), t[1])

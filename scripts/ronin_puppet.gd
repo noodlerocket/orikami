@@ -612,6 +612,13 @@ func _pose_model() -> void:
 			pose = SamuraiAnimator.wall_slide(_clock)
 		&"duck":
 			pose = SamuraiAnimator.duck(_clock)
+		&"crawl":
+			# Shuffling along ducked: short sliding steps, a soft scuff each.
+			var before_shuffle := _run_phase
+			_run_phase = fposmod(_run_phase + _step * strides_per_second * 0.9, 1.0)
+			if _run_phase < before_shuffle or (before_shuffle < 0.5 and _run_phase >= 0.5):
+				Sound.play(self, &"step", -12.0)
+			pose = SamuraiAnimator.crawl(_run_phase, _clock)
 		&"sneak":
 			# Creeping (cutscenes): short steps at `strides_per_second`.
 			var before_step := _run_phase

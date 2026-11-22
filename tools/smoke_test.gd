@@ -253,14 +253,16 @@ func _run(main: Node) -> void:
 	_check("resting at a shrine heals him (%d/%d)" % [ronin.health, ronin.max_health], ronin.health == ronin.max_health)
 	_check("and he will come back there (%.1f m from it)" % absf(rest_spot.x - shrine.global_position.x), absf(rest_spot.x - shrine.global_position.x) < 0.1)
 
-	# Falling in the pit: the screen fades and he is back at the start.
+	await _expanded_village(main, ronin)
+
+	# Falling into deep water: the screen fades and he is back at the shrine.
 	var spawn: Vector3 = ronin.get("_spawn_position")
 	before = ronin.health
-	ronin.position = Vector3((Village.PIT_LEFT + Village.PIT_RIGHT) * 0.5, 1.0, 0.0)
+	ronin.position = Vector3((Canals.DEEP.x + Canals.DEEP.y) * 0.5, -4.0, 0.0)
 	ronin.velocity = Vector3.ZERO
 	await _frames(150)
-	_check("a fall into the pit puts him back at the start (%.1f m away)" % ronin.position.distance_to(spawn), ronin.position.distance_to(spawn) < 1.0)
-	_check("a fall costs one health (%d -> %d)" % [before, ronin.health], ronin.health == before - 1 or (before == 1 and ronin.health == ronin.max_health))
+	_check("deep water carries him back to the last shrine (%.1f m away)" % ronin.position.distance_to(spawn), ronin.position.distance_to(spawn) < 1.0)
+	_check("and costs one health (%d -> %d)" % [before, ronin.health], ronin.health == before - 1 or (before == 1 and ronin.health == ronin.max_health))
 
 	# The camera follows smoothly into and out of the courtyard (it used to
 	# jump left on stepping out). Checked after the fight is set up, below.
@@ -535,6 +537,134 @@ func _run(main: Node) -> void:
 	print("SMOKE TEST: ", "ALL PASSED" if _failures == 0 else "%d FAILED" % _failures)
 	Engine.time_scale = 1.0
 	quit(_failures)
+
+
+## The areas of the expanded village: the Fallen Street, the canals, the
+## river and its bridge, the gatehouse, the Shrine Steps.
+func _expanded_village(main: Node, ronin: Ronin) -> void:
+	var village: Village = main.get_node("Village")
+	var camera: Camera3D = main.get_node("Camera")
+	ronin.set("_draw_safe", 120.0)  # nothing hurts him during these checks
+	# A soggy plank holds him a moment, then gives way: he drops into the
+	# canals, unharmed, and the camera goes down with him without a jump.
+	var plank: SoggyPlank = village.fallen.planks[1]
+	var health_before := ronin.health
+	ronin.position = Vector3(plank.global_position.x + plank.length * 0.5, 0.5, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await physics_frame
+	(camera as FollowCamera).snap_to_target()
+	var held := false
+	var biggest := 0.0
+	var last_cam := camera.global_position
+	for f in 200:
+		await process_frame
+		if f == 22:
+			held = ronin.is_on_floor() and ronin.global_position.y > -0.4 and not plank.fallen
+		if f > 2:
+			biggest = maxf(biggest, camera.global_position.distance_to(last_cam))
+		last_cam = camera.global_position
+	_check("a soggy plank holds him for a moment", held)
+	_check("then gives way and drops him into the canals (y %.1f)" % ronin.global_position.y, plank.fallen and ronin.global_position.y < -3.5)
+	_check("falling through it is not a death (%d -> %d)" % [health_before, ronin.health], ronin.health == health_before)
+	_check("the camera follows him down smoothly (biggest step %.2f m)" % biggest, biggest < 0.45)
+	_check("underground, the camera is down with him (y %.1f)" % camera.global_position.y, camera.global_position.y < 0.5)
+	# Wading in the canal water slows him.
+	ronin.position = Vector3(67.0, Village.CANAL_WATER - 0.3, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(10)
+	Input.action_press("move_right")
+	var fastest := 0.0
+	var waded := false
+	for f in 18:
+		await physics_frame
+		fastest = maxf(fastest, ronin.velocity.x)
+		waded = waded or ronin.wading
+	Input.action_release("move_right")
+	_check("wading in the canal slows him (%.1f m/s)" % fastest, waded and fastest < ronin.run_speed * 0.75)
+	# A sluice presses him down.
+	ronin.position = Vector3(Canals.SLUICES[0], -4.6, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(10)
+	_check("a sluice presses him down (%.1f m/s)" % ronin.velocity.y, ronin.velocity.y < -11.0 or ronin.global_position.y < -6.0)
+	# The crawlspace: standing he cannot pass; ducked he shuffles through,
+	# and stays ducked under it even when he lets go.
+	ronin.position = Vector3(Canals.CRAWL.x - 1.2, Village.PIPE_FLOOR + 0.05, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(10)
+	Input.action_press("move_right")
+	await _frames(60)
+	_check("standing, he cannot get into the crawlspace (x %.1f)" % ronin.global_position.x, ronin.global_position.x < Canals.CRAWL.x)
+	Input.action_press("aim_down")
+	await _frames(90)
+	Input.action_release("aim_down")
+	await _frames(8)
+	var stays_down: bool = ronin.get("_ducking")
+	await _frames(160)
+	Input.action_release("move_right")
+	_check("ducked, he crawls under it and stays down beneath it", stays_down)
+	_check("and comes out the other side (x %.1f)" % ronin.global_position.x, ronin.global_position.x > Canals.CRAWL.y + 0.2)
+	# The grate into Well Square opens with two cuts from below.
+	ronin.position = Vector3(Village.GRATE_X - 0.45, -1.95, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(15)
+	for k in 2:
+		Input.action_press("aim_up")
+		Input.action_press("slash")
+		await _frames(2)
+		Input.action_release("slash")
+		Input.action_release("aim_up")
+		await _frames(30)
+	_check("two cuts from below open the drain grate", village.canals.grate_open)
+	# Out over the river the gusts push him west; falling in, the river
+	# carries him off, back to the shrine.
+	var spawn: Vector3 = ronin.get("_spawn_position")
+	ronin.position = Vector3((RiverBridge.GAP.x + RiverBridge.GAP.y) * 0.5, 3.0, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(14)
+	_check("a gust over the river pushes him (%.2f m/s)" % ronin.velocity.x, ronin.velocity.x < -0.15)
+	await _frames(150)
+	_check("the river carries him back to the shrine (%.1f m away)" % ronin.global_position.distance_to(spawn), ronin.global_position.distance_to(spawn) < 1.0)
+	# The gate: barred from the far side.
+	var gate := village.gatehouse
+	var wall: Array = Village.CLIMB_WALLS[0]
+	ronin.position = Vector3(wall[0] - 1.0, 0.05, 0.0)
+	ronin.velocity = Vector3.ZERO
+	ronin.facing = 1.0
+	await _frames(10)
+	Input.action_press("slash")
+	await _frames(2)
+	Input.action_release("slash")
+	await _frames(30)
+	_check("from the west, the gate stays barred", not gate.opened)
+	ronin.position = Vector3(wall[1] + 1.2, 0.05, 0.0)
+	ronin.velocity = Vector3.ZERO
+	ronin.facing = -1.0
+	await _frames(10)
+	Input.action_press("slash")
+	await _frames(2)
+	Input.action_release("slash")
+	await _frames(30)
+	Input.action_press("move_left")
+	await _frames(50)
+	Input.action_release("move_left")
+	_check("from the east, a cut unbars it and the way west is open (x %.1f)" % ronin.global_position.x, gate.opened and ronin.global_position.x < wall[0])
+	# Three shrines to rest at.
+	_check("there are three shrines", village.find_children("*", "RestShrine", true, false).size() >= 3)
+	# Up the Shrine Steps.
+	ronin.position = Vector3(Village.STEPS.x - 0.5, 0.05, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(10)
+	Input.action_press("move_right")
+	await _frames(int((Village.STEPS.y - Village.STEPS.x - 0.5) / ronin.run_speed * 60.0))
+	Input.action_release("move_right")
+	await _frames(20)
+	_check("he walks up the Shrine Steps (%.2f m up, at x %.1f)" % [ronin.global_position.y, ronin.global_position.x],
+			ronin.global_position.y > Village.STEPS_TOP * 0.8 and ronin.is_on_floor())
+	ronin.position = Vector3(20.0, 0.1, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(20)
+	ronin.set("_draw_safe", 0.0)
+	ronin.health = ronin.max_health
 
 
 ## Puts the Ronin just in front of the husk, the two facing each other.

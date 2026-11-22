@@ -36,6 +36,11 @@ const MOON_AT := Vector3(30.0, 15.2, -50.5)
 
 var _rng := RandomNumberGenerator.new()
 var _clouds: Array[Node3D] = []
+## Every rolling skyline as it was made, so the east end can be carried on
+## (see _build_east): [base, height, lump, p1, p2, p3, z, top colour, body
+## colour, fade, rim colour, rim width, skyline].
+var _layers: Array = []
+var _peaks_end := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -44,6 +49,7 @@ func _ready() -> void:
 	_build_mountains()
 	_build_far_village()
 	_build_far_rain()
+	_build_east()
 
 
 func _process(delta: float) -> void:
@@ -60,12 +66,12 @@ func _process(delta: float) -> void:
 func _build_sky() -> void:
 	# The night itself: darkest overhead, paler toward the horizon.
 	var sky := _sheet()
-	sky.fade_quad(Vector3(-200.0, -30.0, -53.0), Vector3(220.0, -30.0, -53.0),
-			Vector3(220.0, 12.0, -53.0), Vector3(-200.0, 12.0, -53.0), Color(0.33, 0.37, 0.59), Color(0.17, 0.195, 0.37))
-	sky.fade_quad(Vector3(-200.0, 12.0, -53.0), Vector3(220.0, 12.0, -53.0),
-			Vector3(220.0, 26.0, -53.0), Vector3(-200.0, 26.0, -53.0), Color(0.17, 0.195, 0.37), Color(0.075, 0.085, 0.19))
-	sky.fade_quad(Vector3(-200.0, 26.0, -53.0), Vector3(220.0, 26.0, -53.0),
-			Vector3(220.0, 70.0, -53.0), Vector3(-200.0, 70.0, -53.0), Color(0.075, 0.085, 0.19), Color(0.03, 0.035, 0.1))
+	sky.fade_quad(Vector3(-200.0, -30.0, -53.0), Vector3(330.0, -30.0, -53.0),
+			Vector3(330.0, 12.0, -53.0), Vector3(-200.0, 12.0, -53.0), Color(0.33, 0.37, 0.59), Color(0.17, 0.195, 0.37))
+	sky.fade_quad(Vector3(-200.0, 12.0, -53.0), Vector3(330.0, 12.0, -53.0),
+			Vector3(330.0, 26.0, -53.0), Vector3(-200.0, 26.0, -53.0), Color(0.17, 0.195, 0.37), Color(0.075, 0.085, 0.19))
+	sky.fade_quad(Vector3(-200.0, 26.0, -53.0), Vector3(330.0, 26.0, -53.0),
+			Vector3(330.0, 70.0, -53.0), Vector3(-200.0, 70.0, -53.0), Color(0.075, 0.085, 0.19), Color(0.03, 0.035, 0.1))
 	_add(sky, true)
 
 	# The moon: a wide soft glow, a tighter one, a torn pale rim, and the disc
@@ -149,6 +155,7 @@ func _build_mountains() -> void:
 		peaks.append(Vector2(x + wide * _rng.randf_range(0.4, 0.6), tall))
 		x += wide
 	peaks.append(Vector2(x, 8.0))
+	_peaks_end = Vector2(x, 8.0)
 	var range_sheet := _sheet()
 	var range_line := PaperMesh.tear(peaks, 2.2, 0.35, _rng, false)
 	_curtain(range_sheet, range_line, -48.5, Color(0.31, 0.355, 0.585), Color(0.38, 0.43, 0.66), 9.0)
@@ -206,7 +213,9 @@ func _build_mountains() -> void:
 ## One layer of rolling hills. Returns its skyline, so pines can be stood on it.
 func _hills(z: float, base: float, height: float, lump: float, color: Color, rim: Color) -> PackedVector2Array:
 	var skyline := _rolling(base, height, lump)
+	_layers[_layers.size() - 1].append_array([z, color.lightened(0.09), color, height * 2.2, rim, _rim(z), skyline])
 	var ridge := _rolling(base - height * 1.05, height * 0.7, lump * 0.75)
+	_layers[_layers.size() - 1].append_array([z + 0.05, color.darkened(0.07), color.darkened(0.1), height, color.lightened(0.12), _rim(z) * 0.7, ridge])
 	var b := _sheet()
 	_curtain(b, skyline, z, color.lightened(0.09), color, height * 2.2)
 	_torn_rim(b, skyline, z - 0.02, rim, _rim(z))
@@ -227,6 +236,21 @@ func _rolling(base: float, height: float, lump: float) -> PackedVector2Array:
 	while x <= 190.0:
 		line.append(Vector2(x, base + height * (0.55 * sin(x / lump + p1) + 0.3 * sin(x / (lump * 0.43) + p2)
 				+ 0.15 * sin(x / (lump * 0.19) + p3))))
+		x += lump * 0.25
+	_layers.append([base, height, lump, p1, p2, p3])
+	return PaperMesh.tear(line, lump * 0.11, lump * 0.03, _rng, false)
+
+
+## The same skyline as _rolling made, carried on east from where it ended.
+func _rolling_on(layer: Array, from: Vector2, to: float) -> PackedVector2Array:
+	var base: float = layer[0]
+	var height: float = layer[1]
+	var lump: float = layer[2]
+	var line := PackedVector2Array([from])
+	var x := from.x + lump * 0.25
+	while x <= to:
+		line.append(Vector2(x, base + height * (0.55 * sin(x / lump + layer[3]) + 0.3 * sin(x / (lump * 0.43) + layer[4])
+				+ 0.15 * sin(x / (lump * 0.19) + layer[5]))))
 		x += lump * 0.25
 	return PaperMesh.tear(line, lump * 0.11, lump * 0.03, _rng, false)
 
@@ -395,7 +419,7 @@ func _build_far_village() -> void:
 
 	# The river, with moonlight broken on it, and the arched bridge across.
 	var water := _sheet()
-	water.fade_quad(Vector3(-80.0, -8.0, -12.4), Vector3(100.0, -8.0, -12.4), Vector3(100.0, 0.9, -12.4),
+	water.fade_quad(Vector3(-80.0, -8.0, -12.4), Vector3(330.0, -8.0, -12.4), Vector3(330.0, 0.9, -12.4),
 			Vector3(-80.0, 0.9, -12.4), Color(0.09, 0.11, 0.25), Color(0.19, 0.235, 0.45))
 	water.color = Color(0.5, 0.57, 0.82)
 	for i in 70:
@@ -570,8 +594,67 @@ func _mist(z: float, top: float, amount: float) -> void:
 	var b := PaperMesh.new(1)
 	var solid := Color(MIST.r, MIST.g, MIST.b, amount * mist_strength)
 	var clear := Color(MIST.r, MIST.g, MIST.b, 0.0)
-	b.fade_quad(Vector3(-200.0, top - 7.0, z), Vector3(220.0, top - 7.0, z),
-			Vector3(220.0, top, z), Vector3(-200.0, top, z), solid, clear)
-	b.fade_quad(Vector3(-200.0, -45.0, z), Vector3(220.0, -45.0, z),
-			Vector3(220.0, top - 7.0, z), Vector3(-200.0, top - 7.0, z), solid, solid)
+	b.fade_quad(Vector3(-200.0, top - 7.0, z), Vector3(330.0, top - 7.0, z),
+			Vector3(330.0, top, z), Vector3(-200.0, top, z), solid, clear)
+	b.fade_quad(Vector3(-200.0, -45.0, z), Vector3(330.0, -45.0, z),
+			Vector3(330.0, top - 7.0, z), Vector3(-200.0, top - 7.0, z), solid, solid)
 	add_child(b.build_veil())
+
+
+# --- The east end ------------------------------------------------------------------
+
+## The village grew east (to the Shrine Steps and the courtyard, x 190), so
+## the far layers are carried on past where they used to end. Built last,
+## with its own random numbers, so nothing already seen west of here changes.
+func _build_east() -> void:
+	var kept := _rng
+	_rng = RandomNumberGenerator.new()
+	_rng.seed = layout_seed * 31 + 5
+	var to := 330.0
+	# The peaks.
+	var peaks := PackedVector2Array([_peaks_end])
+	var x := _peaks_end.x
+	while x < to:
+		var wide := _rng.randf_range(15.0, 26.0)
+		peaks.append(Vector2(x + wide * _rng.randf_range(0.4, 0.6), _rng.randf_range(12.5, 19.0)))
+		x += wide
+		peaks.append(Vector2(x, _rng.randf_range(7.5, 9.5)))
+	var range_sheet := _sheet()
+	var range_line := PaperMesh.tear(peaks, 2.2, 0.35, _rng, false)
+	_curtain(range_sheet, range_line, -48.5, Color(0.31, 0.355, 0.585), Color(0.38, 0.43, 0.66), 9.0)
+	_torn_rim(range_sheet, range_line, -48.52, Color(0.5, 0.56, 0.8), _rim(-48.5))
+	range_sheet.color = Color(0.5, 0.56, 0.79)
+	for i in range(1, peaks.size() - 1, 2):
+		var top := peaks[i]
+		range_sheet.polygon(PaperMesh.tear(PackedVector2Array([top + Vector2(0.0, 0.1), top + Vector2(2.6, -2.4),
+				top + Vector2(1.0, -1.7), top + Vector2(0.2, -2.9), top + Vector2(-0.9, -1.6), top + Vector2(-2.4, -2.6)]),
+				0.9, 0.14, _rng), -48.4)
+	_add(range_sheet, true)
+	# Every rolling layer of hills, carried on from where it ended.
+	for layer: Array in _layers:
+		if layer.size() < 13:
+			continue  # (a skyline that is not part of a hill layer)
+		var b := _sheet()
+		var old: PackedVector2Array = layer[12]
+		var line := _rolling_on(layer, old[old.size() - 1], to)
+		var z: float = layer[6]
+		_curtain(b, line, z, layer[7], layer[8], layer[9])
+		_torn_rim(b, line, z - 0.02, layer[10], layer[11])
+		_add(b, true)
+	# More of the far village on its slope, and the middle row behind the
+	# street, as far as the courtyard.
+	var houses := _sheet()
+	var lights := _sheet()
+	x = 63.0
+	while x < 215.0:
+		_far_house(houses, lights, Vector2(x, _rng.randf_range(1.0, 2.0)), _rng.randf_range(4.6, 6.5), _rng.randf_range(3.0, 4.6), -15.6, 1.0)
+		x += _rng.randf_range(7.0, 10.0)
+	_add(houses, true)
+	_glow(lights, 1.3)
+	var mid := _sheet()
+	var mid_lights := _sheet()
+	for h: Array in [[60.5, 0.0, 5.0, 5.8], [141.5, 0.0, 5.5, 6.4], [160.0, 0.6, 6.0, 5.6]]:
+		_far_house(mid, mid_lights, Vector2(h[0], h[1]), h[2], h[3], -8.8, 0.78)
+	_add(mid, true)
+	_glow(mid_lights, 1.4)
+	_rng = kept

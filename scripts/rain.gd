@@ -15,6 +15,7 @@ extends Node3D
 @export var streak_color := Color(0.78, 0.84, 1.0, 0.3)
 
 var _drops: CPUParticles3D
+var _look: ShaderMaterial
 
 
 func _ready() -> void:
@@ -33,14 +34,16 @@ func _ready() -> void:
 
 	var streak := QuadMesh.new()
 	streak.size = Vector2(streak_width, streak_length)
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.albedo_color = streak_color
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.billboard_mode = BaseMaterial3D.BILLBOARD_FIXED_Y
-	mat.billboard_keep_scale = true
-	mat.disable_fog = true
-	streak.material = mat
+	# (A shader of our own, so that underground no rain falls inside the
+	# canals: see shaders/rain_streak.gdshader.)
+	_look = ShaderMaterial.new()
+	_look.shader = preload("res://shaders/rain_streak.gdshader")
+	_look.set_shader_parameter(&"tint", streak_color)
+	_look.set_shader_parameter(&"hole", Vector2(Village.FALL_LEFT, Village.FALL_RIGHT))
+	_look.set_shader_parameter(&"hole_floor", Village.CANAL_WATER)
+	_look.set_shader_parameter(&"river", Village.RIVER)
+	_look.set_shader_parameter(&"river_floor", RiverBridge.WATER)
+	streak.material = _look
 	_drops.mesh = streak
 	_drops.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_drops)
@@ -49,7 +52,9 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	var camera := get_viewport().get_camera_3d()
 	if camera:
+		# Underground, the drops start no lower than above the street.
 		global_position = Vector3(camera.global_position.x,
-				camera.global_position.y + height_above_camera, -2.0)
+				maxf(camera.global_position.y, 4.2) + height_above_camera, -2.0)
+		_look.set_shader_parameter(&"clip_on", camera.global_position.y < 3.5)
 	# The rain slants further over in a gust.
 	_drops.direction = Vector3(-0.04 - Wind.speed_at(global_position.x) * wind_slant, -1.0, 0.0)
