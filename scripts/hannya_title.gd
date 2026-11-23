@@ -13,6 +13,9 @@ extends Control
 var KANJI: Texture2D = preload("res://textures/title_hannya_kanji.png")
 var NAME: Texture2D = preload("res://textures/title_hannya_name.png")
 var SUBTITLE: Texture2D = preload("res://textures/title_hannya_subtitle.png")
+## The boss's seal (a hanko with its two characters carved in; rendered by
+## tools/render_seals.py). Replaced a plain square with a cut mark (Julian).
+var SEAL: Texture2D = preload("res://textures/seal_hannya.png")
 
 var _stroke := 0.0     # 0 to 1: how much of the brush stroke is drawn
 var _words := 0.0      # 0 to 1: the name fading in
@@ -95,11 +98,12 @@ func _draw() -> void:
 		var sub_size := Vector2(SUBTITLE.get_width(), SUBTITLE.get_height()) * (sub_height / SUBTITLE.get_height())
 		draw_texture_rect(SUBTITLE, Rect2(Vector2(name_at.x + thick * 0.08, middle.y + thick * 0.62), sub_size),
 				false, Color(0.75, 0.75, 0.82, _words * 0.85))
-	# The seal: a vermilion square with a pale cut mark, stamped on.
+	# The seal: pressed down onto the end of the stroke at a slight tilt,
+	# landing from a little above (bigger, fainter) and settling.
 	if _seal > 0.0:
-		var side := thick * 0.62 * lerpf(1.4, 1.0, _seal)
-		var at := Vector2(left + length + side * 0.2, middle.y - side * 0.9)
-		draw_rect(Rect2(at, Vector2(side, side)), Color(0.72, 0.17, 0.12, _seal))
-		draw_rect(Rect2(at + Vector2(side * 0.22, side * 0.2), Vector2(side * 0.14, side * 0.6)), Color(0.95, 0.85, 0.78, _seal))
-		draw_rect(Rect2(at + Vector2(side * 0.5, side * 0.2), Vector2(side * 0.3, side * 0.14)), Color(0.95, 0.85, 0.78, _seal))
-		draw_rect(Rect2(at + Vector2(side * 0.58, side * 0.42), Vector2(side * 0.14, side * 0.38)), Color(0.95, 0.85, 0.78, _seal))
+		var side := thick * 1.25 * lerpf(1.35, 1.0, _seal)
+		var at := Vector2(left + length + thick * 0.55, middle.y - thick * 0.15)
+		draw_set_transform(at, deg_to_rad(-5.0), Vector2.ONE)
+		draw_texture_rect(SEAL, Rect2(Vector2(-side, -side) * 0.5 + Vector2(3, 4), Vector2(side, side)), false, Color(0.0, 0.0, 0.03, 0.45 * _seal))
+		draw_texture_rect(SEAL, Rect2(Vector2(-side, -side) * 0.5, Vector2(side, side)), false, Color(1.0, 1.0, 1.0, _seal))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

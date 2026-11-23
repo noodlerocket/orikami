@@ -205,6 +205,7 @@ func _start_intro() -> void:
 	_title.KANJI = preload("res://textures/title_akane_kanji.png")
 	_title.NAME = preload("res://textures/title_akane_name.png")
 	_title.SUBTITLE = preload("res://textures/title_akane_subtitle.png")
+	_title.SEAL = preload("res://textures/seal_akane.png")
 	_title.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_overlay.add_child(_title)

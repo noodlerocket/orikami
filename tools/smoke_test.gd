@@ -985,6 +985,7 @@ func _expanded_village(main: Node, ronin: Ronin) -> void:
 	_check("a jump that clips a corner slips round it (%.2f m up)" % corner_jump, corner_jump > 2.0)
 	await _new_enemies(village, ronin)
 	await _bamboo_creatures(village, ronin)
+	await _lantern_market(village, ronin)
 	await _cranes_and_saving(main, village, ronin)
 	# Three shrines to rest at.
 	_check("there are three shrines", village.find_children("*", "RestShrine", true, false).size() >= 3)
@@ -1071,7 +1072,11 @@ func _cranes_and_saving(main: Node, village: Village, ronin: Ronin) -> void:
 func _new_enemies(village: Village, ronin: Ronin) -> void:
 	var dog: PaperDog = village.find_children("*", "PaperDog", true, false)[1]
 	var bird: PaperBird = village.find_children("*", "PaperBird", true, false)[0]
-	var keeper: LanternHusk = village.find_children("*", "LanternHusk", true, false)[0]
+	var keeper: LanternHusk = null   # (the town's: the market's rest while he is away)
+	for k: LanternHusk in village.find_children("*", "LanternHusk", true, false):
+		if not LanternMarket.in_market(k.global_position.x):
+			keeper = k
+			break
 	ronin.set("_draw_safe", 0.0)
 	# The dog: seeing him ahead, it gives its tell, then charges; a parried
 	# charge staggers it, and a cut then finishes it.
@@ -1308,8 +1313,88 @@ func _bamboo_creatures(village: Village, ronin: Ronin) -> void:
 ## What a blow does to his paper depends on what struck him: ink soaks it,
 ## fire scorches it, a blade, claws or teeth tear it; and nothing is left
 ## once he can be hurt again.
+## The Lantern Market: the way in from Akane's clearing, the bridge, the
+## steps, a keeper's bow, and the way back.
+func _lantern_market(village: Village, ronin: Ronin) -> void:
+	var was_dueled := SaveGame.akane_dueled
+	var was_at := ronin.global_position   # (put back here after: the next checks expect it)
+	SaveGame.akane_dueled = true
+	# (As after she has yielded: her duel is over, she is gone.)
+	var duel := village.bamboo.duel
+	var duel_state: StringName = duel.get("_state")
+	var akane_shown := duel.akane.visible
+	duel.set("_state", &"done")
+	duel.akane.visible = false
+	duel.akane.set_physics_process(false)
+	ronin.set("_draw_safe", 5.0)
+	ronin.position = Vector3(BambooGrove.SHIFT + BambooGrove.EAST_END - 5.0, 2.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(20)
+	_check("after Akane the clearing's east end opens", village.bamboo.east_wall == null)
+	Input.action_press("move_right")
+	await _frames(70)
+	Input.action_release("move_right")
+	await _frames(90)
+	var x := ronin.global_position.x
+	_check("walking east out of her clearing brings him to the Lantern Market (x %.1f)" % x,
+			LanternMarket.in_market(x) and ronin.is_on_floor())
+	# The bridge's crown.
+	var crown := LanternMarket.SHIFT + (LanternMarket.BRIDGE.x + LanternMarket.BRIDGE.y) * 0.5
+	ronin.position = Vector3(crown, LanternMarket.deck_at(crown - LanternMarket.SHIFT) + 0.6, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(40)
+	var deck := LanternMarket.deck_at(crown - LanternMarket.SHIFT)
+	_check("he stands on the red bridge's crown (%.2f, deck %.2f)" % [ronin.global_position.y, deck],
+			ronin.is_on_floor() and absf(ronin.global_position.y - deck) < 0.2)
+	# Up the steps to the plaza.
+	ronin.position = Vector3(LanternMarket.SHIFT + LanternMarket.STEPS.x - 1.0, LanternMarket.UPPER.z + 0.1, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(10)
+	Input.action_press("move_right")
+	await _frames(int((LanternMarket.STEPS.y - LanternMarket.STEPS.x + 2.0) / ronin.run_speed * 60.0))
+	Input.action_release("move_right")
+	await _frames(20)
+	_check("he walks up the market's steps to the gate (%.2f m up)" % ronin.global_position.y,
+			ronin.global_position.y > LanternMarket.PLAZA.z - 0.3 and ronin.is_on_floor())
+	# A keeper bows as he passes.
+	var keeper: MarketKeeper = village.lantern_market.find_children("*", "MarketKeeper", true, false)[0]
+	ronin.position = Vector3(keeper.global_position.x + 3.0, keeper.global_position.y + 0.1, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(15)
+	ronin.position.x = keeper.global_position.x + 0.3
+	var deepest := 0.0
+	for i in 40:
+		await _frames(1)
+		deepest = maxf(deepest, (keeper.get("_torso") as Node3D).rotation.x)
+	_check("a shopkeeper bows as he passes (%.2f rad)" % deepest, deepest > 0.25)
+	# And west out of the market, back to her clearing.
+	ronin.position = Vector3(LanternMarket.SHIFT + LanternMarket.ARRIVE_X, 0.1, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(10)
+	Input.action_press("move_left")
+	await _frames(60)
+	Input.action_release("move_left")
+	await _frames(90)
+	_check("walking west out of the market returns him to the bamboo (x %.1f)" % ronin.global_position.x,
+			BambooGrove.in_grove(ronin.global_position.x))
+	SaveGame.akane_dueled = was_dueled
+	duel.set("_state", duel_state)
+	duel.akane.visible = akane_shown
+	ronin.global_position = was_at
+	ronin.velocity = Vector3.ZERO
+	await _frames(90)
+	ronin.set("_draw_safe", 0.0)
+	ronin.health = ronin.max_health
+
+
 func _struck_kinds(village: Village, ronin: Ronin) -> void:
 	var puppet: RoninPuppet = ronin.get_node("Puppet")
+	# Every enemy holds still meanwhile, so only the blows under test land.
+	var held: Array[Node] = []
+	for node: Node in village.find_children("*", "", true, false):
+		if (node is PaperHusk or node is PaperCritter or node is BurningPaper) and node.is_physics_processing():
+			node.set_physics_process(false)
+			held.append(node)
 	var shown := func() -> Dictionary:
 		return {&"ink": puppet.shows_ink(), &"fire": puppet.shows_burn(), &"cut": puppet.shows_tear()}
 	var wait_clean := func() -> void:
@@ -1360,8 +1445,10 @@ func _struck_kinds(village: Village, ronin: Ronin) -> void:
 		dog.call("_bite", 0.5)
 		await _frames(3)
 		_check("a paper dog's bite tears his paper (%s)" % ronin.last_hurt_kind, ronin.last_hurt_kind == &"cut" and puppet.shows_tear() and not puppet.shows_ink())
-		dog.set_physics_process(true)
 		await wait_clean.call()
+	for node: Node in held:
+		if is_instance_valid(node):
+			node.set_physics_process(true)
 
 
 ## Puts the Ronin just in front of the husk, the two facing each other.

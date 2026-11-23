@@ -106,6 +106,15 @@ const MOSS := Color(0.3, 0.34, 0.18)
 @export var day_saturation := 1.05
 @export var day_contrast := 1.12
 
+@export_group("Night in the Lantern Market")
+## Warmer than the town's night (Julian's picture: gold lantern light, warm
+## haze). The town is 0.8 saturation, 0.55-ish ambient.
+@export var market_saturation := 1.05
+@export var market_contrast := 1.08
+@export var market_ambient := 0.55
+@export var market_ambient_color := Color(0.86, 0.66, 0.52)
+@export var market_fog_color := Color(0.36, 0.25, 0.22)
+
 @export_group("Wind")
 ## The steady breeze, in metres per second.
 @export var wind_breeze := 2.0
@@ -163,6 +172,7 @@ var steps: ShrineSteps
 var fallen: FallenStreet
 var rooftops: RooftopRoad
 var bamboo: BambooGrove
+var lantern_market: LanternMarket
 ## The invisible wall at the courtyard's far end (gone when its gate opens).
 var east_wall: StaticBody3D
 var market: MarketStreet
@@ -209,6 +219,13 @@ func _ready() -> void:
 	bamboo = BambooGrove.new()
 	bamboo.village = self
 	add_child(bamboo)
+	# The Lantern Market, past the bamboo (its own place; the town's random
+	# draws are put back afterwards, so nothing in the town changes).
+	var saved_rng: int = _rng.state
+	lantern_market = LanternMarket.new()
+	lantern_market.village = self
+	add_child(lantern_market)
+	_rng.state = saved_rng
 	_build_foreground()
 	for spot: Vector2 in enemy_positions:
 		var husk: Node3D = HUSK_SCENE.instantiate()
@@ -359,6 +376,19 @@ func set_daylight(on: bool) -> void:
 		_moon.light_color = Color(0.64, 0.72, 0.96)
 		_moon.light_energy = moon_energy
 		_moon.rotation_degrees = Vector3(-42.0, 24.0, 0.0)
+
+
+## The warm night of the Lantern Market (on), or back to the town's (off).
+## Switched while the screen is black.
+func set_market(on: bool) -> void:
+	set_daylight(false)
+	if on:
+		_env.ambient_light_color = market_ambient_color
+		_env.ambient_light_energy = market_ambient
+		_env.fog_light_color = market_fog_color
+		_env.adjustment_saturation = market_saturation
+		_env.adjustment_contrast = market_contrast
+		_env.background_color = LanternMarket.NIGHT
 
 
 # --- Houses -----------------------------------------------------------------

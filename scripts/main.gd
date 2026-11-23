@@ -27,6 +27,7 @@ var _boss_bar: BossBar
 var _pause: PauseMenu
 var _smudge: Smudge
 var _explore_clock := 0.0
+var _in_market := false
 var _travelling := false   # fading between the town and the bamboo grove
 var _free_camera := false  # (--zoom: the camera goes anywhere)
 
@@ -81,9 +82,16 @@ func _process(delta: float) -> void:
 	_set_camera_limits()
 	# Day in the grove, night in the town; no rain in the grove.
 	var grove := BambooGrove.in_grove(_ronin.global_position.x)
+	var market := LanternMarket.in_market(_ronin.global_position.x)
 	village.bamboo.set_awake(grove)
+	village.lantern_market.set_awake(market)
+	if market != _in_market:
+		_in_market = market
+		village.set_market(market)
 	if grove != village.daylight:
 		village.set_daylight(grove)
+		if not grove:
+			village.set_market(market)
 		($Rain as Rain).ease_off(0.0 if grove else 1.0, 0.05)
 		Sound.duck_rain(grove)
 		# The paper grain over the screen is lighter in the bright bamboo
@@ -102,6 +110,14 @@ func _process(delta: float) -> void:
 			_travel(Vector3(BambooGrove.SHIFT + BambooGrove.ARRIVE_X, 1.55, 0.0), 1.0)
 		elif x < BambooGrove.SHIFT + BambooGrove.GATE_X - 0.45 and x > BambooGrove.SHIFT + BambooGrove.GATE_X - 4.0:
 			_travel(Vector3(BambooGrove.RETURN_X, Village.STEPS_TOP + 0.05, 0.0), -1.0)
+		# East out of Akane's clearing (once she has yielded) into the
+		# Lantern Market; west out of the market back to her clearing.
+		elif SaveGame.akane_dueled and village.bamboo.east_wall:
+			village.bamboo.open_east()
+		elif x > BambooGrove.SHIFT + BambooGrove.EAST_END - 1.2 and x < BambooGrove.SHIFT + BambooGrove.EAST_END + 4.0:
+			_travel(Vector3(LanternMarket.SHIFT + LanternMarket.ARRIVE_X, 0.05, 0.0), 1.0)
+		elif x < LanternMarket.SHIFT + LanternMarket.WEST_X and x > LanternMarket.SHIFT - 6.0:
+			_travel(Vector3(BambooGrove.SHIFT + BambooGrove.EAST_END - 4.0, 2.15, 0.0), -1.0)
 	_explore_clock += delta
 	if _explore_clock > 0.4:
 		_explore_clock = 0.0
@@ -129,10 +145,16 @@ func _process(delta: float) -> void:
 func _set_camera_limits() -> void:
 	if _free_camera:
 		return
-	if BambooGrove.in_grove(_ronin.global_position.x):
+	if LanternMarket.in_market(_ronin.global_position.x):
+		_camera.min_x = LanternMarket.SHIFT + 6.0
+		_camera.max_x = LanternMarket.SHIFT + LanternMarket.END - 9.0
+		if _camera.rest_zone.x < LanternMarket.SHIFT - 300.0:
+			_camera.set(&"_rest_y", _ronin.global_position.y)  # (just arrived)
+		_camera.rest_zone = Vector2(LanternMarket.SHIFT - 20.0, LanternMarket.SHIFT + LanternMarket.END + 20.0)
+	elif BambooGrove.in_grove(_ronin.global_position.x):
 		_camera.min_x = BambooGrove.SHIFT + BambooGrove.GATE_X + 5.0
 		_camera.max_x = BambooGrove.SHIFT + BambooGrove.EAST_END - 9.0
-		if _camera.rest_zone.x < 0.0:
+		if _camera.rest_zone.x < 0.0 or _camera.rest_zone.x > BambooGrove.SHIFT + 500.0:
 			_camera.set(&"_rest_y", _ronin.global_position.y)  # (just arrived)
 		_camera.rest_zone = Vector2(BambooGrove.SHIFT + BambooGrove.GATE_X, BambooGrove.SHIFT + BambooGrove.EAST_END + 5.0)
 	else:
@@ -491,6 +513,11 @@ func _apply_debug_start() -> void:
 				await get_tree().create_timer(0.3).timeout
 				_boss.health = 0
 				_boss.call("_die")).call_deferred()
+		elif arg == "--market":
+			# Straight into the Lantern Market (Akane met, the glide learned).
+			SaveGame.akane_dueled = true
+			_ronin.has_glide = true
+			_ronin.position = Vector3(LanternMarket.SHIFT + LanternMarket.ARRIVE_X, 0.1, 0.0)
 		elif arg == "--glide":
 			_ronin.has_glide = true  # (as if learned in the bamboo)
 		elif arg == "--map":

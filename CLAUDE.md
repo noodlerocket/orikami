@@ -46,7 +46,7 @@ Bamboo of Folded Wind after it (see "The expanded village"), with:
 Pause, settings and controls pages share one UI style. Downloads for
 Windows and Mac carry Julian's icon.
 
-**Next:** Julian plays the overnight work and judges it (the report lists
+**Next:** Julian looks at the Lantern Market (built, not yet played); then Hōshō's hall and fight. Julian plays the overnight work and judges it (the report lists
 what only he can judge). Then: Julian judges Akane's duel (built: proposed lore, she yields
 rather than dies; her music and sounds are in); the road on past the bamboo (the
 open middle of the game); the endings (the ink marks are saved; nothing
@@ -654,6 +654,49 @@ has its own script, built from `Village._ready`:
   streak along her draw (`streak_time`); sheet `akane_cut`. Her own
   duel music (`music_akane_duel.ogg`, `AkaneDuel.music_volume`, fades as she
   yields) and sounds (`akane_slash`, `akane_draw`, `fox_fire`). Sheets: `akane`, `akane_poses`.
+- **The Lantern Market** (`lantern_market.gd`, `market_keeper.gd`; Julian's
+  picture `docs/reference/lantern_market.webp`; not yet played by Julian): its own
+  place at `LanternMarket.SHIFT` (2000), entered by walking east out of
+  Akane's clearing once she has yielded (`BambooGrove.open_east`; the
+  clearing's end shows warm haze and lanterns), back west the same way.
+  Night with rain, graded warmer (`Village.set_market`, "Night in the
+  Lantern Market" settings). Left to right: shrine 6 (`market`), the Lower
+  Market (ground 0) with stalls at the back (`BOOTHS`: tiled roofs, red
+  noren with crests, crested lanterns, brushed banners, wares: fans,
+  sweets, sake, fish, a smoking grill, cranes), bouncy street stalls and a
+  lantern string to pogo (`STALLS`, `STRINGS`), red walkways up high with
+  cranes (`GALLERIES`); the red arched bridge over a canal (`BRIDGE`,
+  `deck_at`) up to the Upper Market (3 m); steps to the plaza (6.5 m) and
+  the Gilded Gate, shut (Hōshō's hall is not built). Behind: a terrace of
+  lit shops, a red bridge with figures, a hillside of glowing houses up to
+  a golden pagoda palace, lantern strings, a crumpled gold moon; gold leaf
+  drifting; the wet stones reach to a dark railing in front (`NEAR_Z`).
+  The ground is the market's own (not `Village._build_ground_block`, whose
+  torn front edge lay as a line across the stones: Julian). The bridge has
+  tall lantern posts at its feet (`_toro`) and lantern garlands along both
+  rails (arms at its crown were "basic and lazy"). Far bridges stand on
+  legs, lantern strings on poles, gallery lamps hang from brackets (all
+  floated). Cherry trees stand behind the stalls (`z` -7.3) so no branch
+  goes through a roof. An upgraded background (a terraced town climbing
+  behind the stalls) was built and undone at Julian's request: leave it.
+  Shopkeepers (`MarketKeeper`): gilded paper dolls that breathe, work
+  (fold, pour, fan the grill), look up at him and bow as he passes.
+  Enemies: husks and lantern husks. `--market` starts there. Stall light:
+  `LanternMarket.booth_light`.
+- **The whole region is planned** (`docs/lantern_market_plan.md`, map
+  `docs/market_map.png` from `tools/market_map.py`; proposed, for Julian):
+  about 450 m (double the grove), three layers (street, roofs, canals),
+  the built 150 m as its first third; a flying mini-boss in the middle
+  (a ryū, Julian's choice; proposed: the Festival Dragon 祭龍, a parade dragon the Rain drove mad), the Fan Gust after it.
+- **Hōshō** (the Lantern Market's general; not built yet): Julian's four
+  views `docs/reference/hosho_*`; Meshy `models/hosho.glb` (3.0 m, 39,430
+  triangles, 4K texture, the usual 24 bones; multi-image-to-3d from all four
+  views, meshy-7.1 + meshy-7 4K, remeshed to 40,000:
+  `01a205a7-5881-71cd-aa33-040ab297191c`, rig
+  `01a205aa-c699-74dd-a3d5-afa87ee4b91b`). A first meshy-t2.5 + meshy-n1
+  version from the front view was "low detail, blurry" (Julian); a
+  text-only one lost his look. The naginata was dropped by Meshy: fold it
+  in code.
 - Backdrop glows (the moon's, the castle's, far lamps) are vertex-colour
   discs (`Backdrop._soft_disc`), not `Scenery.halo`: a halo square once
   flashed up as a pale rectangle round the moon on the rooftops (rare, not
@@ -737,7 +780,12 @@ through:
   The first time he comes to her (after the tutorial), she holds up a sheet
   and tells him in pictures (`paper_maker_tale.gd`, no words, about 16 s,
   hold Space to skip, `SaveGame.papermaker_told`): the castle shut, weeping;
-  the village bleeding ink, a husk; him, blank, in a vermilion ensō. Only in
+  the village bleeding ink, a husk; him, blank, in a vermilion ensō. The
+  pictures are ink paintings made with Meshy (nano-banana-pro, 9 credits
+  each; sources `docs/reference/tale_*_source.png`, prepared into
+  `textures/tale_*.jpg` by `tools/prepare_tale.py`), multiplied onto her
+  sheet, brushed on and wiped away by `shaders/ink_reveal.gdshader`
+  (pictures drawn stroke by stroke in code were not artistic enough). Only in
   a real game (`PaperMakerTale.allowed`; the check and debug starts set
   `force`). Sheets: `papermaker`, `tale`.
 - **Well Square:** the Paper-Maker's workshop (`paper_maker_yard.gd`):
@@ -792,6 +840,24 @@ through:
   every roof.
 - Not built yet in Market Street: the ladder shortcut from the roofs, the
   paper birds, collecting cranes.
+
+### The loading screen
+- `loading_screen.gd` (`LoadingScreen.go(get_tree(), path)`): used after the
+  prologue and for Continue. Sumi black, a warm glow, a pale ensō brushed
+  round 折神 as the world loads (solid ink, dry bristles at its tail), the
+  vermilion 折神 seal (`textures/seal_orikami.png`) stamped when ready, paper
+  flecks drifting up, a line of advice or lore (`HINTS`). Loads the scene
+  in the background, changes to it, keeps the game paused underneath while
+  the world draws `settle_frames`, then fades (`fade_time`); at least
+  `least_time` on screen. Debug starts skip it. Sheet:
+  `docs/screenshots/loading.png`.
+
+### Bosses' seals
+- The vermilion seal at the end of a boss's painted title (`HannyaTitle.SEAL`)
+  is a real hanko with the boss's two characters carved in, worn like a
+  stamp: `tools/render_seals.py` (Python + Pillow, the brush font) writes
+  `textures/seal_<name>.png` (hannya 般若, akane 朱狐, orikami 折神). A new
+  boss: add a line there. (A square with a cut mark was rejected: Julian.)
 
 ### Skipping cutscenes
 - `skip_prompt.gd` (`SkipPrompt`, drawn by `UiStyle.skip_prompt`) in all

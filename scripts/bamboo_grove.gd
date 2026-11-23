@@ -98,12 +98,14 @@ var stem_feet: Array[Vector2] = []
 ## is in the town, where none of it can be seen or heard (set_awake).
 var _far: Array[Node] = []
 var _awake := true
+## The thicket closing the east end (gone once Akane has yielded).
+var east_wall: StaticBody3D
 var _town_gate: Node3D   # the gate in the courtyard (in the town's place)
 
 
 ## True when this x (a real, world x) is in the grove rather than the town.
 static func in_grove(x: float) -> bool:
-	return x > SHIFT * 0.5
+	return x > SHIFT * 0.5 and not LanternMarket.in_market(x)
 
 
 func _ready() -> void:
@@ -148,8 +150,11 @@ func _ready() -> void:
 	shrine.position = Vector3(SHRINE_X, 1.5, -0.9)
 	shrine.scale = Vector3.ONE * 1.45
 	add_child(shrine)
-	# The end of what is built: a thicket too dense to pass.
-	_solid(Vector3(EAST_END - 0.5, 10.0, 0.0), Vector3(1.0, 40.0, 4.0)).set_meta(&"no_climb", true)
+	# The east end: a thicket too dense to pass until Akane has yielded;
+	# then the way on to the Lantern Market (open_east).
+	east_wall = _solid(Vector3(EAST_END - 0.5, 10.0, 0.0), Vector3(1.0, 40.0, 4.0))
+	east_wall.set_meta(&"no_climb", true)
+	_build_east_way()
 	# Behind the gate at the west end (he is taken back to the town as he
 	# walks through it): nothing to walk into.
 	_solid(Vector3(GATE_X - 2.6, 10.0, 0.0), Vector3(1.0, 40.0, 4.0)).set_meta(&"no_climb", true)
@@ -1127,3 +1132,31 @@ func _banner(x: float) -> void:
 	cloth.polygon(PackedVector2Array([c + Vector2(-0.18, 0.0), c + Vector2(-0.34, -0.12), c + Vector2(-0.15, 0.03)]), 0.013)
 	hang.add_child(cloth.build())
 	Scenery.windswept(hang, 0.06, _rng)
+
+
+# --- The way east, to the Lantern Market ---------------------------------------------
+
+## Opens the way east out of Akane's clearing (she has yielded).
+func open_east() -> void:
+	if east_wall:
+		east_wall.queue_free()
+		east_wall = null
+
+
+## A glimpse of the market through the bamboo at the clearing's east end:
+## warm haze between the stems and a few red lanterns tied to them, so
+## the way on looks like somewhere, not a wall of stems.
+func _build_east_way() -> void:
+	var g := 2.1
+	var haze := PaperMesh.new(1)
+	for k in 5:
+		var z := 2.0 - k * 2.0
+		haze.fade_quad(Vector3(EAST_END - 4.0, g - 2.0, z), Vector3(EAST_END - 4.0, g + 12.0, z),
+				Vector3(EAST_END + 1.0, g + 12.0, z), Vector3(EAST_END + 1.0, g - 2.0, z),
+				Color(1.0, 0.72, 0.42, 0.0), Color(1.0, 0.72, 0.42, 0.3))
+	add_child(haze.build_veil(true))
+	for spot: Vector3 in [Vector3(EAST_END - 2.2, g + 3.2, -1.6), Vector3(EAST_END - 0.6, g + 4.0, -2.4)]:
+		var l := Scenery.lantern(_rng, 1.6, 0.9, 0.3)
+		l.position = spot
+		add_child(l)
+		Scenery.windswept(l, 0.04, _rng)

@@ -113,7 +113,7 @@ func _on_chosen(item: StringName) -> void:
 			_menu.fade_to_black(func() -> void: get_tree().change_scene_to_file(PROLOGUE_SCENE))
 		&"continue":
 			SaveGame.continuing = true
-			_menu.fade_to_black(func() -> void: get_tree().change_scene_to_file("res://scenes/main.tscn"))
+			_menu.fade_to_black(func() -> void: LoadingScreen.go(get_tree(), GAME_SCENE))
 		&"quit":
 			_menu.fade_to_black(func() -> void: get_tree().quit())
 		&"get_windows", &"get_mac":

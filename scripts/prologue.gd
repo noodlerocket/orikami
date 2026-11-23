@@ -175,7 +175,7 @@ func _finish() -> void:
 	finished.emit()
 	if is_inside_tree() and get_tree().current_scene == self:
 		into_well = true
-		get_tree().change_scene_to_file(GAME_SCENE)
+		LoadingScreen.go(get_tree(), GAME_SCENE)
 
 
 ## 0..1 as the clock goes from a to b, smoothed.

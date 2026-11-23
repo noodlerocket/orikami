@@ -2,7 +2,7 @@ class_name ShrineSteps
 extends Node3D
 ## The Shrine Steps (area 6 of the expanded village, docs/village_map.png):
 ## a long flight of worn stone steps up from the street to the shrine
-## courtyard, lined with stone lanterns, an old cherry leaning over them,
+## courtyard, lined with stone lanterns, an old cherry at their foot leaning over them,
 ## and at their foot the third shrine: the last rest before the Hannya.
 ## He walks up them as up a slope (the steps are for the eye; underfoot
 ## it is a smooth ramp, so he never catches on a step's edge).
@@ -103,11 +103,16 @@ func _build_lanterns() -> void:
 ## The cherry's depth: in front of the houses' eaves (at -3.4 its trunk ran
 ## up through a roof).
 const TREE_Z := -2.75
+## Which way and how far the cherry leans (positive: toward the steps).
+@export var tree_lean := 0.6
 
 
 func _build_tree() -> void:
-	var tree := Scenery.sakura_tree(_rng, 7.6, -0.6, 28, 0.42)
-	tree.position = Vector3(Village.STEPS.x + 4.4, village._street_height(Village.STEPS.x + 4.4), TREE_Z)
+	# Rooted on level ground at the foot of the steps, behind the shrine,
+	# leaning out over the first steps (Julian: planted ON the steps it made
+	# no sense).
+	var tree := Scenery.sakura_tree(_rng, 7.6, tree_lean, 28, 0.42)
+	tree.position = Vector3(Village.STEPS.x - 2.6, 0.0, TREE_Z)
 	add_child(tree)
 	var crown: Vector2 = tree.get_meta(&"crown")
 	village._add_falling_petals(Vector2(tree.position.x + crown.x, tree.position.y + crown.y), TREE_Z)

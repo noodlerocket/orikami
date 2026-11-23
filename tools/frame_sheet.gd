@@ -1100,7 +1100,7 @@ func _tale() -> Image:
 	var tile := Vector2i(480, 270)
 	var sheet := Image.create(tile.x * 4, tile.y * 2, false, Image.FORMAT_RGB8)
 	var shot := 0
-	for t: float in [0.5, 1.6, 2.6, 2.3, 2.7, 2.6, 1.6, 2.2]:
+	for t: float in [1.8, 2.2, 1.7, 2.0, 1.7, 2.0, 1.7, 2.0]:
 		await create_timer(t).timeout
 		sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((shot % 4) * tile.x, (shot / 4) * tile.y))
 		shot += 1
