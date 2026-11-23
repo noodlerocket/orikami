@@ -15,9 +15,16 @@ extends RefCounted
 ## Everything lives in static variables, so it survives changing scenes
 ## (from the title into the game).
 
-## Where it is saved. (The automated check and the debug start flags use
-## files of their own, so they never touch a real saved game.)
-static var file := "user://save.cfg"
+## Where it is saved: one of the save slots (Julian), user://save_1.cfg to
+## save_3.cfg. (The automated check and the debug start flags use files of
+## their own, so they never touch a real saved game.)
+static var file := "user://save_1.cfg"
+## How many save slots there are, and which one is in use.
+const SLOTS := 3
+static var slot := 1
+## The names of the shrines, for the slots' summaries.
+const SHRINE_NAMES := {"paper_maker": "the Paper-Maker's door", "warehouse": "the river warehouse",
+	"steps": "the Shrine Steps", "bamboo": "the bamboo altar", "mill": "the paper mill", "market": "the Mist Gate"}
 
 static var last_shrine := ""
 static var rested: Array[String] = []
@@ -43,6 +50,50 @@ static var continuing := false
 
 static func exists() -> bool:
 	return FileAccess.file_exists(file)
+
+
+static func slot_file(n: int) -> String:
+	return "user://save_%d.cfg" % n
+
+
+## Plays in slot `n` from now on.
+static func use_slot(n: int) -> void:
+	slot = n
+	file = slot_file(n)
+
+
+## True while a real slot is in use (not the check's or a debug start's file).
+static func is_real() -> bool:
+	return file.begins_with("user://save_")
+
+
+## The slots that hold a saved game. (A save from before there were slots,
+## user://save.cfg, becomes slot 1.)
+static func filled_slots() -> Array[int]:
+	if FileAccess.file_exists("user://save.cfg") and not FileAccess.file_exists(slot_file(1)):
+		DirAccess.rename_absolute("user://save.cfg", slot_file(1))
+	var filled: Array[int] = []
+	for n in range(1, SLOTS + 1):
+		if FileAccess.file_exists(slot_file(n)):
+			filled.append(n)
+	return filled
+
+
+## A slot's line on the title: where he rests and how many cranes he has.
+static func summary(n: int) -> String:
+	var cfg := ConfigFile.new()
+	if cfg.load(slot_file(n)) != OK:
+		return "Slot %d   empty" % n
+	var shrine: String = SHRINE_NAMES.get(cfg.get_value("game", "last_shrine", ""), "the well")
+	var count := 0
+	for entry: String in cfg.get_value("game", "cranes", []):
+		count += int(entry.get_slice(":", 1))
+	return "Slot %d   %s,  %d cranes" % [n, shrine, count]
+
+
+## Forgets a slot's saved game (starting over in it).
+static func erase_slot(n: int) -> void:
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(slot_file(n)))
 
 
 ## Forget everything (a new game).

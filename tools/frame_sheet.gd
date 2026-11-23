@@ -121,7 +121,11 @@ func _initialize() -> void:
 		"marks":
 			sheet = await _marks()
 		"cutscene":
-			sheet = await _cutscene()
+			# (an optional third argument picks the moments: "30,30.5,31")
+			if args.size() > 2 and args[2].contains(","):
+				sheet = await _cutscene(Array(args[2].split(",")).map(func(t: String) -> float: return float(t)))
+			else:
+				sheet = await _cutscene()
 		"sneak":
 			sheet = await _sneak()
 		"boss":

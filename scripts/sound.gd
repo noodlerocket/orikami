@@ -118,6 +118,24 @@ static func play(from: Node, sound: StringName, louder: float = 0.0) -> void:
 		from.get_tree().call_group(&"sound", &"play_sound", sound, louder)
 
 
+var _away_fade: Tween
+
+## Leaving the game's window fades all its sound out; coming back fades it
+## in again (Julian: the music should fade out).
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_APPLICATION_FOCUS_OUT and what != NOTIFICATION_APPLICATION_FOCUS_IN:
+		return
+	if not OS.get_cmdline_user_args().is_empty():
+		return  # (not in debug or tool runs)
+	if _away_fade:
+		_away_fade.kill()
+	var to := -60.0 if what == NOTIFICATION_APPLICATION_FOCUS_OUT else master_volume
+	_away_fade = create_tween()
+	_away_fade.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_away_fade.tween_method(func(db: float) -> void: AudioServer.set_bus_volume_db(0, db),
+			AudioServer.get_bus_volume_db(0), to, 0.8 if what == NOTIFICATION_APPLICATION_FOCUS_OUT else 0.5)
+
+
 func _ready() -> void:
 	add_to_group(&"sound")
 	Sound.load_levels()

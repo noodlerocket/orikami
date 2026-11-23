@@ -206,6 +206,10 @@ func _plan_events() -> void:
 		[30.0, func() -> void:
 			stage.hannya.show_body(false)
 			_mask.visible = true
+			# The tear's scraps are left behind at the cut to the close-up:
+			# one drifted between the camera and the mask, a pale shape over
+			# her cheek for a moment (Julian).
+			_scraps.visible = false
 			Sound.play(self, &"mask_creak", 3.0)],
 		[34.5, func() -> void:
 			_mask.visible = false

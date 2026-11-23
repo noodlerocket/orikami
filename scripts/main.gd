@@ -27,6 +27,18 @@ var _boss_bar: BossBar
 var _pause: PauseMenu
 var _smudge: Smudge
 var _explore_clock := 0.0
+## Particle systems in the world, and how often (seconds) those far from
+## the camera are put to sleep (_cull_far).
+var _culled: Array[CPUParticles3D] = []
+var _cull_clock := 0.0
+## How far beyond the camera (metres, along x) particles keep running.
+@export var particle_reach := 38.0
+## Lanterns cast real shadows only this near the camera (metres, along x),
+## and at most this many at once: each shadow redraws the scene, and 30 of
+## them, most off screen, cost the town a third of its frames.
+@export var shadow_reach := 12.0
+@export var most_shadows := 2
+var _shadowed: Array[OmniLight3D] = []
 var _in_market := false
 var _travelling := false   # fading between the town and the bamboo grove
 var _free_camera := false  # (--zoom: the camera goes anywhere)
@@ -118,6 +130,10 @@ func _process(delta: float) -> void:
 			_travel(Vector3(LanternMarket.SHIFT + LanternMarket.ARRIVE_X, 0.05, 0.0), 1.0)
 		elif x < LanternMarket.SHIFT + LanternMarket.WEST_X and x > LanternMarket.SHIFT - 6.0:
 			_travel(Vector3(BambooGrove.SHIFT + BambooGrove.EAST_END - 4.0, 2.15, 0.0), -1.0)
+	_cull_clock += delta
+	if _cull_clock > 0.25:
+		_cull_clock = 0.0
+		_cull_far()
 	_explore_clock += delta
 	if _explore_clock > 0.4:
 		_explore_clock = 0.0
@@ -138,6 +154,39 @@ func _process(delta: float) -> void:
 	if _boss and is_instance_valid(_boss) and _boss.health > 0:
 		if not _boss.active and in_arena and _ronin.global_position.x > Village.ARENA.x + 2.0:
 			_begin_fight()
+
+
+## Rain splashes, drips, petals and drifting leaves all through the world
+## were simulated every frame wherever he was (about 7,000 particles: the
+## main cause of the frame drops, Julian: "laggy"). Those far from the
+## camera sleep (not drawn, not simulated) until it comes near again. The
+## rain itself follows the camera and is left alone, as are particles made
+## later (bursts, sparks).
+func _cull_far() -> void:
+	if _culled.is_empty():
+		for p: CPUParticles3D in $Village.find_children("*", "CPUParticles3D", true, false):
+			_culled.append(p)
+	var cam := _camera.global_position.x
+	if _shadowed.is_empty():
+		for l: OmniLight3D in $Village.find_children("*", "OmniLight3D", true, false):
+			if l.shadow_enabled:
+				_shadowed.append(l)
+	var by_distance := _shadowed.filter(func(l: OmniLight3D) -> bool: return is_instance_valid(l))
+	by_distance.sort_custom(func(a: OmniLight3D, b: OmniLight3D) -> bool:
+		return absf(a.global_position.x - cam) < absf(b.global_position.x - cam))
+	for i in by_distance.size():
+		var l: OmniLight3D = by_distance[i]
+		l.shadow_enabled = i < most_shadows and absf(l.global_position.x - cam) < shadow_reach
+	for p: CPUParticles3D in _culled:
+		if not is_instance_valid(p):
+			continue
+		var half := 3.0
+		if p.emission_shape == CPUParticles3D.EMISSION_SHAPE_BOX:
+			half = p.emission_box_extents.x * absf(p.global_transform.basis.get_scale().x)
+		var near := absf(p.global_position.x - cam) < half + particle_reach
+		if near != p.visible:
+			p.visible = near
+			p.process_mode = Node.PROCESS_MODE_INHERIT if near else Node.PROCESS_MODE_DISABLED
 
 
 ## Where the camera may go: the town (well to the courtyard's middle), or

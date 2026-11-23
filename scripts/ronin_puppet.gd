@@ -399,7 +399,8 @@ func _update_wings(delta: float) -> void:
 func play_skid(wet: bool) -> void:
 	_skid_clock = 0.0
 	_frame_clock = 1.0
-	Sound.play(self, &"wade" if wet else &"skid", -6.0)
+	if wet:
+		Sound.play(self, &"wade", -6.0)  # (the dry skid's screech was removed: Julian)
 	var dust := CPUParticles3D.new()
 	dust.emitting = false
 	dust.one_shot = true

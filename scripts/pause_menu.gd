@@ -51,6 +51,20 @@ func is_open() -> bool:
 	return _open
 
 
+## Leaving the game's window pauses it, as the pause key would (Julian).
+## Only once he has been in the window (a window that opens without focus
+## must not pause itself), and never in a debug or tool run (screenshots,
+## frame sheets: any command-line option).
+var _had_focus := false
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		_had_focus = true
+	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT and _had_focus and OS.get_cmdline_user_args().is_empty() 			and not _open and not get_tree().paused and can_pause.call():
+		open()
+
+
 func open() -> void:
 	if _open:
 		return

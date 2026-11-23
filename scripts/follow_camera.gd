@@ -115,7 +115,7 @@ func _process(delta: float) -> void:
 	# Smoothing must never let him rise past the middle of the screen. (He
 	# crosses that line smoothly, so holding the camera to it does not jerk.)
 	if keep_below_center and target:
-		position.y = maxf(position.y, _lowest_y_keeping_center(target.global_position))
+		position.y = maxf(position.y, _lowest_y_keeping_center(_target_at()))
 	position.z = distance
 	_shake = move_toward(_shake, 0.0, shake_fade * delta * maxf(_shake, 0.05))
 	h_offset = randf_range(-_shake, _shake)
@@ -138,8 +138,14 @@ func _wanted_lead() -> float:
 	return target.facing * look_ahead + running
 
 
+## Where the target is drawn (the Ronin glides between physics steps: his
+## visual_position), so the camera follows smoothly too.
+func _target_at() -> Vector3:
+	return target.call(&"visual_position") if target.has_method(&"visual_position") else target.global_position
+
+
 func _goal() -> Vector3:
-	var at := target.global_position
+	var at := _target_at()
 	var y := maxf(lerpf(level_height, at.y, follow_height) + height_offset, min_y)
 	if at.x > rest_zone.x and at.x < rest_zone.y:
 		if target is CharacterBody3D and (target as CharacterBody3D).is_on_floor():

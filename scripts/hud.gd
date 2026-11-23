@@ -78,7 +78,11 @@ func cranes_found(total: int) -> void:
 func _draw_tag() -> void:
 	var at := corner + Vector2(6.0, 98.0)
 	_tag.draw_set_transform(at * (1.0 - crane_tag_scale), 0.0, Vector2.ONE * crane_tag_scale)
-	var area := Rect2(at, Vector2(138.0, 44.0))
+	# The scrap is as wide as what is written on it (the numbers stuck out
+	# of a fixed one: Julian).
+	var words := str(_cranes)
+	var number_w := UiStyle.width(words, 31)
+	var area := Rect2(at, Vector2(maxf(138.0, 66.0 + number_w + UiStyle.width("/ 1000", 15) + 18.0), 44.0))
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 31
 	var outline := PackedVector2Array()
@@ -103,10 +107,9 @@ func _draw_tag() -> void:
 	_tag.draw_colored_polygon(PackedVector2Array([c + Vector2(1, -1), c + Vector2(9, -13 - lift), c + Vector2(6, 1)]), Color(INK, 0.55))
 	_tag.draw_line(c + Vector2(11, 3), c + Vector2(18, -6), Color(INK, 0.85), 2.0, true)
 	_tag.draw_line(c + Vector2(-12, 2), c + Vector2(-19, -3), Color(INK, 0.85), 2.0, true)
-	var words := str(_cranes)
 	var big := 26 + int(round(_tag_pulse * 5.0))
 	_tag.draw_string(UiStyle.FONT, at + Vector2(58.0, 33.0 + _tag_pulse * 2.0), words, HORIZONTAL_ALIGNMENT_LEFT, -1, big, Color(INK, 0.9))
-	_tag.draw_string(UiStyle.FONT, at + Vector2(62.0 + UiStyle.width(words, 26), 33.0), "/ 1000", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(INK, 0.55))
+	_tag.draw_string(UiStyle.FONT, at + Vector2(66.0 + number_w, 33.0), "/ 1000", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(INK, 0.55))
 	_tag.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 

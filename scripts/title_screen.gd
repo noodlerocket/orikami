@@ -106,6 +106,15 @@ func _build_backdrop() -> void:
 
 
 func _on_chosen(item: StringName) -> void:
+	var word := String(item)
+	if word.begins_with("new_"):
+		# A new game in that slot (its old save, if any, is gone).
+		SaveGame.use_slot(int(word.trim_prefix("new_")))
+		SaveGame.erase_slot(SaveGame.slot)
+		item = &"begin"
+	elif word.begins_with("load_"):
+		SaveGame.use_slot(int(word.trim_prefix("load_")))
+		item = &"continue"
 	match item:
 		&"begin":
 			SaveGame.reset()

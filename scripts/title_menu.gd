@@ -53,17 +53,44 @@ func _ready() -> void:
 	menu.origin = Vector2(0.075, 0.71)
 	menu.text_size = 0.034
 	add_child(menu)
+	# Save slots (Julian): Begin asks which slot to start in (once there is a
+	# saved game), and starting over in a used one asks first; Continue asks
+	# which saved game when there is more than one.
+	var filled := [] if download_instead else SaveGame.filled_slots()
+	var extra_pages := []   # [name, title, lines], added after the main page
+	var begin: Dictionary = {"label": "Begin", "page": &"download"} if download_instead else {"id": &"begin", "label": "Begin"}
+	if not filled.is_empty():
+		begin = {"label": "Begin", "page": &"slots_new"}
+		var lines := []
+		for n in range(1, SaveGame.SLOTS + 1):
+			if n in filled:
+				lines.append({"label": SaveGame.summary(n), "page": StringName("overwrite_%d" % n)})
+				extra_pages.append([StringName("overwrite_%d" % n), "Start over in slot %d? Its saved game will be lost." % n,
+						[{"id": StringName("new_%d" % n), "label": "Start over"}, {"label": "Back", "back": true}]])
+			else:
+				lines.append({"id": StringName("new_%d" % n), "label": SaveGame.summary(n)})
+		lines.append({"label": "Back", "back": true})
+		extra_pages.append([&"slots_new", "Begin in which slot?", lines])
 	var main_lines: Array = [
-		{"label": "Begin", "page": &"download"} if download_instead else {"id": &"begin", "label": "Begin"},
+		begin,
 		{"label": "Settings", "page": &"settings"},
 		{"label": "Controls", "page": &"controls"},
 	]
-	# A saved game: Continue, first (Begin still starts anew, with the prologue).
-	if not download_instead and SaveGame.exists():
-		main_lines.insert(0, {"id": &"continue", "label": "Continue"})
+	# A saved game: Continue, first.
+	if filled.size() == 1:
+		main_lines.insert(0, {"id": StringName("load_%d" % filled[0]), "label": "Continue"})
+	elif filled.size() > 1:
+		main_lines.insert(0, {"label": "Continue", "page": &"slots_load"})
+		var lines := []
+		for n: int in filled:
+			lines.append({"id": StringName("load_%d" % n), "label": SaveGame.summary(n)})
+		lines.append({"label": "Back", "back": true})
+		extra_pages.append([&"slots_load", "Continue which game?", lines])
 	if not OS.has_feature("web"):
 		main_lines.append({"id": &"quit", "label": "Quit"})
 	menu.add_page(&"main", "", main_lines)
+	for page: Array in extra_pages:
+		menu.add_page(page[0], page[1], page[2])
 	menu.add_page(&"settings", "Settings", TitleMenu.settings_lines())
 	menu.add_page(&"controls", "", [{"label": "Back", "back": true}])
 	var windows := {"id": &"get_windows", "label": "Windows"}

@@ -272,8 +272,14 @@ func _process(_delta: float) -> void:
 	# top of that rocks back and forth in two overlapping rhythms, one slow
 	# and wide, one a bit quicker and smaller. Every piece keeps its own
 	# pace, so they never move in step.
+	# (Only those near the camera: swinging all ~740 in the world every frame
+	# cost frames for nothing.)
+	var cam_x := camera_x()
 	for node: Node3D in get_tree().get_nodes_in_group(&"windswept"):
-		var blow := Wind.speed_at(node.global_position.x)
+		var at_x := node.global_position.x
+		if absf(at_x - cam_x) > 40.0:
+			continue
+		var blow := Wind.speed_at(at_x)
 		var gain: float = node.get_meta(&"wind_gain")
 		var phase: float = node.get_meta(&"wind_phase")
 		var rest: Vector3 = node.get_meta(&"wind_rest")
@@ -290,6 +296,12 @@ func _process(_delta: float) -> void:
 	var camera := get_viewport().get_camera_3d()
 	if _near and camera:
 		_near.position.y = minf(camera.global_position.y - 4.2, 0.0) * 1.6
+
+
+## Where the camera is along x (for leaving far things still).
+func camera_x() -> float:
+	var camera := get_viewport().get_camera_3d()
+	return camera.global_position.x if camera else 0.0
 
 
 ## Lit windows (by their house's x) whose storm shutters slide shut as he

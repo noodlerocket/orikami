@@ -25,8 +25,17 @@ func _ready() -> void:
 	_left = wall[0]
 	_right = wall[1]
 	_build_gate()
-	# A lantern on the gatehouse, lighting the way under it.
-	village._hang_lantern(Vector3(_right + 0.55, 2.35, 1.25), 0.15, 0.6, false)
+	# A lantern on the gatehouse, lighting the way under it, hung from an
+	# iron bracket fixed to the passage's east post (it hung from nothing:
+	# Julian).
+	var bracket := PaperMesh.new(_rng.randi())
+	bracket.color = Color(0.09, 0.08, 0.1)
+	bracket.box(Vector3(_right + 0.22, 2.42, 1.1), Vector3(0.72, 0.06, 0.06))
+	bracket.extrude(PackedVector2Array([Vector2(_right - 0.06, 1.98), Vector2(_right + 0.36, 2.4), Vector2(_right + 0.3, 2.44),
+			Vector2(_right - 0.06, 2.06)]), 1.08, 1.12)
+	bracket.box(Vector3(_right - 0.04, 2.2, 1.1), Vector3(0.06, 0.5, 0.08))
+	add_child(bracket.build())
+	village._hang_lantern(Vector3(_right + 0.52, 2.4, 1.1), 0.12, 0.6, false)
 
 
 func _build_gate() -> void:

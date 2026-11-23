@@ -277,6 +277,8 @@ var _wall_away := 0.0       # how long he has held away from the wall
 var _sliding := false       # clinging to a wall and sliding down it
 var _sinking := false        # in water: sinking straight down, through the bed
 var _in_pit := false        # falling into a pit; waiting for the screen to fade
+var _prev_physics_position := Vector3.ZERO   # where he was a physics step ago (visual_position)
+var _sink_y := 0.0          # how far his puppet has sunk in deep water
 var _dead := false
 var _grounded_time := 0.0
 var _safe_position := Vector3.ZERO
@@ -319,7 +321,26 @@ func _ready() -> void:
 	_safe_position = global_position
 
 
+## Where he is drawn: between his last two physics steps, so on a screen
+## that draws faster than physics runs (60 a second) he glides instead of
+## stepping, and the world following him does not judder (Julian: running
+## made the world look blurry). The camera follows this too.
+func visual_position() -> Vector3:
+	var now := global_position
+	if _prev_physics_position.distance_to(now) > 2.0:
+		return now  # (a jump to somewhere else: no gliding across)
+	return _prev_physics_position.lerp(now, Engine.get_physics_interpolation_fraction())
+
+
+func _process(_delta: float) -> void:
+	if not is_physics_processing():
+		_prev_physics_position = global_position  # (held, or placed by a cutscene)
+	var offset := visual_position() - global_position
+	_puppet.position = Vector3(offset.x, _sink_y + offset.y, 0.0)
+
+
 func _physics_process(delta: float) -> void:
+	_prev_physics_position = global_position
 	_count_down(delta)
 	var grounded := is_on_floor()
 
@@ -329,7 +350,7 @@ func _physics_process(delta: float) -> void:
 			# He goes down out of sight. (Only how he looks: his body stops on
 			# the bed as before, so nothing below the river, in the canals,
 			# notices him.)
-			_puppet.position.y = maxf(_puppet.position.y - sink_speed * delta, -sink_depth)
+			_sink_y = maxf(_sink_y - sink_speed * delta, -sink_depth)
 		_apply_gravity(delta, grounded)
 		move_and_slide()
 		_update_puppet()
@@ -965,7 +986,7 @@ func respawn_at_checkpoint() -> void:
 	_draw_safe = 0.6  # a moment's safety, without the struck look
 	_in_pit = false
 	_sinking = false
-	_puppet.position.y = 0.0
+	_sink_y = 0.0
 	respawns += 1
 
 

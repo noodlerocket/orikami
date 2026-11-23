@@ -440,6 +440,8 @@ There is no controls line along the bottom of the game screen any more
   paper as a relief, then leaning through the tear ("so bad"), then a wide
   shot of her stepping through, then hair and a robe under the mask. All
   undone: he wants the ORIGINAL cutscene left alone. Do not change it.
+  (One fix he asked for: the tear's paper scraps are dropped at the cut to
+  the mask close-up, at 30 s; one drifted over her cheek there.)
   It plays the first time he enters the courtyard; hold Space to
   skip; `--cutscene` plays it at once.
 - **The fight** (`hannya_boss.gd`, 30 health, 6 posture):
@@ -714,11 +716,14 @@ has its own script, built from `Village._ready`:
   `paper_critter.gd` (shared: health, flash overlay, posture, seal),
   `paper_dog.gd`, `paper_bird.gd` (pogo-able), `lantern_husk.gd` +
   `burning_paper.gd` (a parried wad flies back at the thrower).
-- Systems: `save_game.gd` (user://save.cfg; the automated check and any
-  debug-flag run use their own files), Continue on the title, `crane_bundle.gd`
+- Systems: `save_game.gd` (three save slots, user://save_1.cfg to save_3;
+  an old user://save.cfg becomes slot 1. With a saved game, Begin asks
+  which slot and asks before starting over in a used one; Continue goes
+  straight in with one saved game, asks which with several. The automated
+  check and any debug-flag run use their own files), Continue on the title, `crane_bundle.gd`
   (`Village.CRANE_BUNDLES` + the back room; HUD tag), `smudge.gd` (death
   leaves his ink; cut it back), the Map page in the pause menu, corner
-  nudge / ledge hop / skid / shaking off water (`Ronin` "Forgiveness"),
+  nudge / ledge hop / skid (silent: its screech was removed, Julian) / shaking off water (`Ronin` "Forgiveness"),
   `FollowCamera.run_lead`, `hannya_ending.gd` (after the fight; proposed lore:
   a crack, ink drips out and her own mask washes blank white, a shader laid
   over her paper, `shaders/wash_white.gdshader`; a second mask falling off
@@ -785,7 +790,9 @@ through:
   each; sources `docs/reference/tale_*_source.png`, prepared into
   `textures/tale_*.jpg` by `tools/prepare_tale.py`), multiplied onto her
   sheet, brushed on and wiped away by `shaders/ink_reveal.gdshader`
-  (pictures drawn stroke by stroke in code were not artistic enough). Only in
+  (pictures drawn stroke by stroke in code were not artistic enough). The
+  third was redone from his reference (`ronin_front.png`, image-to-image)
+  so the samurai is the Blank Ronin, all white paper. Only in
   a real game (`PaperMakerTale.allowed`; the check and debug starts set
   `force`). Sheets: `papermaker`, `tale`.
 - **Well Square:** the Paper-Maker's workshop (`paper_maker_yard.gd`):
@@ -931,7 +938,9 @@ through:
   under); "Press any key" first (also lets a browser start sound); then
   Begin / Settings / Controls / Quit on the dark rock; prompts bottom right.
 - `pause_menu.gd` (`PauseMenu`, built by `Main._build_pause`): Esc, P or
-  Start. Wash, ink down the left, 休 seal and RESTING; Resume / Settings /
+  Start, or leaving the game's window (once he has been in it; never in a
+  debug or tool run); the `Sound` node fades all sound out while the
+  window is left and back in on return. Wash, ink down the left, 休 seal and RESTING; Resume / Settings /
   Controls / Return to the title (asks first). Not during the loading cover
   or the cutscene. The `Sound` node keeps running while paused.
 - Settings (both menus): Music and Sounds volume, Full screen (not in the
@@ -1026,6 +1035,24 @@ through:
   GitHub's builder), so web/desktop builds can only be tested after a push.
 - The workflow's actions are on their Node 24 versions (checkout v7,
   configure-pages v6, upload-pages-artifact v5, deploy-pages v5).
+
+## Speed (Julian: "laggy, several fps drops", 2026-11-23)
+Measured with a script that stands him at spots across the world and times
+frames (Intel graphics on this computer):
+- **Particles far away sleep** (`Main._cull_far`, `particle_reach` 38 m):
+  rain splashes, drips, petals and leaves all over the world (about 7,000
+  particles) were simulated every frame wherever he was.
+- **Only things near the camera sway** (`Village._process`, 40 m).
+- **Lantern shadows only on the two lanterns nearest him**
+  (`Main.most_shadows` 2, `shadow_reach` 12 m): five shadowed lanterns cost
+  about 8 ms a frame. Rule for new work: never give a light a shadow
+  without counting the cost.
+- Result: town 26-32 fps became about 40; grove and market 24-38 became
+  50-60. The town is still the heaviest (about 800 things drawn a frame):
+  merging its many small meshes is the next step if it needs more.
+- **He is drawn between physics steps** (`Ronin.visual_position`, the
+  camera follows it): on a screen faster than 60 Hz running made the world
+  judder ("too blurry"). His collision is unchanged.
 
 ## Pitfalls learned overnight (2026-11-22)
 - `GeometryInstance3D.transparency` does nothing in the Compatibility

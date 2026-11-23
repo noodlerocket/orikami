@@ -44,7 +44,7 @@ var _held: Array[Node] = []   # enemies held still while she shows him
 
 
 static func allowed() -> bool:
-	return force or SaveGame.file == "user://save.cfg"
+	return force or SaveGame.is_real()
 
 
 func _ready() -> void:
