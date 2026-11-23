@@ -865,9 +865,14 @@ func _expanded_village(main: Node, ronin: Ronin) -> void:
 	var held := false
 	var biggest := 0.0
 	var last_cam := camera.global_position
+	var landed_at := Time.get_ticks_msec()
+	var looked := false
 	for f in 200:
 		await process_frame
-		if f == 22:
+		# (A moment = 0.3 s by the clock, not a count of drawn frames: those
+		# come slower as the world grows, and the plank gives way at 0.55 s.)
+		if not looked and Time.get_ticks_msec() - landed_at >= 300:
+			looked = true
 			held = ronin.is_on_floor() and ronin.global_position.y > -0.4 and not plank.fallen
 		if f > 2:
 			biggest = maxf(biggest, camera.global_position.distance_to(last_cam))
@@ -1070,7 +1075,10 @@ func _cranes_and_saving(main: Node, village: Village, ronin: Ronin) -> void:
 
 ## The paper dog, the paper bird and the lantern husk.
 func _new_enemies(village: Village, ronin: Ronin) -> void:
-	var dog: PaperDog = village.find_children("*", "PaperDog", true, false)[1]
+	# (the town's second dog: the market's dogs sleep while he is in town)
+	var town_dogs := village.find_children("*", "PaperDog", true, false).filter(
+			func(d: Node3D) -> bool: return not LanternMarket.in_market(d.global_position.x))
+	var dog: PaperDog = town_dogs[1]
 	var bird: PaperBird = village.find_children("*", "PaperBird", true, false)[0]
 	var keeper: LanternHusk = null   # (the town's: the market's rest while he is away)
 	for k: LanternHusk in village.find_children("*", "LanternHusk", true, false):
@@ -1367,6 +1375,58 @@ func _lantern_market(village: Village, ronin: Ronin) -> void:
 		await _frames(1)
 		deepest = maxf(deepest, (keeper.get("_torso") as Node3D).rotation.x)
 	_check("a shopkeeper bows as he passes (%.2f rad)" % deepest, deepest > 0.25)
+	# The Canal Quarter: a boat carries him; the hoist lifts him; a canal
+	# takes him under (back to the last shrine).
+	var quarter: CanalQuarter = village.lantern_market.find_children("*", "CanalQuarter", true, false)[0]
+	# (The market's enemies hold still meanwhile: a husk by the hoist would
+	# knock him off it, which is the game working, not the hoist failing.)
+	var held: Array[Node] = []
+	for node: Node in village.lantern_market.find_children("*", "", true, false):
+		if (node is PaperHusk or node is PaperCritter) and node.is_physics_processing():
+			node.set_physics_process(false)
+			held.append(node)
+	var boat: LanternBoat = quarter.find_children("*", "LanternBoat", true, false)[0]
+	ronin.global_position = boat.global_position + Vector3(0.0, 0.6, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(20)
+	var on_boat := ronin.global_position.x
+	await _frames(90)
+	_check("a lantern boat carries him across the canal (%.2f m; boat at %.1f, %.1f; pit %s, physics %s, floor %s)" % [absf(ronin.global_position.x - on_boat),
+			boat.global_position.x, boat.global_position.y, ronin.is_in_pit(), ronin.is_physics_processing(), ronin.is_on_floor()],
+			absf(ronin.global_position.x - on_boat) > 1.0 and ronin.global_position.y > CanalQuarter.WATER_Y)
+	var hoist: Node3D = null
+	for n: Node in quarter.get_children():
+		if n is AnimatableBody3D and not n is LanternBoat:
+			hoist = n
+	for i in 600:   # (step on at the bottom, as he would)
+		await physics_frame
+		if hoist.position.y < CanalQuarter.HOIST_RANGE.x + 0.05:
+			break
+	ronin.global_position = hoist.global_position + Vector3(0.0, 0.15, 0.0)
+	ronin.velocity = Vector3.ZERO
+	var lowest := ronin.global_position.y
+	var highest := lowest
+	for i in 360:
+		await physics_frame
+		highest = maxf(highest, ronin.global_position.y)
+	_check("the lantern hoist lifts him to the high walkways (%.1f m to %.1f m)" % [lowest, highest], highest > CanalQuarter.HOIST_RANGE.y - 0.3)
+	# (Into the first canal at the end its boat is not at, the boat held.)
+	boat.set_physics_process(false)
+	var into := 166.9 if boat.position.x < 163.0 else 159.1
+	ronin.global_position = Vector3(LanternMarket.SHIFT + into, CanalQuarter.WATER_Y + 1.0, 0.0)
+	ronin.velocity = Vector3.ZERO
+	var went_under := false
+	for i in 90:
+		await physics_frame
+		if ronin.is_in_pit():
+			went_under = true
+			break
+	_check("falling into a canal takes him under", went_under)
+	await _frames(150)
+	boat.set_physics_process(true)
+	for node: Node in held:
+		if is_instance_valid(node):
+			node.set_physics_process(true)
 	# And west out of the market, back to her clearing.
 	ronin.position = Vector3(LanternMarket.SHIFT + LanternMarket.ARRIVE_X, 0.1, 0.0)
 	ronin.velocity = Vector3.ZERO
@@ -1431,7 +1491,8 @@ func _struck_kinds(village: Village, ronin: Ronin) -> void:
 	_check("burning paper scorches him (%s)" % ronin.last_hurt_kind, ronin.last_hurt_kind == &"fire" and puppet.shows_burn() and not puppet.shows_ink())
 	await wait_clean.call()
 	# A paper dog's bite tears his paper (no ink).
-	var dogs := village.find_children("*", "PaperDog", true, false)
+	var dogs := village.find_children("*", "PaperDog", true, false).filter(
+			func(d: Node3D) -> bool: return not LanternMarket.in_market(d.global_position.x))
 	if not dogs.is_empty():
 		var dog: PaperDog = dogs[0]
 		dog.set_physics_process(false)

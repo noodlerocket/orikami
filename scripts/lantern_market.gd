@@ -22,8 +22,9 @@ extends Node3D
 
 ## How far along x the market really is.
 const SHIFT := 2000.0
-## Its east end (the Gilded Gate).
-const END := 150.0
+## Its east end, as far as it is built: the Ward's gate, shut (the region
+## is planned to about 450 m: docs/lantern_market_plan.md).
+const END := 216.0
 ## Where he arrives (local x), and how far west he may walk before he is
 ## taken back to the bamboo.
 const ARRIVE_X := 3.0
@@ -33,7 +34,9 @@ const LOWER := Vector3(-8.0, 58.0, 0.0)
 const CANAL := Vector2(58.0, 72.0)
 const UPPER := Vector3(72.0, 116.0, 3.0)
 const STEPS := Vector2(116.0, 128.0)
-const PLAZA := Vector3(128.0, END + 4.0, 6.5)
+## Festival Square, at the top of the steps (then the Canal Quarter:
+## canal_quarter.gd).
+const PLAZA := Vector3(128.0, 146.0, 6.5)
 ## The canal's water and its bed.
 const WATER_Y := -0.9
 const CANAL_BED := -1.6
@@ -56,7 +59,7 @@ const STRINGS := [[33.0, 10.0], [98.5, 9.0]]
 ## cranes hidden on them.
 const GALLERIES := [[30.0, 5.2, 7.0], [96.0, 8.0, 6.0]]
 const HUSKS := [Vector2(50.0, 0.0), Vector2(88.0, 3.0)]
-const LANTERN_HUSKS := [Vector2(38.0, 0.0), Vector2(106.0, 3.0), Vector2(138.0, 6.5)]
+const LANTERN_HUSKS := [Vector2(38.0, 0.0), Vector2(106.0, 3.0), Vector2(133.0, 6.5)]
 ## The colours of the picture.
 const RED_CLOTH := Color(0.62, 0.17, 0.14)
 const CREAM := Color(0.9, 0.84, 0.72)
@@ -93,9 +96,11 @@ static func ground_at(x: float) -> float:
 		return LOWER.z
 	if x <= STEPS.x:
 		return UPPER.z
-	if x >= STEPS.y:
+	if x < STEPS.y:
+		return lerpf(UPPER.z, PLAZA.z, (x - STEPS.x) / (STEPS.y - STEPS.x))
+	if x <= PLAZA.y:
 		return PLAZA.z
-	return lerpf(UPPER.z, PLAZA.z, (x - STEPS.x) / (STEPS.y - STEPS.x))
+	return CanalQuarter.ground_at(x)
 
 
 ## The bridge's deck: rising from the lower street in an arch and coming down
@@ -118,8 +123,13 @@ func _ready() -> void:
 	_build_steps()
 	for b: Array in BOOTHS:
 		_booth(b[0], b[1], b[2])
+	_fill_between_booths()
 	_build_street_life()
-	_build_gate()
+	# (The Gilded Gate, _build_gate, moves to the region's far end when it is
+	# built; past the square come the canals.)
+	var quarter := CanalQuarter.new()
+	quarter.market = self
+	add_child(quarter)
 	_build_foreground()
 	_build_air()
 	shrine = RestShrine.new()
@@ -203,6 +213,24 @@ func _light(at: Vector3, energy: float, reach: float) -> OmniLight3D:
 	light.position = at
 	add_child(light)
 	return light
+
+
+## Where something standing at x has its foot: the ground, or the bed of a
+## canal (over water things stand in it, down to the bottom).
+static func foot_at(x: float) -> float:
+	if x > CANAL.x and x < CANAL.y and not (x >= BRIDGE.x and x <= BRIDGE.y):
+		return CANAL_BED
+	if x > PLAZA.y:
+		for w: Vector2 in CanalQuarter.WATERS:
+			if x > w.x and x < w.y:
+				return CanalQuarter.BED_Y
+	return ground_at(x)
+
+
+## A lantern hung under a house's eave (Scenery.house: the eave is at
+## height - 0.25, reaching 1.75 m in front of the wall).
+func _eave_lantern(house_at: Vector3, height: float, x: float, size: float = 1.0) -> void:
+	_hang(Vector3(x, house_at.y + height - 0.4, house_at.z + 1.45), size, 0.3)
 
 
 ## A crested chochin hung from a hook (local), swaying in the wind.
@@ -353,13 +381,14 @@ func _build_midground() -> void:
 		# on, reaching back past them (they floated over nothing: Julian).
 		stone.color = Color(0.2, 0.19, 0.23)
 		stone.box(Vector3(x + (w + gap) * 0.5, g - 3.0, (z + 1.85 + z - 4.0) * 0.5), Vector3(w + gap, 6.0, 5.85))
-		var house := Scenery.house(_rng, w, _rng.randf_range(3.6, 4.8), _rng.randf() < 0.85, village.window_glow,
+		var hh := _rng.randf_range(3.6, 4.8)
+		var house := Scenery.house(_rng, w, hh, _rng.randf() < 0.85, village.window_glow,
 				[["round"], ["noren"], ["awning"], ["sudare"], []][_rng.randi() % 5])
 		house.position = Vector3(x + w * 0.5, g, z)
 		add_child(house)
 		# A lantern at its eave, and its light on the terrace.
 		if _rng.randf() < 0.6:
-			_hang(Vector3(x + w * 0.5 + _rng.randf_range(-1.5, 1.5), g + 3.6, z + 1.6), 1.0, 0.25)
+			_eave_lantern(house.position, hh, x + w * 0.5 + _rng.randf_range(-1.5, 1.5))
 		x += w + gap
 	add_child(stone.build())
 	for lx: float in [10.0, 40.0, 82.0, 120.0]:
@@ -1059,6 +1088,27 @@ func _booth(x: float, kind: String, robe: Color) -> void:
 	_shine(x, g, 5.0, 0.9)
 
 
+## Between neighbouring stalls: a dark boarded wall and a strip of roof, so
+## the lit houses behind do not show through the gap as pale pillars.
+func _fill_between_booths() -> void:
+	var b := PaperMesh.new(_rng.randi())
+	b.shade_jitter = 0.15
+	for i in range(BOOTHS.size() - 1):
+		var x0: float = BOOTHS[i][0]
+		var x1: float = BOOTHS[i + 1][0]
+		if x1 - x0 > 9.0 or absf(ground_at(x0) - ground_at(x1)) > 0.1:
+			continue
+		var mid := (x0 + x1) * 0.5
+		var gap := x1 - x0 - 6.0 + 0.3
+		var g := ground_at(mid)
+		b.color = Scenery.WOOD.darkened(0.45)
+		b.box(Vector3(mid, g + 2.3, -3.9), Vector3(gap, 4.6, 1.6))
+		b.color = Scenery.ROOF.darkened(0.25)
+		b.extrude(PackedVector2Array([Vector2(mid - gap * 0.5, g + 3.3), Vector2(mid + gap * 0.5, g + 3.3),
+				Vector2(mid + gap * 0.5, g + 4.78), Vector2(mid - gap * 0.5, g + 4.78)]), -5.05, -3.1)
+	add_child(b.build())
+
+
 ## Brush writing: columns of a few strokes each, like characters.
 func _writing(b: PaperMesh, top: Vector2, glyphs: int, size: float, z: float) -> void:
 	b.color = PaperMesh.SUMI
@@ -1157,11 +1207,13 @@ func _smoke() -> CPUParticles3D:
 	p.preprocess = 2.6
 	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
 	p.emission_box_extents = Vector3(0.7, 0.05, 0.15)
-	p.direction = Vector3(0.0, 1.0, 0.0)
-	p.spread = 12.0
-	p.gravity = Vector3(-0.25, 0.35, 0.0)
-	p.initial_velocity_min = 0.4
-	p.initial_velocity_max = 0.7
+	# Out toward us first, under the stall's eave, then rising in the open
+	# (straight up it went through the roof like a pale chimney: Julian).
+	p.direction = Vector3(0.0, 0.25, 1.0)
+	p.spread = 10.0
+	p.gravity = Vector3(-0.2, 0.45, 0.0)
+	p.initial_velocity_min = 0.9
+	p.initial_velocity_max = 1.2
 	p.scale_amount_min = 0.6
 	p.scale_amount_max = 1.4
 	var grow := Curve.new()
@@ -1209,7 +1261,7 @@ func _build_street_life() -> void:
 		# Lanterns along the walkway's rail.
 		n += 1
 	# Cherry trees at the back of the street, petals falling from them.
-	for t: Array in [[3.0, 0.0, -3.2, 5.5], [56.0, 0.0, -7.3, 6.0], [74.0, 3.0, -7.3, 5.0], [119.0, 3.4, -3.6, 5.5], [143.0, 6.5, -5.0, 6.0]]:
+	for t: Array in [[3.0, 0.0, -3.2, 5.5], [56.0, 0.0, -7.3, 6.0], [74.0, 3.0, -7.3, 5.0], [119.0, 3.4, -3.6, 5.5], [131.0, 6.5, -5.0, 6.0]]:
 		var tree := Scenery.sakura_tree(_rng, t[3], _rng.randf_range(-0.2, 0.2), 70)
 		tree.position = Vector3(t[0], t[1], t[2])
 		add_child(tree)
@@ -1256,9 +1308,11 @@ func _gallery(mid: float, top: float, width: float) -> void:
 	b.color = LACQUER
 	b.box(Vector3(mid, top - 0.27, 1.12), Vector3(width + 0.1, 0.16, 0.08))
 	b.box(Vector3(mid, top - 0.27, -1.12), Vector3(width + 0.1, 0.16, 0.08))
-	var g := ground_at(mid)
 	for side: float in [-1.0, 1.0]:
 		var px := mid + side * (width * 0.5 - 0.25)
+		# Each post stands on what is really under it: the street, a quay,
+		# the steps, or the canal's bed (one ending in mid-air: Julian).
+		var g := foot_at(px)
 		b.color = LACQUER
 		b.box(Vector3(px, (g + top) * 0.5, -1.3), Vector3(0.12, top - g, 0.12))
 		b.box(Vector3(px, top + 0.85, -1.15), Vector3(0.1, 1.7, 0.1))

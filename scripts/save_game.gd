@@ -24,7 +24,8 @@ const SLOTS := 3
 static var slot := 1
 ## The names of the shrines, for the slots' summaries.
 const SHRINE_NAMES := {"paper_maker": "the Paper-Maker's door", "warehouse": "the river warehouse",
-	"steps": "the Shrine Steps", "bamboo": "the bamboo altar", "mill": "the paper mill", "market": "the Mist Gate"}
+	"steps": "the Shrine Steps", "bamboo": "the bamboo altar", "mill": "the paper mill", "market": "the Mist Gate",
+	"teahouse": "the canal teahouse"}
 
 static var last_shrine := ""
 static var rested: Array[String] = []

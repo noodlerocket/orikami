@@ -202,6 +202,37 @@ the game)**
   back at the last shrine he rested at; no ink, no blink. (The old pit is now
   the Fallen Street's way down.)
 
+## Checking a new area (Julian, 2026-11-23: "this can't happen again")
+The first Canal Quarter went to Julian with beams in mid-air, posts ending
+above the quay, lanterns hanging from nothing, a boat sailing through the
+pilings, smoke rising through a roof and pale gaps between stall roofs.
+Before ANY new or changed area is shown to him:
+1. **Photograph all of it**: `python tools/area_sweep.py FROM_X TO_X` (every
+   9 m, street level), and again along any high route
+   (`... FROM_X TO_X 9 11 docs/screenshots/sweep_high`). Look at every
+   sheet, enlarged where needed.
+2. **Go down this list for every object**, in the code AND the pictures:
+   - Does it stand on something? Every post, pole, leg and pillar reaches
+     the ground, quay, deck or canal bed under ITS OWN x
+     (`LanternMarket.foot_at`), not the height of its neighbour.
+   - Does it hang from something? Every lantern hangs under an eave
+     (`_eave_lantern`), from a bracket, a rope or a beam that is itself
+     held up. A hook in the air is a fault.
+   - Do beams meet their posts? A beam's ends sit ON post tops or into
+     them, never above or beside.
+   - Does anything move through anything? Trace each moving thing's path
+     (boats, hoists, swinging signs, drifting lanterns, smoke) against
+     everything solid near it.
+   - Do particles go through roofs or walls? Smoke and steam must leave
+     from under the eave.
+   - Gaps: between neighbouring buildings and roofs, is there a slit that
+     shows something bright behind? Fill it.
+   - Is anything at the same depth as something it overlaps (flicker)?
+   - Does every bridge, stair and walkway go from somewhere to somewhere?
+   - Faces the camera sees from lower ground (quay fronts, terrace walls):
+     dressed stone, never a plain black slab.
+3. Fix, photograph again, look again. Only then show him.
+
 ## Checking work without eyes or ears
 
 A single screenshot cannot show motion, and sound cannot be heard. Use these,
@@ -685,6 +716,23 @@ has its own script, built from `Village._ready`:
   (fold, pour, fan the grill), look up at him and bow as he passes.
   Enemies: husks and lantern husks. `--market` starts there. Stall light:
   `LanternMarket.booth_light`.
+- **Festival Square and the Canal Quarter** (`canal_quarter.gd`, 2026-11-23;
+  `docs/screenshots/canal_quarter.png`; not yet played by Julian): the
+  market now runs to `END` 216. The square (128 to 146) has a drum tower,
+  the empty racks the festival dragon hung from (claw-torn, shreds on the
+  hooks) and a lantern hoist (`CanalQuarter.Hoist`, `HOIST_RANGE`) up to the
+  high route. Stairs down to stone quays (`QUAYS`, 3 m) between deep canals
+  (`WATERS`, falling in = back to the last shrine); lantern boats drift
+  across (`LanternBoat`, `lantern_boat.gd`: dip when landed on, pause at the
+  ends); pilings; floating paper lanterns; a gold-leaf workshop (booth) with
+  cranes `market_workshop`; red walkways up high (`WALKWAYS`, cranes
+  `market_high`, a lantern string); stairs up to the teahouse bank, shrine 7
+  `teahouse`; the Ward's gate (`WARD_GATE`), sealed with paper charms, the
+  storm beyond: the dragon's arena, next. The Gilded Gate is not built at
+  the square any more (`_build_gate` kept for the region's far end).
+  Moving platforms here are `AnimatableBody3D` with `sync_to_physics` OFF,
+  moved in `_physics_process`, AND given `constant_linear_velocity` so he
+  rides them (with sync on they did not move at all).
 - **The whole region is planned** (`docs/lantern_market_plan.md`, map
   `docs/market_map.png` from `tools/market_map.py`; proposed, for Julian):
   about 450 m (double the grove), three layers (street, roofs, canals),
