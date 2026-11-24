@@ -103,6 +103,15 @@ one by one, faces peek out; the fan-maker gives him the **Fan Gust**.
 
 (The first idea, Wanyūdō the burning wheel, was dropped for the dragon.)
 
+## Status (2026-11-24)
+
+Built: all of it except the Rise's hoist shortcut to Festival Square, the
+canal lock shortcut and the Fan Gust's awning and waterwheel. The Gilded
+Gate leads into Hōshō's hall and fight (`hosho_hall.gd`). Under the
+Terraces' bridge is a back alley with a door up to the far terrace (no rope
+ladder). The Fan Gust's fire barricade to a hidden room is the burning
+store in the Upper Market.
+
 ## Order of building (when Julian says go)
 
 1. Move the Gilded Gate to the far end; Festival Square as the crossroads.

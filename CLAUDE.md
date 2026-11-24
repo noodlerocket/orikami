@@ -29,13 +29,16 @@ screen, but Begin there offers the downloads instead of starting.
 **Before changing anything, read "Working with Julian" and "What Julian
 likes".** They were learned the slow way and save rounds of rework.
 
-## Where the game stands (2026-11-22)
+## Where the game stands (2026-11-24)
 
 Title screen (Julian's looping video), a 45 s pop-up-book prologue, the
 cutscene of him leaping out of the well, a tutorial, then Kamiyama Village
 at night in the rain, about 210 m from the well to the shrine courtyard in
-three layers (canals, street, Rooftop Road), and the first stretch of the
-Bamboo of Folded Wind after it (see "The expanded village"), with:
+three layers (canals, street, Rooftop Road); the whole Bamboo of Folded
+Wind in daylight, ending with Akane's duel; and the whole Lantern Market
+(about 480 m: the Night Bazaar, Festival Square, the Canal Quarter, the Ward
+of Shut Doors with the Festival Dragon, the Lantern Makers' Rise, the
+Gilded Terraces and Hōshō's hall and fight), with:
 - the Blank Ronin: run, jump, dash, wall slide and wall jump, duck, a 4-way
   iaijutsu cut with pogo, parry (gold) and block, the charged iaijutsu draw,
   healing with ink, ink marks that build up on his paper, shredding death;
@@ -44,12 +47,24 @@ Bamboo of Folded Wind after it (see "The expanded village"), with:
 - the first boss, **the Weeping Hannya**, with a 40-second shadow-puppet
   cutscene, a full fight, and an ending cutscene after it (proposed lore);
 - the paper dog, the paper bird and the lantern husk (folded in code);
-- four shrines that save; paper cranes to find; the Smudge; a map; the
-  Crane Glide.
+- nine shrines that save; paper cranes to find; the Smudge; a map; the
+  Crane Glide and the Fan Gust;
+- in the grove red pandas and kite husks; in the market lantern ghosts
+  (chōchin-obake) and gilded guards; three more bosses: Akane (a duel),
+  the Festival Dragon (a mini-boss) and Hōshō, the Lantern Market's
+  general.
 Pause, settings and controls pages share one UI style. Downloads for
 Windows and Mac carry Julian's icon.
 
-**Next:** Julian plays the Ward, the Festival Dragon, the Fan Gust, the Lantern Makers' Rise, the Gilded Terraces, Hōshō's Gate and the Hōshō fight (all built 2026-11-23, none played yet). Julian plays the overnight work and judges it (the report lists
+**Next:** Julian plays and judges the overnight work of 2026-11-24
+(`docs/overnight_report_2026-11-24.md`: Hōshō tuned, the Meshy lantern
+ghost, the back alley, the burning store). Not built from the market plan:
+the hoist shortcut from the Rise to Festival Square (a rope over the roofs
+would hit the drying deck, the drum tower and the Ward's gate: plan it with
+Julian), the canal lock shortcut, the other Fan Gust ideas (blowing an
+awning round, a waterwheel raising a boat). After the market: the rest of
+the open middle (Sumi Marsh, Koinobori Skies, the Thousand Gates, Yukiyama
+Peaks; `docs/lore.md`, proposed), which waits for Julian's go. Julian plays the overnight work and judges it (the report lists
 what only he can judge). Then: Julian judges Akane's duel (built: proposed lore, she yields
 rather than dies; her music and sounds are in); the road on past the bamboo (the
 open middle of the game); the endings (the ink marks are saved; nothing
@@ -1323,6 +1338,11 @@ frames (Intel graphics on this computer):
 | `scripts/windfall_gorge.gd`, `canopy_road.gd`, `paper_mill.gd`, `bamboo_falls.gd`, `updraft.gd`, `lashed_deck.gd` | The grown bamboo grove's areas, its rising gusts and lashed decks |
 | `scripts/paper_critter.gd`, `paper_dog.gd`, `paper_bird.gd`, `lantern_husk.gd`, `burning_paper.gd` | The new enemies |
 | `scripts/akane.gd`, `akane_duel.gd`, `brush_line.gd` | Akane and her duel at the end of the bamboo; a brushed spoken line |
+| `scripts/lantern_market.gd`, `canal_quarter.gd`, `ward_quarter.gd`, `rise_quarter.gd`, `terraces_quarter.gd` | The Lantern Market, area by area (each chains `ground_at` to the next) |
+| `scripts/festival_dragon.gd`, `hosho.gd`, `hosho_hall.gd` | The Festival Dragon; Hōshō and his hall |
+| `scripts/market_keeper.gd`, `chochin_obake.gd`, `gilded_guard.gd`, `lantern_boat.gd` | Shopkeepers, lantern ghosts, gilded guards, lantern boats |
+| `scripts/fire_barrier.gd`, `windmill.gd`, `pinwheel.gd`, `gate_walls.gd`, `action_hint.gd` | Burning barricades, the windmill, pinwheels, the walls beside gates, on-screen hints |
+| `scripts/paper_fan.gd`, `gust_wind.gd`, `cine_camera.gd` | The Fan Gust's fan and its wind; the directed-cutscene camera |
 | `scripts/paper_maker.gd` | The Paper-Maker at her vat (Meshy model `models/papermaker.glb`, posed by hand) |
 | `scripts/save_game.gd`, `crane_bundle.gd`, `smudge.gd`, `ability_card.gd`, `hannya_ending.gd` | Saving, cranes, the Smudge, ability card, the ending after the Hannya |
 | `scripts/water_fx.gd`, `villager_shadow.gd`, `perched_birds.gd` | Splashes and water, shadows behind shoji, perched birds |
@@ -1397,8 +1417,10 @@ frame sheet when the change can be seen.
       enemies, shortcuts, cranes, the Smudge, a map. (The Paper-Maker is
       only a shadow.)
 - [x] **An ending after the Hannya** (proposed lore; awaiting Julian).
-- [ ] **M5:** the Bamboo of Folded Wind region (first stretch and the Crane
-      Glide built; the rest, and Akane, not).
+- [x] **M5:** the Bamboo of Folded Wind region, the Crane Glide and
+      Akane's duel (built; Akane's duel awaits Julian's judgement).
+- [x] **The Lantern Market** (2026-11-23/24): the whole region, the
+      Festival Dragon, the Fan Gust, Hōshō (awaiting Julian's play).
 - [ ] **M6:** vertical slice polish: audio balance, map.
 
 ## Known gaps
