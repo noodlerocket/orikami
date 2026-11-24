@@ -49,6 +49,9 @@ const WALKS := [[231.6, 8.8, 3.8], [266.8, 8.8, 3.8], [236.6, 11.1, 3.4], [261.8
 const LANE := Vector2(239.8, 258.6)
 ## The gate up to the Lantern Makers' Rise, at the Ward's east end.
 const RISE_GATE := 296.0
+## The fan-maker's shop, at the front of the house there: after the dragon
+## she gives him the Fan Gust.
+const FAN_SHOP := 279.5
 
 ## How loud its fight music plays (dB, before the Music volume setting).
 @export var music_volume := -7.0
@@ -82,12 +85,18 @@ var _camera_tween: Tween
 var _slammed := 0
 var _opened := 0
 var _shadows_added := false
+var _fan_maker: MarketKeeper
+var _cine: CineCamera
+var _held := false
+var _settled := false
+var _focused := false
+var _fan_given := false
 
 
 func _ready() -> void:
 	_rng.seed = 5150
 	add_to_group(&"ward")
-	quarter._quay(218.0, WARD.y + 2.0, G)
+	quarter._quay(218.0, RiseQuarter.STEPS_1.x, G)
 	_build_backing()
 	_build_houses()
 	for w: Array in WALKS:
@@ -97,6 +106,7 @@ func _ready() -> void:
 	_build_lights()
 	_build_curtains()
 	_build_rise_gate()
+	_build_fan_shop()
 	dragon = FestivalDragon.new()
 	dragon.arena = ARENA
 	dragon.lane = LANE
@@ -123,6 +133,7 @@ func _ready() -> void:
 	Sound.place_loop(self, "canal_drips.ogg", Vector3(282.0, G + 2.5, -3.0), -16.0, 8.0)
 	if SaveGame.dragon_beaten:
 		_state = &"done"
+		_fan_maker_comes()
 		dragon.lie_dead()
 		for k: int in SaveGame.ward_ruins:
 			var i := dragon.houses.find(_houses[k])
@@ -595,6 +606,8 @@ func _build_curtains() -> void:
 ## Up (true) or down; the water starts at the storm and reaches the ground,
 ## and stops the same way (the last of it falls).
 func _set_curtains(up: bool) -> void:
+	if up and not _walls.is_empty():
+		return
 	for holder: Node3D in _curtains:
 		var splash := holder.get_child(holder.get_child_count() - 1) as CPUParticles3D
 		var t := create_tween()
@@ -622,8 +635,8 @@ func _set_curtains(up: bool) -> void:
 		_walls.clear()
 
 
-## The gate up to the Lantern Makers' Rise: shut (not built yet), stone
-## steps climbing behind it.
+## The gate up to the Lantern Makers' Rise, its door swung open; the Rise
+## itself (RiseQuarter) is built from here.
 func _build_rise_gate() -> void:
 	var gx := RISE_GATE
 	var b := PaperMesh.new(_rng.randi())
@@ -632,24 +645,115 @@ func _build_rise_gate() -> void:
 	for pz: float in [1.6, -2.6]:
 		b.box(Vector3(gx, G + 2.9, pz), Vector3(0.4, 5.8, 0.4))
 	b.box(Vector3(gx, G + 5.4, -0.5), Vector3(0.5, 0.35, 5.2))
-	b.color = Scenery.WOOD.darkened(0.2)
-	b.box(Vector3(gx, G + 2.5, -0.5), Vector3(0.18, 5.0, 4.0))
-	b.color = Color(0.09, 0.08, 0.1)
-	for y: float in [1.2, 3.6]:
-		b.box(Vector3(gx - 0.1, G + y, -0.5), Vector3(0.06, 0.18, 4.0))
-	# The steps climbing on behind it, toward the kilns' glow.
-	for k in 8:
-		b.color = Color(0.3, 0.3, 0.37) * _rng.randf_range(0.85, 1.05)
-		b.box(Vector3(gx + 1.0 + k * 0.6, G + 0.2 + k * 0.4, -0.5), Vector3(0.62, 0.4 + k * 0.8, 5.0))
 	add_child(b.build())
-	market._solid(Vector3(gx, G + 15.0, 0.0), Vector3(0.5, 30.0, 4.0)).set_meta(&"no_climb", true)
+	# Its door stands open, swung back into the Ward (the way up is
+	# barred by fire instead: RiseQuarter).
+	var door := PaperMesh.new(_rng.randi())
+	door.color = Scenery.WOOD.darkened(0.2)
+	door.box(Vector3(gx - 1.95, G + 2.5, -2.55), Vector3(3.8, 5.0, 0.18))
+	door.color = Color(0.09, 0.08, 0.1)
+	for y: float in [1.2, 3.6]:
+		door.box(Vector3(gx - 1.95, G + y, -2.43), Vector3(3.8, 0.18, 0.06))
+	add_child(door.build())
+	# Walls either side of it (Julian: every gate, not only the Ward's).
+	GateWalls.build(self, market, _rng, gx, G, -2.6, 1.6, -5.1, 5.3, Vector2(293.6, gx - 0.22))
+	var rise := RiseQuarter.new()
+	rise.market = market
+	rise.quarter = quarter
+	rise.ward = self
+	add_child(rise)
 	add_child(Scenery.tiled_roof(_rng, gx - 1.2, gx + 1.2, Vector2(G + 5.6, 2.4), Vector2(G + 6.8, -0.5), 3))
 	add_child(Scenery.tiled_roof(_rng, gx - 1.2, gx + 1.2, Vector2(G + 5.6, -3.4), Vector2(G + 6.8, -0.5), 3, false))
 	market._hang(Vector3(gx - 0.5, G + 6.05, 1.2), 1.0, 0.8)   # (hooked right under the roof)
-	var glow := PaperMesh.new(1)
-	glow.fade_quad(Vector3(gx + 1.0, G + 1.0, -5.0), Vector3(gx + 1.0, G + 14.0, -5.0), Vector3(gx + 16.0, G + 14.0, -5.0), Vector3(gx + 16.0, G + 1.0, -5.0),
-			Color(0.9, 0.45, 0.15, 0.35), Color(0.9, 0.45, 0.15, 0.0))
-	add_child(glow.build_veil(true))
+
+
+## The fan-maker's shop: a counter at the front of her house with three fans
+## standing open on it, a pot of pinwheels beside it turning in the wind
+## (her wares, left out when the Ward shut; the gust whirs them).
+func _build_fan_shop() -> void:
+	var x := FAN_SHOP
+	var b := PaperMesh.new(_rng.randi())
+	b.shade_jitter = 0.15
+	b.color = Scenery.WOOD.darkened(0.1)
+	b.box(Vector3(x, G + 0.5, -2.9), Vector3(2.4, 1.0, 0.6))
+	b.color = PaperMesh.TIMBER
+	b.box(Vector3(x, G + 1.02, -2.9), Vector3(2.5, 0.05, 0.7))
+	b.color = Color(0.3, 0.34, 0.5)   # an indigo cloth along its front
+	b.box(Vector3(x, G + 0.78, -2.58), Vector3(2.4, 0.4, 0.02))
+	add_child(b.build())
+	for k in 3:
+		var fan := PaperFan.new()
+		fan.position = Vector3(x - 0.75 + k * 0.75, G + 1.05, -2.95)
+		fan.rotation.z = deg_to_rad(10.0)
+		fan.scale = Vector3.ONE * 0.85
+		add_child(fan)
+		fan.open = 0.9 - k * 0.15
+	var pot := PaperMesh.new(_rng.randi())
+	pot.color = Color(0.34, 0.26, 0.22)
+	pot.frustum(10, Vector2(0.2, 0.2), Vector2(0.26, 0.26), 0.45, Vector3(x + 1.8, G, -2.7))
+	add_child(pot.build())
+	for k in 3:
+		var wheel := Pinwheel.new()
+		wheel.height = 0.95 + k * 0.18
+		wheel.position = Vector3(x + 1.72 + k * 0.08, G + 0.3, -2.7 + k * 0.05)
+		wheel.rotation.z = (k - 1) * 0.12
+		add_child(wheel)
+
+
+## After the dragon: the fan-maker is back at her counter (a paper doll like
+## the market's shopkeepers, in indigo, fanning herself).
+func _fan_maker_comes() -> void:
+	if _fan_maker:
+		return
+	_fan_maker = MarketKeeper.new()
+	_fan_maker.robe = Color(0.28, 0.32, 0.48)
+	_fan_maker.work = "fan"
+	_fan_maker.position = Vector3(FAN_SHOP, G, -3.45)
+	add_child(_fan_maker)
+
+
+## She holds out a fan; it flies to his hand and folds shut there: he has the
+## Fan Gust (SaveGame "gust"), and its card shows.
+func _give_fan() -> void:
+	_fan_given = true
+	var fan := PaperFan.new()
+	add_child(fan)
+	fan.position = Vector3(FAN_SHOP + 0.35, G + 1.3, -3.0)
+	fan.rotation.z = deg_to_rad(10.0)
+	fan.scale = Vector3.ONE * 0.8
+	Sound.play(self, &"fan_gust", -4.0)
+	var ronin := _ronin
+	var hand := func() -> Vector3: return to_local(ronin.global_position) + Vector3(0.0, 1.1, 0.3)
+	var t := create_tween()
+	t.tween_property(fan, "open", 1.0, 0.5).set_trans(Tween.TRANS_SINE)
+	t.tween_interval(0.5)
+	t.tween_property(fan, "position", hand.call() + Vector3(0.0, 0.8, 0.0), 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	t.parallel().tween_property(fan, "rotation:z", deg_to_rad(370.0), 0.6)
+	t.tween_property(fan, "position", hand.call(), 0.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	t.parallel().tween_property(fan, "open", 0.0, 0.35)
+	t.parallel().tween_property(fan, "scale", Vector3.ONE * 0.3, 0.35)
+	t.tween_callback(func() -> void:
+		fan.queue_free()
+		learn_gust())
+
+
+func learn_gust() -> void:
+	if _ronin:
+		_ronin.has_gust = true
+		(_ronin.get_node("Puppet") as RoninPuppet).play_healed()
+	if "gust" not in SaveGame.abilities:
+		SaveGame.abilities.append("gust")
+	SaveGame.write()
+	Sound.play(self, &"draw_ready", 0.0)
+	var card := AbilityCard.new()
+	card.title = "Fan Gust"
+	card.prompts = [["O", "RT", "Fan Gust"], ["S + O", "Down + RT", "Lift, in the air"]]
+	card.advice = "A paper fan's gust: blows back fire and paper, whirs wheels, sways what hangs. Gust down in the air to lift yourself."
+	var ronin := _ronin
+	card.used = func() -> bool: return is_instance_valid(ronin) and ronin.has_gusted
+	var where := _overlay_node()
+	if where:
+		where.add_child(card)
 
 
 # --- The fight ---------------------------------------------------------------------
@@ -665,7 +769,12 @@ func _process(delta: float) -> void:
 	var camera := get_viewport().get_camera_3d() as FollowCamera
 	if camera:
 		var watching := _state in [&"intro", &"fight"] and dragon.visible and dragon.mode() != &"perch"
-		camera.focus = dragon.to_global(dragon.head) if watching else Vector3(NAN, NAN, NAN)
+		if watching:
+			camera.focus = dragon.to_global(dragon.head)
+			_focused = true
+		elif _focused:
+			camera.focus = Vector3(NAN, NAN, NAN)
+			_focused = false
 	match _state:
 		&"before":
 			if x > ARENA.x + 3.0 and x < ARENA.y - 3.0 and _ronin.is_on_floor() and _ronin.is_physics_processing():
@@ -677,6 +786,8 @@ func _process(delta: float) -> void:
 			_run_intro()
 		&"after":
 			_run_after()
+	if _fan_maker and not _fan_given and not "gust" in SaveGame.abilities 			and absf(x - FAN_SHOP) < 1.4 and _ronin.is_on_floor() and _ronin.is_physics_processing():
+		_give_fan()
 
 
 func _overlay_node() -> Node:
@@ -708,9 +819,9 @@ func _start_intro() -> void:
 	_skip = SkipPrompt.new()
 	_overlay.add_child(_skip)
 	_skip.skipped.connect(func() -> void:
-		if _state == &"intro":
-			_end_intro())
-	_camera_back(true)
+		if _state == &"intro" and _cine:
+			_cine.finish())
+	_direct_intro()
 
 
 func _make_title() -> HannyaTitle:
@@ -724,34 +835,85 @@ func _make_title() -> HannyaTitle:
 	return title
 
 
-## The intro, by the clock: the square's open shutters slam one by one
-## (0.3 to 1.7 s), a cracked bell; it pours down off the roofs (1.8), sweeps
-## over him, coils round the stone lantern and laughs (to 7.5); its name is
-## painted (6.2); the rain walls fall and the fight begins (9.6).
+## The intro, shot by shot (Julian: much more dramatic and cinematic):
+##   0    Low along the street, the camera dollies past the houses as the
+##        last open shutters slam one by one, each a jolt.
+##   2.4  A cracked bell. The camera tilts up to the storm over the roofs:
+##        lightning, and in its flash a long shape crossing the clouds.
+##   3.6  It pours down off the roofs: the camera tracks its head as it
+##        sweeps low over him, a roar as it passes.
+##   5.6  Low by the stone lantern as it coils round it, pushing in.
+##   7.4  Its head, close: it turns to us, roars, laughs.
+##   9.2  Pulling back and up over the square, its name painted; the walls
+##        of rain fall at both ends. 12: the fight.
+func _direct_intro() -> void:
+	_cine = CineCamera.new()
+	_cine.game_camera = get_viewport().get_camera_3d()
+	_cine.length = 12.0
+	var m := market.global_position
+	var g := m.y + G
+	var r := _ronin.global_position
+	var l := m + LANTERN
+	var head := func() -> Vector3: return dragon.to_global(dragon.head)
+	_cine.shot(0.0, 2.4, Vector3(r.x + 1.0, g + 1.3, 7.5), Vector3(r.x + 9.0, g + 1.6, 7.0),
+			Vector3(r.x + 7.0, g + 2.6, -4.0), Vector3(r.x + 15.0, g + 2.8, -4.0), Vector2(40.0, 38.0))
+	_cine.shot(2.4, 3.6, Vector3(l.x - 7.0, g + 0.8, 10.0), Vector3(l.x - 6.0, g + 0.7, 10.5),
+			Vector3(l.x - 2.0, g + 5.0, -4.0), Vector3(l.x + 3.0, g + 11.0, -8.0), Vector2(46.0, 50.0))
+	_cine.shot(3.6, 5.6, func() -> Vector3: return head.call() + Vector3(-3.0, 1.0, 10.0),
+			func() -> Vector3: return head.call() + Vector3(2.0, 0.6, 8.0), head, head, Vector2(42.0, 38.0), Vector2(-3.0, 2.0), 0.06)
+	_cine.shot(5.6, 7.4, Vector3(l.x - 3.6, g + 0.5, l.z + 6.5), Vector3(l.x - 2.2, g + 0.7, l.z + 4.8),
+			Vector3(l.x, g + 2.4, l.z), Vector3(l.x, g + 3.6, l.z), Vector2(40.0, 34.0))
+	_cine.shot(7.4, 9.2, func() -> Vector3: return head.call() + Vector3(-0.7, -0.4, 4.4),
+			func() -> Vector3: return head.call() + Vector3(-0.5, -0.5, 3.4), head, head, Vector2(34.0, 28.0), Vector2(2.0, -2.0), 0.02)
+	_cine.shot(9.2, 12.0, Vector3(l.x - 2.0, g + 3.5, 8.0), Vector3(l.x - 4.0, g + 5.5, 21.0),
+			Vector3(l.x, g + 4.0, -2.0), Vector3(l.x, g + 3.5, -2.0), Vector2(38.0, 40.0), Vector2.ZERO, 0.02, 0.8)
+	_cine.at(2.4, func() -> void:
+		Sound.play(self, &"fire_bell", 2.0)
+		dragon.play_intro(LANTERN))
+	_cine.at(2.9, func() -> void:
+		dragon.bolt_visual(Vector3(LANTERN.x + 9.0, G + 6.0, -14.0))
+		_cine.flash(0.3, 0.4)
+		_cine.shake(0.3))
+	_cine.at(3.3, func() -> void: Sound.play(self, &"dragon_roar", -2.0))
+	_cine.at(4.7, func() -> void:
+		_cine.shake(0.6)
+		Sound.play(self, &"dragon_roar", 2.0))
+	_cine.at(7.4, func() -> void:
+		dragon.look_override = dragon.to_local(_cine.camera().global_position))
+	_cine.at(7.6, func() -> void:
+		Sound.play(self, &"dragon_roar", 4.0)
+		dragon.set(&"_jaw", 1.0)
+		_cine.shake(0.9))
+	_cine.at(8.5, func() -> void: Sound.play(self, &"dragon_laugh", 3.0))
+	_cine.at(9.2, func() -> void: dragon.look_override = Vector3(NAN, NAN, NAN))
+	_cine.at(9.4, func() -> void:
+		_title.paint()
+		Sound.play(self, &"taiko_hit", 0.0))
+	_cine.at(10.6, func() -> void:
+		_set_curtains(true)
+		_cine.shake(0.25))
+	_cine.finished.connect(func() -> void:
+		dragon.look_override = Vector3(NAN, NAN, NAN)
+		if _state == &"intro":
+			_end_intro())
+	add_child(_cine)
+
+
 func _run_intro() -> void:
 	var puppet: RoninPuppet = _ronin.get_node("Puppet")
 	var open := _windows.filter(func(w: Dictionary) -> bool: return w["open"] and not (w["house"] as Node3D).has_meta(&"ruin"))
-	if _time > 0.3 + _slammed * 0.28 and not open.is_empty():
+	if _cine and _cine.time > 0.4 + _slammed * 0.3 and _cine.time < 2.4 and not open.is_empty():
 		_slammed += 1
 		# Nearest him first, outward.
 		open.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 			return absf((a["house"] as Node3D).position.x - _ronin_x()) < absf((b["house"] as Node3D).position.x - _ronin_x()))
 		_set_shutters(open[0], false, true)
 		Sound.play(self, &"shutter_slam", -2.0 + _rng.randf_range(-2.0, 1.0))
-	if _time > 1.6 and dragon.mode() == &"perch":
-		Sound.play(self, &"fire_bell", 2.0)
-		dragon.play_intro(LANTERN)
-		Sound.play(self, &"dragon_roar", 0.0)
+		_cine.shake(0.12)
 	if dragon.mode() == &"intro":
 		puppet.facing = signf(dragon.head.x - _ronin_x()) if absf(dragon.head.x - _ronin_x()) > 0.5 else puppet.facing
 		_ronin.facing = puppet.facing
-		if dragon.get(&"_mode_time") > 5.2 and dragon.get(&"_mode_time") - get_process_delta_time() <= 5.2:
-			Sound.play(self, &"dragon_laugh", 2.0)
-	if _time > 7.8 and _title.get(&"_stroke") == 0.0:
-		_title.paint()
-		Sound.play(self, &"taiko_hit", 0.0)
-	if _time > 11.4:
-		_end_intro()
+
 
 
 func _ronin_x() -> float:
@@ -759,6 +921,13 @@ func _ronin_x() -> float:
 
 
 func _end_intro() -> void:
+	if _state != &"intro":
+		return
+	_state = &"starting"
+	if _cine:
+		var cine := _cine
+		_cine = null
+		cine.finish()
 	if _overlay:
 		var fade := create_tween()
 		fade.tween_property(_overlay, "modulate:a", 0.0, 0.5)
@@ -815,10 +984,93 @@ func _play_music(on: bool) -> void:
 		_music_fade.tween_callback(_music.stop)
 
 
+## Its death (Julian: much more dramatic and cinematic):
+##   0    The killing cut: everything slows (a quarter speed for a moment),
+##        a white flash; the camera pushes in on its head.
+##   1    It writhes up into the storm; the camera, low, looks up after it.
+##   3.3  Lightning strikes it, twice; it comes apart in the air, and the
+##        camera, wide, follows the rain of paper down.
+##   5.1  Its head crashes onto the stones last.
+##   5.7  Quiet. The walls of rain stop, the clouds part, moonlight falls on
+##        the heap; the camera eases in on him standing by it. 9: play.
+func _direct_death() -> void:
+	_cine = CineCamera.new()
+	_cine.game_camera = get_viewport().get_camera_3d()
+	_cine.length = 9.0
+	var m := market.global_position
+	var g := m.y + G
+	var hx := dragon.to_global(dragon.head).x
+	var head := func() -> Vector3: return dragon.to_global(dragon.head)
+	_cine.shot(0.0, 1.0, func() -> Vector3: return head.call() + Vector3(-1.6, 0.6, 6.0),
+			func() -> Vector3: return head.call() + Vector3(-0.9, 0.3, 4.2), head, head, Vector2(36.0, 32.0))
+	_cine.shot(1.0, 3.3, Vector3(hx - 3.0, g + 0.9, 9.0), Vector3(hx - 3.5, g + 0.8, 9.5), head, head,
+			Vector2(46.0, 50.0), Vector2(0.0, -3.0), 0.04)
+	_cine.shot(3.3, 5.7, Vector3(hx - 1.0, g + 5.5, 16.0), Vector3(hx - 1.0, g + 2.6, 13.0), head,
+			Vector3(hx, g + 0.9, m.z - 2.0), Vector2(44.0, 40.0), Vector2.ZERO, 0.03)
+	_cine.shot(5.7, 9.0, Vector3(hx - 4.5, g + 1.7, 10.5), Vector3(hx - 3.0, g + 1.4, 7.8),
+			Vector3(hx - 0.5, g + 1.0, m.z - 2.0), Vector3(hx, g + 0.9, m.z - 2.0), Vector2(40.0, 36.0), Vector2.ZERO, 0.015, 0.8)
+	_cine.at(0.0, func() -> void:
+		_cine.flash(0.7, 0.6)
+		_cine.shake(0.5)
+		Engine.time_scale = 0.25)
+	_cine.at(0.9, func() -> void: Engine.time_scale = 1.0)
+	dragon.struck_down.connect(func() -> void:
+		if _cine:
+			_cine.flash(0.8, 0.5)
+			_cine.shake(0.7), CONNECT_ONE_SHOT)
+	dragon.crashed.connect(func() -> void:
+		if _cine:
+			_cine.shake(1.0), CONNECT_ONE_SHOT)
+	_cine.at(5.9, func() -> void:
+		_set_curtains(false)
+		_moonlight())
+	_cine.finished.connect(func() -> void:
+		Engine.time_scale = 1.0
+		_cine = null
+		if _hud:
+			_hud.visible = true
+		if _held:
+			_held = false
+			_ronin.set_physics_process(true))
+	add_child(_cine)
+
+
+## After it falls: the clouds over the Ward part and a shaft of pale
+## moonlight comes down on the heap, then fades as the night settles.
+func _moonlight() -> void:
+	var x := dragon.head.x - 1.0
+	var beam := PaperMesh.new(3)
+	beam.fade_quad(Vector3(x - 1.6, G, -2.8), Vector3(x - 4.0, G + 22.0, -6.0), Vector3(x + 4.0, G + 22.0, -6.0), Vector3(x + 3.0, G, -2.8),
+			Color(0.75, 0.8, 0.95, 0.22), Color(0.75, 0.8, 0.95, 0.0))
+	var mesh := beam.build_veil(true)
+	add_child(mesh)
+	mesh.scale = Vector3(1.0, 0.001, 1.0)
+	var t := create_tween()
+	t.tween_property(mesh, "scale:y", 1.0, 1.6).set_trans(Tween.TRANS_SINE)
+	t.tween_interval(6.0)
+	t.tween_property(mesh, "scale:x", 0.001, 3.0).set_trans(Tween.TRANS_SINE)
+	t.tween_callback(mesh.queue_free)
+	var light := OmniLight3D.new()
+	light.light_color = Color(0.7, 0.78, 1.0)
+	light.light_energy = 0.0
+	light.omni_range = 9.0
+	light.position = Vector3(x, G + 4.0, -1.5)
+	add_child(light)
+	var l := create_tween()
+	l.tween_property(light, "light_energy", 1.6, 1.6)
+	l.tween_interval(6.0)
+	l.tween_property(light, "light_energy", 0.0, 3.0)
+	l.tween_callback(light.queue_free)
+
+
 func _on_defeated() -> void:
 	_state = &"after"
 	_time = 0.0
 	_opened = 0
+	_hud = get_tree().get_first_node_in_group(&"hud") as CanvasItem
+	if _hud:
+		_hud.visible = false
+	_direct_death()
 	SaveGame.dragon_beaten = true
 	SaveGame.ward_ruins.clear()
 	for k in _houses.size():
@@ -833,19 +1085,30 @@ func _on_defeated() -> void:
 ## the shutters slide open one by one from the middle outward (from 3.5 s),
 ## and the people come back to their windows.
 func _run_after() -> void:
-	if _time > 2.5 and not _walls.is_empty():
-		_set_curtains(false)
+	# He stands and watches while it dies (held once his feet are down).
+	if _cine and not _held and _ronin.is_on_floor():
+		_held = true
+		_ronin.set_physics_process(false)
+		_ronin.velocity = Vector3.ZERO
+		var puppet: RoninPuppet = _ronin.get_node("Puppet")
+		puppet.state = &"idle"
+		puppet.facing = signf(dragon.to_global(dragon.head).x - _ronin.global_position.x)
+		_ronin.facing = puppet.facing
+	if _time > 6.0 and not _settled:
+		_settled = true
 		Sound.duck_music(false)
 		_camera_back(false)
 	var shut := _windows.filter(func(w: Dictionary) -> bool: return not w["open"] and not (w["house"] as Node3D).has_meta(&"ruin"))
-	if _time > 3.5 + _opened * 0.4 and not shut.is_empty():
+	if _time > 6.5 + _opened * 0.4 and not shut.is_empty():
 		_opened += 1
 		var mid := (ARENA.x + ARENA.y) * 0.5
 		shut.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 			return absf((a["house"] as Node3D).position.x - mid) < absf((b["house"] as Node3D).position.x - mid))
 		_set_shutters(shut[0], true, true)
 		Sound.play(self, &"shutter_open", -6.0 + _rng.randf_range(-2.0, 1.0))
-	if shut.is_empty() and _time > 4.0:
+	if _time > 6.5 and _fan_maker == null:
+		_fan_maker_comes()
+	if shut.is_empty() and _time > 7.0 and _cine == null:
 		_add_shadows()
 		_state = &"done"
 		SaveGame.write()

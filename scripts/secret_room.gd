@@ -16,6 +16,13 @@ extends Node3D
 ## The door: in the left wall, this tall.
 @export var door_height := 1.95
 
+## The bundle of cranes on its shelf (each room its own).
+@export var crane_id := "secret_room"
+@export var crane_count := 5
+## Its door already torn away (a room barred some other way: the market's
+## store behind a burning barricade).
+@export var start_open := false
+
 ## Width of the shoji door at the front's left end.
 const DOOR_WIDTH := 0.95
 
@@ -34,6 +41,12 @@ func _ready() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(global_position.x * 41.0)
 	_build(rng)
+	if start_open:
+		opened = true
+		_door_solid.queue_free()
+		_door_target.queue_free()
+		_door_paper.queue_free()
+		(_door_paper.get_meta(&"lattice") as Node3D).queue_free()
 
 
 func _solid(at: Vector3, size: Vector3) -> StaticBody3D:
@@ -81,8 +94,8 @@ func _build(rng: RandomNumberGenerator) -> void:
 	add_child(room)
 	# A bundle of folded paper cranes on the shelf: the room's secret.
 	var cranes := CraneBundle.new()
-	cranes.id = "secret_room"
-	cranes.count = 5
+	cranes.id = crane_id
+	cranes.count = crane_count
 	cranes.position = Vector3(right - 1.0, 1.24, -deep + 0.28)
 	add_child(cranes)
 	var lantern := Scenery.lantern(rng, 1.6, 0.6, 0.35)

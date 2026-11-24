@@ -248,6 +248,11 @@ var _draw_trail: MeshInstance3D   # the streak along the path of the draw
 var _draw_from := 0.0             # x where the draw started
 var _draw_clock := -1.0           # seconds since he arrived, or -1
 var _parry_clock := -1.0          # seconds into the current parry, or -1
+var _fan_clock := -1.0            # seconds into a Fan Gust, or -1
+var _fan_down := false
+var _fan: PaperFan
+var _fan_wind: CPUParticles3D
+var _fan_flecks: CPUParticles3D
 var _clash_clock := -1.0          # seconds into the current clash, or -1
 var _clash: Node3D                # the burst of rays when a parry lands
 var _clash_rays: Array[MeshInstance3D] = []
@@ -300,6 +305,7 @@ func _process(delta: float) -> void:
 			_parry_clock = -1.0
 			_shown_state = &""  # ease back out of the guard
 			_frame_clock = 1.0  # and put the sword away this instant
+	_update_fan(delta)
 	if _model:
 		_update_ready_cue(delta)
 		_update_enso(delta)
@@ -324,7 +330,7 @@ func _process(delta: float) -> void:
 	var rate := frames_per_second
 	if _model and _cut_clock >= 0.0 and not _sheathed and absf(_slash_dir.y) > 0.5:
 		rate = aimed_cut_fps
-	if _model and _parry_clock >= 0.0:
+	if _model and (_parry_clock >= 0.0 or _fan_clock >= 0.0):
 		rate = parry_fps
 	if _frame_clock >= 1.0 / rate:
 		_step = minf(_frame_clock, 1.0 / frames_per_second)
@@ -469,6 +475,131 @@ func end_draw(to: float) -> void:
 	_draw_clock = 0.0
 	_frame_clock = 1.0
 	_set_trail(_draw_from, to)
+
+
+## How long the Fan Gust's sweep takes.
+@export var fan_time := 0.42
+
+
+## Called by ronin.gd for the Fan Gust: the fan is snapped open in his left
+## hand and swept; wind streaks and paper flecks fly off it the way it blows.
+func play_fan(down: bool) -> void:
+	if _fan == null:
+		_build_fan()
+	_fan_clock = 0.0
+	_fan_down = down
+	_cut_clock = -1.0
+	_frame_clock = 1.0
+	_step = 0.0
+	_pose()
+
+
+func _build_fan() -> void:
+	_fan = PaperFan.new()
+	_fan.top_level = true
+	_fan.visible = false
+	add_child(_fan)
+	_fan_wind = CPUParticles3D.new()
+	_fan_wind.top_level = true
+	_fan_wind.one_shot = true
+	_fan_wind.emitting = false
+	_fan_wind.explosiveness = 0.75
+	_fan_wind.amount = 12
+	_fan_wind.lifetime = 0.36
+	_fan_wind.local_coords = false
+	_fan_wind.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	_fan_wind.emission_box_extents = Vector3(0.1, 0.45, 0.3)
+	_fan_wind.spread = 9.0
+	_fan_wind.gravity = Vector3.ZERO
+	_fan_wind.initial_velocity_min = 15.0
+	_fan_wind.initial_velocity_max = 22.0
+	_fan_wind.damping_min = 18.0
+	_fan_wind.damping_max = 26.0
+	_fan_wind.particle_flag_align_y = true
+	var fade := Curve.new()
+	fade.add_point(Vector2(0.0, 1.0))
+	fade.add_point(Vector2(1.0, 0.0))
+	_fan_wind.scale_amount_curve = fade
+	var streak := QuadMesh.new()
+	streak.size = Vector2(0.025, 0.9)
+	var pale := StandardMaterial3D.new()
+	pale.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	pale.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	pale.albedo_color = Color(0.92, 0.9, 0.86, 0.55)
+	pale.cull_mode = BaseMaterial3D.CULL_DISABLED
+	pale.disable_fog = true
+	streak.material = pale
+	_fan_wind.mesh = streak
+	_fan_wind.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_fan_wind)
+	_fan_flecks = CPUParticles3D.new()
+	_fan_flecks.top_level = true
+	_fan_flecks.one_shot = true
+	_fan_flecks.emitting = false
+	_fan_flecks.explosiveness = 0.8
+	_fan_flecks.amount = 12
+	_fan_flecks.lifetime = 0.9
+	_fan_flecks.local_coords = false
+	_fan_flecks.spread = 22.0
+	_fan_flecks.gravity = Vector3(0.0, -1.2, 0.0)
+	_fan_flecks.initial_velocity_min = 5.0
+	_fan_flecks.initial_velocity_max = 9.0
+	_fan_flecks.damping_min = 6.0
+	_fan_flecks.damping_max = 9.0
+	_fan_flecks.angular_velocity_min = -500.0
+	_fan_flecks.angular_velocity_max = 500.0
+	_fan_flecks.scale_amount_curve = fade
+	var fleck := QuadMesh.new()
+	fleck.size = Vector2(0.05, 0.035)
+	var washi := StandardMaterial3D.new()
+	washi.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	washi.albedo_color = Color(0.86, 0.82, 0.74)
+	washi.cull_mode = BaseMaterial3D.CULL_DISABLED
+	washi.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	fleck.material = washi
+	_fan_flecks.mesh = fleck
+	_fan_flecks.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_fan_flecks)
+
+
+## The fan in his left hand, every frame of the gust: snapped open as he
+## sweeps (0.12 to 0.28 of it), held open, folded shut as he draws it back;
+## the wind leaves it as it opens.
+func _update_fan(delta: float) -> void:
+	if _fan == null:
+		return
+	if _fan_clock < 0.0:
+		_fan.visible = false
+		return
+	var was := _fan_clock
+	_fan_clock += delta
+	var u := _fan_clock / fan_time
+	if u > 1.0:
+		_fan_clock = -1.0
+		_fan.visible = false
+		_shown_state = &""
+		_frame_clock = 1.0
+		return
+	var hand: int = _animator._bone.get("LeftHand", -1)
+	if hand < 0:
+		return
+	var space := _animator.skeleton.global_transform
+	var at := space * _animator.skeleton.get_bone_global_pose(hand).origin
+	_fan.visible = u > 0.06 and u < 0.97
+	_fan.open = smoothstep(0.12, 0.28, u) * (1.0 - smoothstep(0.8, 0.97, u))
+	# Its face toward us; its spread pointing the way it blows.
+	var start := -PaperFan.SPREAD * 0.5 * _fan.open - (PI * 0.5 if _fan_down else 0.0)
+	var turn := Basis(Vector3.BACK, start)
+	if facing < 0.0:
+		turn = Basis.from_scale(Vector3(-1.0, 1.0, 1.0)) * turn
+	_fan.global_transform = Transform3D(turn, at)
+	if was / fan_time < 0.2 and u >= 0.2:
+		var blow := Vector3.DOWN if _fan_down else Vector3(facing, 0.0, 0.0)
+		for p: CPUParticles3D in [_fan_wind, _fan_flecks]:
+			p.global_position = at + blow * 0.3
+			p.direction = blow
+			p.restart()
+			p.emitting = true
 
 
 ## Called by ronin.gd when he raises his blade to parry.
@@ -865,6 +996,14 @@ func _pose_model() -> void:
 		else:
 			pose = SamuraiAnimator.with_upper_body(pose, guard)
 		cutting = true  # no in-between frame: the draw must be instant
+
+	# The Fan Gust: like the parry.
+	if _fan_clock >= 0.0:
+		var fan := SamuraiAnimator.fan(_fan_clock / fan_time, _fan_down)
+		# Only standing still does his whole body take the stance; running,
+		# and in the air (a gust down too), his legs keep doing what they do.
+		pose = fan if state == &"idle" and _run_blend <= 0.0 and not _fan_down else SamuraiAnimator.with_upper_body(pose, fan)
+		cutting = true
 
 	# A new kind of stance gets one in-between frame, so it does not pop.
 	# (Standing and running count as one kind: the easing above handles them.)

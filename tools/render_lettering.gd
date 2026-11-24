@@ -18,6 +18,10 @@ const LINES := [
 	["title_dragon_kanji", "祭龍", 220],
 	["title_dragon_name", "The Festival Dragon", 84],
 	["title_dragon_subtitle", "the parade the Rain drove mad", 40],
+	["title_hosho_kanji", "宝照", 220],
+	["title_hosho_name", "Hōshō, the Gilded General", 84],
+	["title_hosho_subtitle", "who hid from the Rain under gold", 40],
+	["hosho_line", "I can feel it. The rain.", 56],
 ]
 
 

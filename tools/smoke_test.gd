@@ -1713,7 +1713,7 @@ func _ward(ronin: Ronin) -> void:
 	await _frames(30)
 	dragon.health = 1
 	dragon.call("_struck", 1, Vector2.RIGHT, null)
-	await _frames(60 * 9)
+	await _frames(60 * 14)
 	var opened := (ward.get(&"_windows") as Array).filter(func(w: Dictionary) -> bool: return w["open"]).size()
 	var nearest := -INF
 	for seg: Node3D in dragon.get(&"_segments"):
@@ -1721,6 +1721,310 @@ func _ward(ronin: Ronin) -> void:
 	_check("it lies back, off his path (head z %.1f, nearest of its body z %.1f)" % [dragon.head.z, nearest], dragon.head.z < -1.5 and nearest < -1.0)
 	_check("beating it: it falls apart, the rain walls stop, %d shutters slide open" % opened,
 			SaveGame.dragon_beaten and dragon.mode() == &"dead" and (ward.get(&"_walls") as Array).is_empty() and opened > 5)
+	await _fan_gust(ward, ronin)
+	await _rise(ronin)
+	await _hosho(ronin)
 	SaveGame.ward_open = saved[0]
 	SaveGame.dragon_met = saved[1]
 	SaveGame.dragon_beaten = saved[2]
+
+
+## The Fan Gust: the fan-maker gives it; it whirs a pinwheel, blows burning
+## paper back, shoves a husk away; gusting down in the air lifts him, once.
+func _fan_gust(ward: WardQuarter, ronin: Ronin) -> void:
+	var had := ronin.has_gust
+	SaveGame.abilities.erase("gust")
+	ronin.has_gust = false
+	ward.call("_fan_maker_comes")
+	ronin.global_position = Vector3(LanternMarket.SHIFT + WardQuarter.FAN_SHOP - 0.6, CanalQuarter.BANK_Y + 0.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(150)
+	_check("the fan-maker gives him the Fan Gust", ronin.has_gust and "gust" in SaveGame.abilities)
+	# A pinwheel at her shop whirs.
+	var wheel: Pinwheel = ward.find_children("*", "Pinwheel", true, false)[0]
+	ronin.global_position = Vector3(wheel.global_position.x - 3.0, CanalQuarter.BANK_Y + 0.2, 0.0)
+	ronin.facing = 1.0
+	await _frames(20)
+	await _gust_once(ronin)
+	await _frames(2)
+	_check("a gust sets a pinwheel whirring (%.0f)" % absf(wheel.get(&"_spin")), absf(wheel.get(&"_spin")) > 15.0)
+	# Burning paper blown back.
+	var wad := BurningPaper.new()
+	ronin.get_parent().add_child(wad)
+	wad.global_position = ronin.global_position + Vector3(3.5, 1.2, 0.0)
+	wad.velocity = Vector3(-6.0, 1.0, 0.0)
+	await _frames(4)
+	await _gust_once(ronin)
+	await _frames(2)
+	_check("a gust blows burning paper back (%.1f m/s)" % wad.velocity.x if is_instance_valid(wad) else "a gust blows burning paper back", is_instance_valid(wad) and wad.velocity.x > 3.0)
+	# A husk shoved away.
+	var husk: PaperHusk = Village.HUSK_SCENE.instantiate()
+	ronin.get_parent().add_child(husk)
+	husk.global_position = ronin.global_position + Vector3(2.5, 0.0, 0.0)
+	await _frames(40)
+	var husk_x := husk.global_position.x
+	await _gust_once(ronin)
+	await _frames(20)
+	_check("a gust shoves a husk back (%.2f m)" % (husk.global_position.x - husk_x), husk.global_position.x - husk_x > 0.5)
+	husk.queue_free()
+	# In the air, a gust down lifts him; a second one does not, until he lands.
+	await _frames(60)
+	Input.action_press("jump")
+	await _frames(12)
+	Input.action_release("jump")
+	for i in 60:
+		await physics_frame
+		if ronin.velocity.y < -1.0:
+			break
+	Input.action_press("aim_down")
+	await _gust_once(ronin)
+	var lifted := ronin.velocity.y
+	await _frames(40)
+	await _gust_once(ronin)
+	var again := ronin.velocity.y
+	Input.action_release("aim_down")
+	_check("in the air, a gust down lifts him (%.1f m/s), once (then %.1f)" % [lifted, again], lifted > 5.0 and again < 5.0)
+	await _frames(60)
+	ronin.has_gust = had
+
+
+func _gust_once(ronin: Ronin) -> void:
+	ronin.set("_gust_cooldown_left", 0.0)
+	Input.action_press("gust")
+	await physics_frame
+	await physics_frame
+	Input.action_release("gust")
+
+
+## The Lantern Makers' Rise: the burning gate holds him until his gust puts
+## it out; a kiln's hot air lifts him while he glides; gusting the windmill
+## winds the cage up the cliff; a lantern ghost's lunge, parried, knocks it
+## down.
+func _rise(ronin: Ronin) -> void:
+	var rise: RiseQuarter = get_first_node_in_group(&"rise")
+	var shift := LanternMarket.SHIFT
+	var had := [ronin.has_gust, ronin.has_glide]
+	var held: Array[Node] = []
+	for node: Node in rise.find_children("*", "", true, false):
+		if (node is PaperHusk or node is PaperCritter) and node.is_physics_processing():
+			node.set_physics_process(false)
+			held.append(node)
+	# The burning gate.
+	ronin.has_gust = false
+	ronin.global_position = Vector3(shift + RiseQuarter.START - 4.5, CanalQuarter.BANK_Y + 0.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	ronin.set("_invulnerable", 99.0)
+	await _frames(20)
+	Input.action_press("move_right")
+	await _frames(70)
+	Input.action_release("move_right")
+	var stopped := ronin.global_position.x - shift
+	ronin.has_gust = true
+	ronin.facing = 1.0
+	ronin.global_position = Vector3(shift + RiseQuarter.START - 4.5, CanalQuarter.BANK_Y + 0.2, 0.0)
+	await _frames(10)
+	await _gust_once(ronin)
+	await _frames(40)
+	Input.action_press("move_right")
+	await _frames(70)
+	Input.action_release("move_right")
+	_check("the burning gate holds him (x %.1f) until his gust puts it out (then x %.1f)" % [stopped, ronin.global_position.x - shift],
+			stopped < RiseQuarter.START - 0.5 and ronin.global_position.x - shift > RiseQuarter.START + 2.0)
+	# The burning store in the Upper Market: its fire bars the door until
+	# the gust puts it out; then he walks in to its cranes.
+	var store_x := LanternMarket.STORE_X
+	ronin.global_position = Vector3(shift + store_x - 4.0, LanternMarket.UPPER.z + 0.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	ronin.facing = 1.0
+	await _frames(20)
+	Input.action_press("move_right")
+	await _frames(60)
+	Input.action_release("move_right")
+	var barred := ronin.global_position.x - shift
+	ronin.global_position = Vector3(shift + store_x - 4.0, LanternMarket.UPPER.z + 0.2, 0.0)
+	await _frames(10)
+	await _gust_once(ronin)
+	await _frames(40)
+	Input.action_press("move_right")
+	await _frames(60)
+	Input.action_release("move_right")
+	_check("the Upper Market's store: its fire bars the door (x %.1f) until a gust puts it out (then x %.1f, inside)" % [barred, ronin.global_position.x - shift],
+			barred < store_x - 0.5 and ronin.global_position.x - shift > store_x + 0.5)
+	# A kiln's hot air.
+	ronin.has_glide = true
+	var kiln: float = RiseQuarter.KILNS[0]
+	ronin.global_position = Vector3(shift + kiln, RiseQuarter.T1.z + 3.0, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(3)
+	Input.action_press("jump")
+	var low := ronin.global_position.y
+	var high := low
+	for i in 90:
+		await physics_frame
+		high = maxf(high, ronin.global_position.y)
+	Input.action_release("jump")
+	_check("gliding over a kiln's grate, its hot air lifts him (%.1f m up)" % (high - low), high - low > 2.0)
+	await _frames(60)
+	# The windmill and the cage.
+	var cage := rise.hoist
+	ronin.global_position = Vector3(shift + RiseQuarter.HOIST_X, RiseQuarter.T1.z + 0.3, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(30)
+	ronin.global_position = Vector3(shift + RiseQuarter.WINDMILL_X - 3.0, RiseQuarter.T1.z + 0.2, 0.0)
+	ronin.facing = 1.0
+	await _frames(10)
+	await _gust_once(ronin)
+	await _frames(2)
+	var spun := rise.windmill.spin
+	ronin.global_position = cage.global_position + Vector3(0.0, 0.3, 0.0)
+	ronin.velocity = Vector3.ZERO
+	var top := 0.0
+	for i in 300:
+		await physics_frame
+		top = maxf(top, ronin.global_position.y - shift * 0.0)
+	_check("gusting the windmill (spin %.1f) winds the cage, and him, up to the workshops (%.1f m)" % [spun, top],
+			spun > 5.0 and top > RiseQuarter.T2.z - 0.3)
+	# A lantern ghost's lunge, parried.
+	var ghost: ChochinObake = rise.find_children("*", "ChochinObake", true, false)[1]
+	ghost.set_physics_process(true)
+	ronin.global_position = ghost.global_position + Vector3(-2.5, -1.5, 0.0)
+	ronin.global_position.y = RiseQuarter.ground_at(ronin.global_position.x - shift) + 0.2
+	ronin.velocity = Vector3.ZERO
+	var staggered := false
+	for i in 400:
+		ronin.facing = signf(ghost.global_position.x - ronin.global_position.x)
+		if ghost.mode == &"lunge":
+			ronin.set("_parry_time", 0.2)
+		await physics_frame
+		if ghost.mode == &"stagger":
+			staggered = true
+			break
+	_check("a lantern ghost lunges; parried, it tumbles down (%s)" % ghost.mode, staggered)
+	ronin.set("_invulnerable", 0.0)
+	for node: Node in held:
+		if is_instance_valid(node):
+			node.set_physics_process(true)
+	ronin.has_gust = had[0]
+	ronin.has_glide = had[1]
+
+
+## The Gilded Terraces and Hōshō: a gilded guard's gold, the fight's start,
+## his second wind, the gold wave (ducked and not), death resetting him,
+## and his defeat.
+func _hosho(ronin: Ronin) -> void:
+	var shift := LanternMarket.SHIFT
+	var hall: HoshoHall = get_first_node_in_group(&"hosho_hall")
+	var boss := hall.hosho
+	var saved := [SaveGame.hosho_met, SaveGame.hosho_beaten, SaveGame.seals.duplicate()]
+	# In the market, nothing of the market is hidden (its paving is built
+	# straight into the village: hidden with the town, the street went bare).
+	var village: Village = hall.market.get_parent()
+	var hidden := 0
+	for c: Node in village.get_children():
+		if c is MeshInstance3D and not (c as VisualInstance3D).visible:   # (far particles sleep hidden: fine)
+			var box: AABB = (c as VisualInstance3D).global_transform * (c as VisualInstance3D).get_aabb()
+			if box.get_center().x > LanternMarket.SHIFT - 50.0:
+				hidden += 1
+	_check("in the market, none of its own pieces are hidden (%d hidden)" % hidden, hidden == 0)
+	# The back alley under the bridge: its back door takes him up through
+	# the cliff to the far terrace.
+	ronin.global_position = Vector3(shift + TerracesQuarter.DOOR_X, TerracesQuarter.DROP_FLOOR + 0.3, 0.0)
+	ronin.velocity = Vector3.ZERO
+	ronin.set("_invulnerable", 99.0)
+	await _frames(30)
+	var floor_y := ronin.global_position.y
+	Input.action_press("aim_up")
+	await _frames(10)
+	Input.action_release("aim_up")
+	await _frames(150)
+	_check("fallen into the back alley (floor %.1f), its door takes him up to the far terrace (x %.1f, y %.1f)" % [floor_y, ronin.global_position.x - shift, ronin.global_position.y],
+			floor_y < TerracesQuarter.DROP_FLOOR + 1.0 and ronin.global_position.y > TerracesQuarter.G2.z - 0.5 and ronin.global_position.x - shift > TerracesQuarter.BRIDGE.y)
+	# A gilded guard: cuts from the front glance off until a parry cracks it.
+	var guard: GildedGuard = hall.get_parent().find_children("*", "GildedGuard", true, false)[0]
+	guard.set_physics_process(false)
+	var before: int = guard.health
+	guard.set(&"_dir", -1.0)
+	guard.take_hit(1, Vector2.RIGHT)
+	var glanced: bool = guard.health == before
+	guard.call("_on_parried")
+	guard.take_hit(1, Vector2.RIGHT)
+	_check("a gilded guard's gold turns a cut from the front (%d to %d), until a parry cracks it (then %d)" % [before, before, guard.health],
+			glanced and guard.cracked and guard.health == before - 1)
+	guard.set_physics_process(true)
+	# Into the hall: the intro, skipped, starts the fight.
+	SaveGame.hosho_met = false
+	SaveGame.hosho_beaten = false
+	ronin.set("_invulnerable", 0.0)
+	ronin.health = ronin.max_health
+	ronin.global_position = Vector3(shift + HoshoHall.ARENA.x + 3.0, TerracesQuarter.HALL.z + 0.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(30)
+	var intro: StringName = hall.get(&"_state")
+	hall.call("_end_intro")
+	await _frames(10)
+	_check("walking into the hall starts his intro (%s), and after it the fight (%s), doors shut" % [intro, hall.get(&"_state")],
+			intro == &"intro" and hall.get(&"_state") == &"fight" and boss.active)
+	# The gold wave, high: ducking lets it pass over; standing, it hits.
+	ronin.set("_draw_safe", 0.0)
+	for ducked: bool in [true, false]:
+		boss.set_physics_process(false)
+		boss.global_position = Vector3(shift + HoshoHall.ARENA.y - 3.0, boss.global_position.y, 0.0)
+		ronin.global_position = Vector3(shift + HoshoHall.ARENA.y - 10.0, TerracesQuarter.HALL.z + 0.2, 0.0)
+		ronin.velocity = Vector3.ZERO
+		ronin.set("_invulnerable", 0.0)
+		ronin.health = ronin.max_health
+		boss.facing = -1.0
+		if ducked:
+			Input.action_press("aim_down")
+		await _frames(10)
+		boss.set(&"_wave_low", false)
+		boss.call("_set_mode", &"wave_tell")
+		boss.wave_coming.emit(false)
+		boss.set_physics_process(true)
+		var lost := 0
+		for i in 120:
+			await physics_frame
+			ronin.global_position.x = shift + HoshoHall.ARENA.y - 10.0
+		lost = ronin.max_health - ronin.health
+		Input.action_release("aim_down")
+		_check("his gold wave rolls along the floor high: %s (lost %d)" % ["ducked, it passes over" if ducked else "standing, it hits", lost],
+				lost == (0 if ducked else 1))
+	# Half health: his second wind.
+	ronin.set("_invulnerable", 99.0)
+	boss.health = boss.max_health / 2 + 1
+	boss.take_hit(1, Vector2.RIGHT)
+	var roused := [false]
+	boss.roused.connect(func() -> void: roused[0] = true, CONNECT_ONE_SHOT)
+	boss.call("_set_mode", &"guard")
+	boss.set(&"_mode_time", 99.0)
+	for i in 200:
+		await physics_frame
+		if roused[0]:
+			break
+	_check("at half health he takes his second wind (%s)" % boss.mode(), roused[0])
+	# Dying in the fight resets him (he is back at a shrine, out of the hall).
+	hall.call("_on_ronin_died")
+	ronin.global_position = Vector3(shift + TerracesQuarter.SHRINE_X, TerracesQuarter.G3.z + 0.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(110)
+	_check("dying resets the fight (%s, health %d of %d)" % [hall.get(&"_state"), boss.health, boss.max_health],
+			hall.get(&"_state") == &"before" and boss.health == boss.max_health)
+	# Coming back: no intro; then beating him.
+	ronin.global_position = Vector3(shift + HoshoHall.ARENA.x + 3.0, TerracesQuarter.HALL.z + 0.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(30)
+	var again: StringName = hall.get(&"_state")
+	boss.health = 1
+	boss.take_hit(1, Vector2.RIGHT)
+	await _frames(10)
+	_check("coming back, the fight starts without the intro (%s); beaten, he kneels and the seal is his (%s)" % [again, boss.mode()],
+			again == &"fight" and boss.mode() == &"defeated" and SaveGame.hosho_beaten and "hosho" in SaveGame.seals)
+	var cine: Node = hall.get(&"_cine")
+	if cine:
+		cine.call("finish")
+	await _frames(60)
+	ronin.set_physics_process(true)
+	ronin.set("_invulnerable", 0.0)
+	SaveGame.hosho_met = saved[0]
+	SaveGame.hosho_beaten = saved[1]
+	SaveGame.seals = saved[2]

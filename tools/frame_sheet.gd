@@ -67,6 +67,10 @@ extends SceneTree
 ##   tale      the Paper-Maker's pictures for him, 8 moments
 ##   akane     Akane: the meeting, her title, then the duel running, 12 moments
 ##   dragon    the Festival Dragon: the intro, then each move in turn, 24 moments
+##   gust      the Fan Gust: the sweep, a gust down in the air, the fan-maker giving it
+##   dragon_cine  the Festival Dragon's intro (12 moments), then its death (12)
+##   chochin   a chōchin-obake: floating, its tell, its lunge, parried (8; use --zoom=3)
+##   hosho     Hōshō: his intro, each of his moves, his second wind, his gold wave, his ending (32 moments)
 ##   gates     the gate between the town and the bamboo grove, from both sides
 ##   iai       close-up of the stance: settling, half-way, ready, and the
 ##             pose he ends the draw in (use --zoom=4.6)
@@ -185,6 +189,14 @@ func _initialize() -> void:
 			sheet = await _akane_cut()
 		"dragon":
 			sheet = await _dragon()
+		"gust":
+			sheet = await _gust()
+		"dragon_cine":
+			sheet = await _dragon_cine()
+		"hosho":
+			sheet = await _hosho()
+		"chochin":
+			sheet = await _chochin()
 		_:
 			push_error("Unknown sheet: " + args[0])
 			quit(1)
@@ -1275,4 +1287,194 @@ func _dragon() -> Image:
 	_main.get_node("Camera").snap_to_target()
 	await create_timer(1.0).timeout
 	await take.call()
+	return sheet
+
+
+## The Fan Gust at the fan-maker's shop in the Ward: the sweep frame by frame
+## (the pinwheels whir, what hangs swings), a gust down in the air (the
+## lift), then the fan-maker holding the fan out to him.
+func _gust() -> Image:
+	var ward: WardQuarter = get_first_node_in_group(&"ward")
+	SaveGame.ward_open = true
+	SaveGame.abilities.erase("gust")
+	_ronin.has_gust = true
+	_ronin.global_position = Vector3(LanternMarket.SHIFT + WardQuarter.FAN_SHOP - 3.0, CanalQuarter.BANK_Y + 0.1, 0.0)
+	_ronin.facing = 1.0
+	_main.call("_set_camera_limits")
+	_main.get_node("Camera").snap_to_target()
+	await create_timer(1.0).timeout
+	var tile := Vector2i(480, 270)
+	var crop := Rect2i(240, 90, 800, 450)
+	var sheet := Image.create(tile.x * 4, tile.y * 4, false, Image.FORMAT_RGB8)
+	var shot := 0
+	Input.action_press("gust")
+	await process_frame
+	Input.action_release("gust")
+	for i in 8:
+		sheet.blit_rect(await _snap(crop, tile), Rect2i(Vector2i.ZERO, tile), Vector2i((shot % 4) * tile.x, (shot / 4) * tile.y))
+		shot += 1
+		await create_timer(0.05).timeout
+	await create_timer(0.8).timeout
+	# In the air, a gust down.
+	Input.action_press("jump")
+	await create_timer(0.3).timeout
+	Input.action_release("jump")
+	await create_timer(0.25).timeout
+	Input.action_press("aim_down")
+	Input.action_press("gust")
+	await process_frame
+	Input.action_release("gust")
+	for i in 4:
+		sheet.blit_rect(await _snap(crop, tile), Rect2i(Vector2i.ZERO, tile), Vector2i((shot % 4) * tile.x, (shot / 4) * tile.y))
+		shot += 1
+		await create_timer(0.08).timeout
+	Input.action_release("aim_down")
+	await create_timer(1.2).timeout
+	# The fan-maker gives it.
+	_ronin.has_gust = false
+	ward.call("_fan_maker_comes")
+	_ronin.global_position = Vector3(LanternMarket.SHIFT + WardQuarter.FAN_SHOP - 0.8, CanalQuarter.BANK_Y + 0.1, 0.0)
+	for t: float in [0.6, 0.6, 0.7, 0.9]:
+		await create_timer(t).timeout
+		sheet.blit_rect(await _snap(crop, tile), Rect2i(Vector2i.ZERO, tile), Vector2i((shot % 4) * tile.x, (shot / 4) * tile.y))
+		shot += 1
+	return sheet
+
+
+## The Festival Dragon's two cutscenes: its intro, then (the fight won at
+## once) its death, moment by moment on the real clock.
+func _dragon_cine() -> Image:
+	var ward: WardQuarter = get_first_node_in_group(&"ward")
+	var dragon := ward.dragon
+	SaveGame.ward_open = true
+	_ronin.global_position = Vector3(LanternMarket.SHIFT + WardQuarter.ARENA.x + 3.5, CanalQuarter.BANK_Y + 0.1, 0.0)
+	_main.call("_set_camera_limits")
+	_main.get_node("Camera").snap_to_target()
+	_ronin.set("_draw_safe", 999.0)
+	var tile := Vector2i(480, 270)
+	var sheet := Image.create(tile.x * 4, tile.y * 6, false, Image.FORMAT_RGB8)
+	var shot := 0
+	var t0 := 0.0
+	for t: float in [0.6, 1.6, 2.6, 3.1, 4.0, 4.8, 6.0, 7.0, 7.8, 8.8, 10.0, 11.2]:
+		await create_timer(t - t0, true, false, true).timeout
+		t0 = t
+		sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((shot % 4) * tile.x, (shot / 4) * tile.y))
+		shot += 1
+	while ward.get(&"_state") != &"fight":
+		await process_frame
+	await create_timer(1.5).timeout
+	dragon.health = 1
+	dragon.call("_struck", 1, Vector2.RIGHT, null)
+	t0 = 0.0
+	for t: float in [0.3, 0.8, 1.8, 2.8, 3.45, 3.9, 4.5, 5.2, 5.6, 6.5, 7.6, 8.6]:
+		await create_timer(t - t0, true, false, true).timeout
+		t0 = t
+		sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((shot % 4) * tile.x, (shot / 4) * tile.y))
+		shot += 1
+	return sheet
+
+
+## Hōshō in his hall: the intro, each move, his shadow's strike, the ending.
+func _hosho() -> Image:
+	var hall: HoshoHall = get_first_node_in_group(&"hosho_hall")
+	var boss := hall.hosho
+	SaveGame.ward_open = true
+	SaveGame.dragon_beaten = true
+	_ronin.global_position = Vector3(LanternMarket.SHIFT + HoshoHall.ARENA.x + 2.5, TerracesQuarter.HALL.z + 0.1, 0.0)
+	_main.call("_set_camera_limits")
+	_main.get_node("Camera").snap_to_target()
+	_ronin.set("_draw_safe", 999.0)
+	_ronin.set("_invulnerable", 999.0)
+	var tile := Vector2i(480, 270)
+	var sheet := Image.create(tile.x * 4, tile.y * 8, false, Image.FORMAT_RGB8)
+	var shot := [0]
+	var take := func() -> void:
+		var i: int = shot[0]
+		if i >= 32:
+			return
+		sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((i % 4) * tile.x, (i / 4) * tile.y))
+		print("hosho shot %d: %s" % [i, boss.mode()])
+		shot[0] = i + 1
+	var t0 := 0.0
+	for t: float in [1.0, 3.6, 5.0, 6.4, 8.0, 10.2]:
+		await create_timer(t - t0, true, false, true).timeout
+		t0 = t
+		await take.call()
+	while hall.get(&"_state") != &"fight":
+		await process_frame
+	await create_timer(1.0).timeout
+	_ronin.global_position = boss.global_position + Vector3(-3.4, 0.2, 0.0)
+	for move: Array in [[&"sweep_high", [0.45, 0.8]], [&"sweep_low", [0.45, 0.8]], [&"thrust_tell", [0.5, 0.85]],
+			[&"lantern_tell", [0.5, 1.0]], [&"storm_tell", [0.6, 1.4]], [&"leap_tell", [0.7, 1.15, 1.45]]]:
+		_ronin.set("_draw_safe", 999.0)
+		_ronin.set("_invulnerable", 999.0)
+		if move[0] == &"sweep_high" or move[0] == &"sweep_low":
+			boss.set(&"_high", move[0] == &"sweep_high")
+			boss.set(&"_second", true)
+			boss.call("_set_mode", &"sweep_tell")
+		else:
+			boss.call("_set_mode", move[0])
+		var w0 := 0.0
+		for w: float in move[1]:
+			await create_timer(w - w0).timeout
+			w0 = w
+			await take.call()
+		while boss.mode() != &"guard":
+			await process_frame
+	boss.call("_set_mode", &"rouse")
+	await create_timer(0.4).timeout
+	await take.call()
+	await create_timer(0.5).timeout
+	await take.call()
+	while boss.mode() != &"guard":
+		await process_frame
+	_ronin.global_position = boss.global_position + Vector3(-7.0, 0.2, 0.0)
+	boss.set(&"_enraged", true)
+	boss.set(&"_wave_low", false)
+	boss.facing = -1.0
+	boss.call("_set_mode", &"wave_tell")
+	boss.wave_coming.emit(false)
+	await create_timer(0.55).timeout
+	await take.call()
+	while boss.mode() != &"wave":
+		await process_frame
+	await create_timer(0.3).timeout
+	await take.call()
+	await create_timer(2.0).timeout
+	boss.call("_parried", 99)
+	await create_timer(0.8).timeout
+	await take.call()
+	boss.health = 1
+	boss.take_hit(1, Vector2.RIGHT)
+	t0 = 0.0
+	for t: float in [0.4, 2.0, 3.6, 5.2, 7.0, 9.0, 11.6, 14.0]:
+		await create_timer(t - t0, true, false, true).timeout
+		t0 = t
+		await take.call()
+	return sheet
+
+
+## A chōchin-obake (the Meshy lantern): floating, its tell, lunge, stagger.
+func _chochin() -> Image:
+	var ghost: ChochinObake = null
+	for g: Node in root.find_children("*", "ChochinObake", true, false):
+		ghost = g
+		break
+	_ronin.global_position = ghost.global_position + Vector3(-3.0, -1.0, 0.0)
+	_ronin.set("_draw_safe", 999.0)
+	_ronin.set("_invulnerable", 999.0)
+	_ronin.set_physics_process(false)
+	_main.call("_set_camera_limits")
+	_main.get_node("Camera").snap_to_target()
+	await create_timer(1.0).timeout
+	var tile := Vector2i(480, 270)
+	var sheet := Image.create(tile.x * 4, tile.y * 2, false, Image.FORMAT_RGB8)
+	var i := 0
+	for step: Array in [[&"", 0.0], [&"", 0.7], [&"tell", 0.2], [&"tell", 0.4], [&"lunge", 0.1], [&"lunge", 0.3], [&"stagger", 0.3], [&"stagger", 1.0]]:
+		if step[0] != &"":
+			ghost.call("_set_mode", step[0])
+		await create_timer(step[1]).timeout
+		sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((i % 4) * tile.x, (i / 4) * tile.y))
+		print("chochin shot %d: %s" % [i, ghost.mode])
+		i += 1
 	return sheet

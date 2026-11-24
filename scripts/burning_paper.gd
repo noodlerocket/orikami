@@ -25,6 +25,7 @@ var _life := 0.0
 
 
 func _ready() -> void:
+	add_to_group(&"gust_target")
 	_ball = Node3D.new()
 	add_child(_ball)
 	var b := PaperMesh.new(randi())
@@ -89,6 +90,25 @@ func _ready() -> void:
 	thin.set_color(1, Color(1, 1, 1, 0.0))
 	_smoke.color_ramp = thin
 	add_child(_smoke)
+
+
+## The Fan Gust: it is blown back the way the wind goes (at its thrower, if
+## that is where it blows), and may burn him; beaten down, it falls.
+func gusted(direction: Vector3, _from: Vector3) -> void:
+	if _burning_out >= 0.0:
+		return
+	_returned = true
+	if direction.y < -0.5:
+		velocity = Vector3(velocity.x * 0.2, -8.0, 0.0)
+		return
+	var home := thrower.global_position + Vector3(0.0, 0.9, 0.0) if is_instance_valid(thrower) else Vector3.INF
+	if home != Vector3.INF and signf(home.x - global_position.x) == signf(direction.x):
+		var to := home - global_position
+		var t := clampf(absf(to.x) / 12.0, 0.25, 0.8)
+		velocity = Vector3(to.x / t, to.y / t + gravity * t * 0.5, 0.0)
+	else:
+		velocity = Vector3(direction.x * 13.0, 3.0, 0.0)
+	Sound.play(self, &"fire_whoosh", -6.0)
 
 
 func _physics_process(delta: float) -> void:

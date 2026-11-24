@@ -105,6 +105,7 @@ var _clock := 0.0
 
 
 func _ready() -> void:
+	add_to_group(&"gust_target")
 	health = max_health
 	_home_x = global_position.x
 	collision_layer = 4  # "enemies"
@@ -350,6 +351,15 @@ func _pose_model() -> void:
 
 
 ## Called by the Ronin's slash. `direction` is the way the blade travelled.
+## The Fan Gust: shoved back staggering a few steps, its swipe broken off.
+func gusted(direction: Vector3, _from: Vector3) -> void:
+	if mode == &"windup" or mode == &"strike":
+		_set_mode(&"recover")
+	_stun = stun_time * 2.0
+	velocity.x = direction.x * 8.0
+	Sound.play(self, &"paper_fold", -4.0)
+
+
 func take_hit(damage: int, direction: Vector2) -> void:
 	var finishing := mode == &"stagger"
 	health = 0 if finishing else health - damage

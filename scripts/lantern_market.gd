@@ -22,10 +22,9 @@ extends Node3D
 
 ## How far along x the market really is.
 const SHIFT := 2000.0
-## Its east end, as far as it is built: the end of the Ward of Shut Doors,
-## at the gate up to the Lantern Makers' Rise (shut). The region is planned
-## to about 450 m: docs/lantern_market_plan.md.
-const END := 300.0
+## Its east end: Hōshō's hall, at the top of the Gilded Terraces (the whole
+## region: docs/lantern_market_plan.md).
+const END := 482.0
 ## Where he arrives (local x), and how far west he may walk before he is
 ## taken back to the bamboo.
 const ARRIVE_X := 3.0
@@ -49,7 +48,7 @@ const SHRINE_X := 8.0
 const BOOTHS := [[14.0, "fans", Color(0.56, 0.18, 0.15)], [21.5, "sweets", Color(0.3, 0.24, 0.26)],
 	[29.0, "sake", Color(0.24, 0.22, 0.3)], [36.5, "fish", Color(0.5, 0.36, 0.22)],
 	[44.0, "grill", Color(0.62, 0.52, 0.38)], [51.5, "cranes", Color(0.52, 0.16, 0.16)],
-	[80.0, "sweets", Color(0.55, 0.2, 0.17)], [87.5, "fans", Color(0.3, 0.26, 0.3)],
+	[87.5, "fans", Color(0.3, 0.26, 0.3)],   # (80: the burning store stands there)
 	[95.0, "sake", Color(0.48, 0.34, 0.2)], [102.5, "grill", Color(0.6, 0.5, 0.36)],
 	[110.0, "fish", Color(0.26, 0.24, 0.32)]]
 ## Stalls standing in the street, whose awnings bounce him up: [x, kind].
@@ -85,6 +84,25 @@ var _shimmer: Array[MeshInstance3D] = []   # lantern reflections on the water
 
 
 ## True when this (real, world) x is in the market.
+## A storehouse in the Upper Market whose door is barred by a burning heap
+## of stall screens: only the Fan Gust (learned later, after the dragon)
+## puts it out; inside, cranes on the shelf. A reason to come back.
+const STORE_X := 79.0
+
+
+func _build_burning_store() -> void:
+	var room := SecretRoom.new()
+	room.crane_id = "market_store"
+	room.crane_count = 8
+	room.start_open = true
+	room.position = Vector3(STORE_X, UPPER.z, 0.0)
+	add_child(room)
+	var fire := FireBarrier.new()
+	fire.id = "market_store_fire"
+	fire.position = Vector3(STORE_X - 1.1, UPPER.z, 0.0)
+	add_child(fire)
+
+
 static func in_market(x: float) -> bool:
 	return x > SHIFT - 300.0
 
@@ -138,6 +156,7 @@ func _ready() -> void:
 	shrine.position = Vector3(SHRINE_X, 0.0, -0.9)
 	shrine.scale = Vector3.ONE * 1.3
 	add_child(shrine)
+	_build_burning_store()
 	for spot: Vector2 in HUSKS:
 		var husk: Node3D = Village.HUSK_SCENE.instantiate()
 		husk.position = Vector3(spot.x, spot.y, 0.0)
@@ -259,6 +278,10 @@ func _build_sky() -> void:
 	var right := END + 120.0
 	var sky := PaperMesh.new(1)
 	sky.shade_jitter = 0.0
+	# (Up to 170 m: the dragon's cutscenes look up into the storm, and above
+	# 70 m the bare background showed through.)
+	sky.fade_quad(Vector3(left, 170.0, -53.0), Vector3(right, 170.0, -53.0), Vector3(right, 70.0, -53.0), Vector3(left, 70.0, -53.0),
+			Color(0.02, 0.025, 0.06), Color(0.035, 0.04, 0.1))
 	sky.fade_quad(Vector3(left, 70.0, -53.0), Vector3(right, 70.0, -53.0), Vector3(right, 14.0, -53.0), Vector3(left, 14.0, -53.0),
 			Color(0.035, 0.04, 0.1), Color(0.1, 0.1, 0.19))
 	sky.fade_quad(Vector3(left, 14.0, -53.0), Vector3(right, 14.0, -53.0), Vector3(right, -30.0, -53.0), Vector3(left, -30.0, -53.0),
@@ -1408,7 +1431,8 @@ func _build_foreground() -> void:
 			b.box(Vector3(x, g - 0.5, z), Vector3(0.2, 2.0, 0.2))
 			b.color = Color(0.1, 0.08, 0.08)
 			b.ellipse(Vector2(x, g + 0.56), Vector2(0.15, 0.11), 8, z + 0.11)
-			if prev != Vector2.INF:
+			# (No rail down the face of a cliff: the Rise's terraces.)
+			if prev != Vector2.INF and absf(prev.y - g) < 1.2:
 				for rh: float in [0.3, -0.05]:
 					b.color = Color(0.07, 0.06, 0.07)
 					b.extrude(PackedVector2Array([Vector2(prev.x, prev.y + rh), Vector2(x, g + rh), Vector2(x, g + rh + 0.1), Vector2(prev.x, prev.y + rh + 0.1)]),

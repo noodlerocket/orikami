@@ -11,6 +11,7 @@ falls in and is carried away: skip those spots). Pass a HEIGHT like 11 with
 "high" in OUT_DIR's name to photograph a high route instead; he lands on
 it. Sheets go to OUT_DIR (default docs/screenshots/sweep, which git
 ignores).
+Takes PARALLEL pictures at a time (separate copies of the game).
 """
 import subprocess
 import sys
@@ -25,15 +26,26 @@ height = float(sys.argv[4]) if len(sys.argv) > 4 else 14.0
 out = Path(sys.argv[5]) if len(sys.argv) > 5 else ROOT / "docs" / "screenshots" / "sweep"
 out.mkdir(parents=True, exist_ok=True)
 
-shots = []
-x = start
-while x <= end:
+# Several copies of the game at once (Julian's idea): each takes one picture.
+from concurrent.futures import ThreadPoolExecutor
+
+PARALLEL = 4
+
+
+def take(x: float) -> Path:
     path = out / f"x_{x:07.1f}.png"
     subprocess.run(["Godot_v4.7.2-stable_win64_console.exe", "--path", str(ROOT), "--", f"--x={x}", f"--y={height}",
-                    f"--screenshot={path}"], capture_output=True, timeout=120)
-    if path.exists():
-        shots.append(path)
+                    f"--screenshot={path}"], capture_output=True, timeout=240)
+    return path
+
+
+spots = []
+x = start
+while x <= end:
+    spots.append(x)
     x += step
+with ThreadPoolExecutor(PARALLEL) as pool:
+    shots = [p for p in pool.map(take, spots) if p.exists()]
 for i in range(0, len(shots), 4):
     ims = [Image.open(p).convert("RGB") for p in shots[i:i + 4]]
     w, h = ims[0].size

@@ -155,7 +155,22 @@ far longer than 50 ms: not pops.
 | `wall_pierce.mp3` | each time its head bursts through a house wall | Crunch of a huge beast bursting through a thin wooden wall, boards splintering and paper ripping. *(Energy over the first 0.5 s; 24% below 300 Hz.)* |
 | `house_crush.mp3` | a house falls; it comes apart | Collapse of a wooden house, beams snapping, paper walls crumpling, tiles clattering. |
 | `shutter_slam.mp3` | the shutters slam in the intro | Slam of a wooden sliding storm shutter, a quick slide and a sharp wooden knock. *(Raised 2x.)* |
+| `fan_gust.mp3` | the Fan Gust; softly as the fan-maker holds out the fan | Whoosh of a folding paper fan snapped open and swept hard, a crisp papery flutter then a soft burst of wind rushing away. *(High-pass at 200 Hz. Starts quietly (0.008 in the first 20 ms); 1% below 300 Hz. Quiet overall: played 4 dB louder than most.)* |
+| `dragon_snap.mp3` | the dragon bites (its head touched) | Snap of huge monster jaws biting shut, a fast vicious chomp of wooden teeth with a short snarl. |
+| `hard_paper.mp3` | a cut glances off the dragon's hard body | Knock of a sword blade glancing off stiff lacquered paper over a bamboo frame. *(High-pass at 250 Hz: nothing below 300 Hz, so not a pop.)* |
 | `shutter_open.mp3` | the shutters slide open after the fight | Opening a wooden sliding shutter gently, a soft rolling slide. *(Very quiet: raised 9x.)* |
+
+The Lantern Makers' Rise and Hōshō (2026-11-23). Measured 2026-11-23
+(channels decoded separately): every peak 0.76 to 0.84. The exact words
+used to generate these were not written down.
+
+| File | Plays when | What it is, and how it measured |
+| --- | --- | --- |
+| `kiln_fire.ogg` | loops at the burning barricades and the kilns (`Sound.place_loop`) | A crackling fire, 4.5 s seamless loop. *(Loud from its first moment because it is a loop's middle: rms 0.16, peak 0.82.)* |
+| `chochin_cackle.mp3` | a chōchin-obake's tell (swelling, before its lunge) | A dry, papery cackle, 1.2 s. *(rms 0.10, peak 0.81.)* |
+| `windmill_creak.mp3` | the paper windmill turning fast after a gust | A wooden creak, 2 s. *(rms 0.08, peak 0.81.)* |
+| `hosho_lunge.mp3` | Hōshō's thrust (his long slide at you) | Lunge of a heavy armoured samurai general charging forward, lacquered armour plates rattling, silk robes snapping, a deep rush of air, no metal ring. *(Trimmed to 0.6 s, 8 ms fade-in, 0.15 s fade-out; peak 0.75; 0% below 300 Hz: a rattle, not a pop.)* |
+| `music_hosho_fight.ogg` | the Hōshō fight (loops; `HoshoHall.music_volume`; fades when he falls or the Ronin dies) | music_v2 (ElevenLabs), 82 s seamless loop. *(rms 0.12 overall; peak 0.84.)* |
 
 Measuring tip: decode each channel separately (or `-ac 1` overstates the
 peak of a stereo file: ffmpeg's down-mix sums the channels).

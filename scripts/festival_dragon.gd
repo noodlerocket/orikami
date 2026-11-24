@@ -37,6 +37,9 @@ signal enraged
 signal crushed(index: int)
 ## A crushed house standing again (he died: the fight starts over).
 signal restored(index: int)
+## Its death: lightning strikes it in the air; its head crashes to the stones.
+signal struck_down
+signal crashed
 
 const HEAD_SCENE := preload("res://models/dragon_head.glb")
 const RED := Color(0.5, 0.14, 0.11)
@@ -154,6 +157,8 @@ var _scorches: Array[Node3D] = []
 ## The great stone lantern's x (set by the Ward): its body never comes to
 ## rest on it when it falls.
 var avoid_x := NAN
+## Where its head looks, when set (market coordinates; a cutscene's camera).
+var look_override := Vector3(NAN, NAN, NAN)
 var _head_node: Node3D
 var _skin: ProceduralSkin
 var _head_mesh: MeshInstance3D
@@ -672,6 +677,8 @@ func _process(delta: float) -> void:
 	_snap -= delta
 	if ronin == null:
 		ronin = get_tree().get_first_node_in_group(&"player") as Ronin
+		if ronin:
+			ronin.gusted.connect(_on_gust)
 	_think(delta)
 	if active and _mode in [&"hover", &"dive_rise", &"dive_tell", &"dive_out", &"rise", &"breath_go", &"bolts_go", &"bolts",
 			&"coil_go", &"ribbons_go", &"ribbons"]:
@@ -963,11 +970,14 @@ func _run_intro(delta: float, r: Vector3) -> void:
 
 func _run_dive(delta: float, r: Vector3) -> void:
 	var entry := Vector3(_from.x + _dir * 3.5, ground + dive_height, 0.0)
-	var drop := 0.4 * _pace()
+	var drop := 0.45 * _pace()
 	if _mode_time < drop:
+		# The plunge: gathering speed along the street (so it meets the dive's
+		# own speed at the bottom), easing down to the height it crosses at.
+		# (Its height once jumped most of the way down in the first frame:
+		# Julian saw it teleport.)
 		var k := _mode_time / drop
-		var at := _from.lerp(entry, k * k)
-		at.y = lerpf(_from.y, entry.y, 1.0 - (1.0 - k) * (1.0 - k) * 0.3) if k > 0.0 else _from.y
+		var at := Vector3(lerpf(_from.x, entry.x, k * k), lerpf(_from.y, entry.y, k * k * (3.0 - 2.0 * k)), lerpf(_from.z, entry.z, k))
 		_put(at, delta)
 	else:
 		var x := head.x + _dir * dive_speed * delta
@@ -1107,6 +1117,16 @@ func _bolt(at: Vector3) -> void:
 		if at.x > box.position.x + 0.1 and at.x < box.end.x - 0.1:
 			_burn_hole(Vector3(at.x, box.end.y - 2.0 + 0.02, 0.0))
 	at.y = ground
+	bolt_visual(at)
+	if ronin:
+		var r := _ronin_local()
+		if absf(r.x - at.x) < bolt_radius and r.y > at.y - 0.6:
+			ronin.take_damage(1, to_global(Vector3(at.x, r.y + 1.0, 0.0)), &"fire")
+
+
+## A bolt out of the storm down onto `at` (market coordinates): the jagged
+## crack of light, a flash, thunder, sparks. Harmless by itself.
+func bolt_visual(at: Vector3) -> void:
 	var b := PaperMesh.new(_rng.randi())
 	b.color = Color(0.94, 0.95, 1.0)
 	var x := at.x
@@ -1148,10 +1168,6 @@ func _bolt(at: Vector3) -> void:
 	sparks.position = at + Vector3(0.0, 0.1, 0.3)
 	sparks.emitting = true
 	sparks.finished.connect(sparks.queue_free)
-	if ronin:
-		var r := _ronin_local()
-		if absf(r.x - at.x) < bolt_radius and r.y > at.y - 0.6:
-			ronin.take_damage(1, to_global(Vector3(at.x, r.y + 1.0, 0.0)), &"fire")
 
 
 ## A hole burnt through a walkway's boards where a bolt went through:
@@ -1340,6 +1356,19 @@ func _throw_ribbon(r: Vector3) -> void:
 	Sound.play(self, &"paper_rip", -2.0)
 
 
+## His Fan Gust: its ribbons in front of him are blown away, torn to scraps.
+func _on_gust(origin: Vector3, direction: Vector3) -> void:
+	var at := to_local(origin)
+	for i in range(_ribbons.size() - 1, -1, -1):
+		var node: Node3D = _ribbons[i][0]
+		var rel := node.position - at
+		var ahead := rel.x * direction.x if direction.y > -0.5 else -rel.y
+		if ahead > -0.4 and ahead < (ronin.gust_reach if ronin else 6.0) and absf(rel.y if direction.y > -0.5 else rel.x) < 2.2:
+			Confetti.burst(get_parent(), to_global(node.position), 10, [RED, GOLD])
+			node.queue_free()
+			_ribbons.remove_at(i)
+
+
 func _update_ribbons(delta: float) -> void:
 	for i in range(_ribbons.size() - 1, -1, -1):
 		var rb: Array = _ribbons[i]
@@ -1360,28 +1389,69 @@ func _update_ribbons(delta: float) -> void:
 			_ribbons.remove_at(i)
 
 
+## Its death, by the clock: it writhes up into the storm, roaring (to
+## 2.6 s); lightning strikes it twice (2.6); it comes apart in the air, its
+## drums raining down as wet paper onto a heap (from 2.8); its head hangs a
+## moment, then falls last and crashes onto the stones (3.6 to 4.4).
 func _run_dying(delta: float) -> void:
-	if _mode_time < 1.3:
-		# It writhes up, shaking.
-		var up := _from + Vector3(sin(_mode_time * 13.0) * 0.6, _mode_time * 2.5, 0.0)
+	var top := Vector3(clampf(_from.x, lane.x, lane.y), ground + 8.5, -1.2)
+	var t := _mode_time
+	if t < 2.6:
+		var k := smoothstep(0.0, 2.6, t)
+		var up := _from.lerp(top, k) + Vector3(sin(t * 9.0) * 0.8 * (1.0 - k * 0.5), sin(t * 13.0) * 0.25, 0.0)
 		_put(up, delta)
 		_jaw_goal = 1.0
-		_roll = 0.4 * sin(_mode_time * 17.0)
-	elif _mode_time < 1.9:
-		var k := (_mode_time - 1.3) / 0.6
-		var top := _from + Vector3(0.0, 3.25, 0.0)
-		var lie := Vector3(clampf(_from.x, lane.x, lane.y), ground + 0.75, 0.6)
-		_put(top.lerp(lie, k * k), delta)
-		_roll = lerpf(_roll, 0.5, delta * 5.0)
+		_roll = 0.45 * sin(t * 15.0)
+		if t - delta < 1.5 and t >= 1.5:
+			Sound.play(self, &"dragon_roar", 4.0)
 	elif not _fallen:
-		Sound.play(self, &"house_crush", -2.0)
-		_fall_apart(true)
-		_set_mode(&"dead")
+		if t - delta < 2.6:
+			struck_down.emit()
+			bolt_visual(Vector3(head.x - 0.3, head.y - 0.5, 0.0))
+			var again := create_tween()
+			again.tween_interval(0.16)
+			again.tween_callback(func() -> void: bolt_visual(Vector3(head.x + 0.4, head.y - 0.3, 0.0)))
+			_flash = 0.3
+		_put(top + Vector3(sin(t * 30.0) * 0.12, 0.0, 0.0), delta)
+		_jaw_goal = 1.0
+		if t >= 2.8:
+			_fall_apart(true, false)
+			_from = head
+	else:
+		# The head, hanging a moment over the falling paper, then down.
+		var lie: Vector3 = get_meta(&"head_lie")
+		if t < 3.6:
+			_put(_from + Vector3(sin(t * 7.0) * 0.2, -(t - 2.8) * 0.6, 0.0), delta)
+		else:
+			var k := minf((t - 3.6) / 0.8, 1.0)
+			var high := _from + Vector3(0.0, -0.5, 0.0)
+			_put(high.lerp(lie, k * k), delta)
+			_roll = lerpf(_roll, 0.5, delta * 4.0)
+			if k >= 1.0:
+				Sound.play(self, &"house_crush", 2.0)
+				Sound.play(self, &"taiko_hit", 0.0)
+				Confetti.burst(get_parent(), to_global(lie), 40, [RED, GOLD, CREAM])
+				var dust := _ink_particles(30, 1.2, Vector2(0.6, 0.6))
+				(dust.mesh as QuadMesh).material = PaperMesh.soft_ink(Color(0.4, 0.38, 0.42, 0.45))
+				dust.one_shot = true
+				dust.explosiveness = 0.9
+				dust.direction = Vector3.UP
+				dust.spread = 80.0
+				dust.gravity = Vector3(0.0, -1.0, 0.0)
+				dust.initial_velocity_min = 1.5
+				dust.initial_velocity_max = 3.5
+				add_child(dust)
+				dust.position = lie
+				dust.emitting = true
+				crashed.emit()
+				_set_mode(&"dead")
+		_jaw_goal = 0.9
+		_pose_head(delta)
 
 
 ## It comes apart: each drum of the body drops to the stones where it is and
 ## slumps, a heap of wet festival paper.
-func _fall_apart(slow: bool) -> void:
+func _fall_apart(slow: bool, head_too: bool = true) -> void:
 	_fallen = true
 	_clear_effects()
 	# A heap behind the street, off his path (Julian: he walked through its
@@ -1397,9 +1467,10 @@ func _fall_apart(slow: bool) -> void:
 				ground + 0.16 + 0.12 * heap.randf(), heap.randf_range(-3.3, -1.9))
 		var turn := Basis(Vector3.UP, _rng.randf_range(-PI, PI)) * Basis.from_scale(Vector3(s.get_meta(&"taper"), 0.4, 1.0))
 		if slow:
+			# Each drum tumbles down out of the air to the heap.
 			var t := create_tween()
-			t.tween_interval((segment_count - i) * 0.045)
-			t.tween_property(s, "transform", Transform3D(turn, lie), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			t.tween_interval((segment_count - i) * 0.035 + _rng.randf_range(0.0, 0.25))
+			t.tween_property(s, "transform", Transform3D(turn, lie), _rng.randf_range(0.55, 0.9)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 			if i % 6 == 0:
 				t.tween_callback(func() -> void:
 					Confetti.burst(get_parent(), to_global(lie), 10, [RED, GOLD, CREAM])
@@ -1407,6 +1478,9 @@ func _fall_apart(slow: bool) -> void:
 		else:
 			s.transform = Transform3D(turn, lie)
 	var drop := Vector3(middle + 2.2, ground + 0.7, -2.5)
+	set_meta(&"head_lie", drop)
+	if not head_too:
+		return
 	if slow:
 		var t := create_tween()
 		t.tween_property(self, "head", drop, 0.3)
@@ -1603,7 +1677,9 @@ func _place_body() -> void:
 
 func _pose_head(delta: float) -> void:
 	var dir := _vel
-	if _look != Vector3.ZERO:
+	if not is_nan(look_override.x):
+		dir = look_override - head
+	elif _look != Vector3.ZERO:
 		dir = _look - head
 	elif dir.length() < 1.0:
 		dir = Basis(_turn) * Vector3.BACK

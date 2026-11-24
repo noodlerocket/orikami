@@ -21,6 +21,9 @@ static var all: Array[Updraft] = []
 @export var strength := 1.0
 ## The last part of its height where its lift fades away (metres).
 @export var fade_top := 2.5
+## Hot air from a kiln's flue (the Lantern Makers' Rise) instead of the
+## folded wind out of a cleft: no cleft or leaves; embers and ash ride it up.
+@export var kiln := false
 
 var _clock := 0.0
 var _shimmers: Array[MeshInstance3D] = []
@@ -54,9 +57,56 @@ func _exit_tree() -> void:
 
 
 func _ready() -> void:
-	_build_cleft()
-	_build_leaves()
+	if kiln:
+		_build_embers()
+	else:
+		_build_cleft()
+		_build_leaves()
 	_build_shimmers()
+
+
+## Embers and flakes of ash carried up on the hot air, the embers fading as
+## they cool.
+func _build_embers() -> void:
+	for ash: bool in [false, true]:
+		var p := CPUParticles3D.new()
+		p.amount = int((10 if ash else 24) + height * 2.0)
+		p.lifetime = height / 4.5
+		p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+		p.emission_box_extents = Vector3(width * 0.3, 0.05, 0.5)
+		p.direction = Vector3.UP
+		p.spread = 8.0
+		p.gravity = Vector3.ZERO
+		p.initial_velocity_min = 3.5
+		p.initial_velocity_max = 5.5
+		p.tangential_accel_min = -1.0
+		p.tangential_accel_max = 1.0
+		p.angular_velocity_min = -200.0
+		p.angular_velocity_max = 200.0
+		var fade := Gradient.new()
+		if ash:
+			fade.set_color(0, Color(0.4, 0.38, 0.4, 0.0))
+			fade.add_point(0.2, Color(0.45, 0.43, 0.45, 0.8))
+			fade.set_color(fade.get_point_count() - 1, Color(0.4, 0.38, 0.4, 0.0))
+		else:
+			fade.set_color(0, Color(1.0, 0.75, 0.35, 1.0))
+			fade.add_point(0.5, Color(1.0, 0.45, 0.15, 0.8))
+			fade.set_color(fade.get_point_count() - 1, Color(0.5, 0.1, 0.05, 0.0))
+		p.color_ramp = fade
+		var mote := QuadMesh.new()
+		mote.size = Vector2(0.09, 0.06) if ash else Vector2(0.05, 0.05)
+		var look := StandardMaterial3D.new()
+		look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		look.vertex_color_use_as_albedo = true
+		look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		look.cull_mode = BaseMaterial3D.CULL_DISABLED
+		look.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		if not ash:
+			look.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		mote.material = look
+		p.mesh = mote
+		p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(p)
 
 
 ## The cleft it blows out of: a dark split in the rock with dry leaves

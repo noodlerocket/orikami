@@ -30,6 +30,10 @@ var _explore_clock := 0.0
 ## Particle systems in the world, and how often (seconds) those far from
 ## the camera are put to sleep (_cull_far).
 var _culled: Array[CPUParticles3D] = []
+var _sleepers: Array[Node3D] = []
+var _cull_x := 0.0
+## Things further than this from the camera (m) rest (Main._cull_far).
+@export var sleep_reach := 60.0
 var _cull_clock := 0.0
 ## How far beyond the camera (metres, along x) particles keep running.
 @export var particle_reach := 38.0
@@ -97,6 +101,7 @@ func _process(delta: float) -> void:
 	var market := LanternMarket.in_market(_ronin.global_position.x)
 	village.bamboo.set_awake(grove)
 	village.lantern_market.set_awake(market)
+	village.set_place(&"market" if market else (&"grove" if grove else &"town"))
 	if market != _in_market:
 		_in_market = market
 		village.set_market(market)
@@ -131,7 +136,10 @@ func _process(delta: float) -> void:
 		elif x < LanternMarket.SHIFT + LanternMarket.WEST_X and x > LanternMarket.SHIFT - 6.0:
 			_travel(Vector3(BambooGrove.SHIFT + BambooGrove.EAST_END - 4.0, 2.15, 0.0), -1.0)
 	_cull_clock += delta
-	if _cull_clock > 0.25:
+	# (At once when he has been moved far: a respawn, a journey.)
+	var jumped := absf(_ronin.global_position.x - _cull_x) > 8.0
+	_cull_x = _ronin.global_position.x
+	if _cull_clock > 0.25 or jumped:
 		_cull_clock = 0.0
 		_cull_far()
 	_explore_clock += delta
@@ -177,6 +185,21 @@ func _cull_far() -> void:
 	for i in by_distance.size():
 		var l: OmniLight3D = by_distance[i]
 		l.shadow_enabled = i < most_shadows and absf(l.global_position.x - cam) < shadow_reach
+	# Things far from the camera rest (creatures, shopkeepers, shrines, fires,
+	# windmills...): the market grew long and all of it was running at once.
+	if _sleepers.is_empty():
+		for n: Node in $Village.find_children("*", "", true, false):
+			if n is PaperHusk or n is PaperCritter or n is MarketKeeper or n is VillagerShadow or n is CraneBundle or n is FireBarrier or n is Windmill or n is Pinwheel or n is RestShrine or n is HangingSign or n is PerchedBirds:
+				# (Never what he stands on: a resting body leaves the physics.)
+				_sleepers.append(n)
+	for n: Node3D in _sleepers:
+		if not is_instance_valid(n):
+			continue
+		# (Near him too: after a jump to a shrine the camera is still far off.)
+		var awake := absf(n.global_position.x - cam) < sleep_reach or absf(n.global_position.x - _ronin.global_position.x) < sleep_reach
+		var want := Node.PROCESS_MODE_INHERIT if awake else Node.PROCESS_MODE_DISABLED
+		if n.process_mode != want:
+			n.process_mode = want
 	for p: CPUParticles3D in _culled:
 		if not is_instance_valid(p):
 			continue
@@ -574,6 +597,19 @@ func _apply_debug_start() -> void:
 			SaveGame.ward_open = true
 			_ronin.has_glide = true
 			_ronin.position = Vector3(LanternMarket.SHIFT + WardQuarter.WARD.x + 3.0, CanalQuarter.BANK_Y + 0.1, 0.0)
+		elif arg == "--hosho":
+			# At Hōshō's Gate, by its shrine (all the way up the market).
+			SaveGame.akane_dueled = true
+			SaveGame.ward_open = true
+			SaveGame.dragon_beaten = true
+			for id: String in ["rise_gate_fire", "rise_deck_fire"]:
+				if id not in SaveGame.shortcuts:
+					SaveGame.shortcuts.append(id)
+			_ronin.has_glide = true
+			_ronin.has_gust = true
+			_ronin.position = Vector3(LanternMarket.SHIFT + TerracesQuarter.SHRINE_X + 1.5, TerracesQuarter.G3.z + 0.1, 0.0)
+		elif arg == "--gust":
+			_ronin.has_gust = true  # (as if learned from the fan-maker)
 		elif arg == "--glide":
 			_ronin.has_glide = true  # (as if learned in the bamboo)
 		elif arg == "--map":
@@ -655,6 +691,8 @@ func _continue_from_save() -> void:
 	if "glide" in SaveGame.abilities:
 		_ronin.has_glide = true
 		village.bamboo.learn_glide(true)
+	if "gust" in SaveGame.abilities:
+		_ronin.has_gust = true
 	if SaveGame.hannya_fallen:
 		# She is gone: the courtyard is quiet, its far gate open.
 		village.bamboo.open_gate(true)

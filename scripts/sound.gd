@@ -55,6 +55,9 @@ const SOUNDS := {
 	&"dragon_breath": {"files": ["dragon_breath.mp3"], "volume": -5.0, "vary": 0.05},
 	&"whisker_crackle": {"files": ["whisker_crackle.mp3"], "volume": -9.0, "vary": 0.06},
 	&"thunder_crack": {"files": ["thunder_crack.mp3"], "volume": -4.0, "vary": 0.08},
+	&"chochin_cackle": {"files": ["chochin_cackle.mp3"], "volume": -5.0, "vary": 0.08},
+	&"windmill_creak": {"files": ["windmill_creak.mp3"], "volume": -6.0, "vary": 0.06},
+	&"fan_gust": {"files": ["fan_gust.mp3"], "volume": -1.0, "vary": 0.06},
 	&"dragon_snap": {"files": ["dragon_snap.mp3"], "volume": -3.0, "vary": 0.06},
 	&"hard_paper": {"files": ["hard_paper.mp3"], "volume": -5.0, "vary": 0.08},
 	&"wall_pierce": {"files": ["wall_pierce.mp3"], "volume": -3.0, "vary": 0.07},
@@ -70,6 +73,7 @@ const SOUNDS := {
 	# Akane's own: her thin quick swish, her rushing draw, her fox-fire flaring.
 	&"akane_slash": {"files": ["akane_slash.mp3"], "volume": -1.0, "vary": 0.07},
 	&"akane_draw": {"files": ["akane_draw.mp3"], "volume": -1.0, "vary": 0.04},
+	&"hosho_lunge": {"files": ["hosho_lunge.mp3"], "volume": 0.0, "vary": 0.05},
 	&"fox_fire": {"files": ["fox_fire.mp3"], "volume": -10.0, "vary": 0.08},
 	&"fire_burst": {"files": ["fire_burst.mp3"], "volume": -8.0, "vary": 0.08},
 	# Moving: a skid, shaking off water; cranes found.

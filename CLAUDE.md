@@ -22,6 +22,9 @@ screen, but Begin there offers the downloads instead of starting.
   by Julian): `docs/village_map.png` (as built) and `docs/overnight_report.md`
   (what was done, settings, what only he can judge).
 - What it looks like: `docs/screenshots/` (frame sheets of every move)
+- **Overnight 2026-11-23/24** (Hōshō tuning, the Meshy lantern ghost, the
+  back alley, the burning store, the market floor fix):
+  `docs/overnight_report_2026-11-24.md`.
 
 **Before changing anything, read "Working with Julian" and "What Julian
 likes".** They were learned the slow way and save rounds of rework.
@@ -46,7 +49,7 @@ Bamboo of Folded Wind after it (see "The expanded village"), with:
 Pause, settings and controls pages share one UI style. Downloads for
 Windows and Mac carry Julian's icon.
 
-**Next:** Julian plays the Ward of Shut Doors and the Festival Dragon; then the Fan Gust and the rest of the Lantern Market region; then Hōshō's hall and fight. Julian plays the overnight work and judges it (the report lists
+**Next:** Julian plays the Ward, the Festival Dragon, the Fan Gust, the Lantern Makers' Rise, the Gilded Terraces, Hōshō's Gate and the Hōshō fight (all built 2026-11-23, none played yet). Julian plays the overnight work and judges it (the report lists
 what only he can judge). Then: Julian judges Akane's duel (built: proposed lore, she yields
 rather than dies; her music and sounds are in); the road on past the bamboo (the
 open middle of the game); the endings (the ink marks are saved; nothing
@@ -312,8 +315,9 @@ Julian owns them. The art references are in `docs/reference/`.
 
 Keyboard (gamepad): A/D move; S duck (on the ground); Space jump (also off
 walls) (A); J cut, W/S to aim it up/down (X); hold K, let go, for the
-iaijutsu draw (Y); L or Shift dash (right shoulder or trigger); I parry, hold
-I to block (left shoulder or trigger); hold U heal (B); Esc or P pause
+iaijutsu draw (Y); L or Shift dash (right shoulder); I parry, hold
+I to block (left shoulder or trigger); hold U heal (B); O Fan Gust, once
+learned (right trigger; it used to dash too); Esc or P pause
 (Start); M mute. W is aim-up
 only. The table is in `tools/setup_input.gd`: edit it, re-run it, and update
 the Controls page (`InkMenu.CONTROLS`) and the tutorial (`Tutorial.STEPS`).
@@ -775,14 +779,142 @@ has its own script, built from `Village._ready`:
   their windows; ruins are saved (`SaveGame.ward_ruins`). Its music
   `music_dragon_fight.ogg` (75 s loop) and sounds (`dragon_*`,
   `thunder_crack`, `whisker_crackle`, `house_crush`, `wall_pierce`,
-  `shutter_*`). `--ward` starts in the Ward; sheet `dragon`. The Fan Gust
-  (its reward in the plan) is not built yet.
+  `shutter_*`). `--ward` starts in the Ward; sheets `dragon`, `dragon_cine`.
+  Its intro and death are directed cutscenes (Julian: "much more dramatic
+  and cinematic"): `CineCamera` (`cine_camera.gd`: its own camera, shots
+  that can track a moving point, letterbox bars, shakes, a white flash,
+  timed events; runs on the real clock). Intro 12 s: a dolly past the
+  slamming shutters, a tilt up to the storm (lightning shows its shape),
+  tracking its head as it sweeps over him, low by the lantern as it coils,
+  a close-up of its face turning to us (`look_override`), roaring and
+  laughing, then wide over the square as its name is painted and the rain
+  walls fall. Death 9 s: slow motion and a flash on the killing cut, it
+  writhes up into the storm, lightning strikes it twice (`struck_down`),
+  it comes apart in the air into a rain of paper, its head crashes last
+  (`crashed`), then quiet, moonlight on the heap (`_moonlight`). The
+  market's sky now reaches 170 m (looking up showed the bare background).
+- **The Fan Gust** (2026-11-23; not yet played by Julian): after the dragon
+  the fan-maker (a `MarketKeeper` in indigo) is back at her shop in the
+  Ward's east lane (`WardQuarter.FAN_SHOP`: a counter of open fans, a pot of
+  pinwheels); coming to her, she holds out a fan that flies to his hand
+  (`learn_gust`, SaveGame ability "gust", an `AbilityCard`). O (right
+  trigger): he snaps a paper fan open in his LEFT hand (`PaperFan`, folded
+  in code; the sword stays sheathed; stance `SamuraiAnimator.fan`) and
+  sweeps a gust `gust_reach` (6 m) ahead: everything in the group
+  "gust_target" with `gusted(direction, from)` is told (burning paper blown
+  back, at its thrower if that way; paper creatures and husks shoved back,
+  their attack broken; `Pinwheel`s whir), the dragon's ribbons are torn
+  away, and what hangs in the street swings (`Wind.puff`). In the air with
+  S held, a gust down lifts him once until he lands, clings or bounces,
+  and he floats (Julian: higher and airier than the first, 8 m/s with full
+  gravity): `gust_lift` 7.5, then gravity at `gust_float_gravity` 0.3
+  easing back over `gust_float_time` 1.1 s. Reach `gust_reach` 8.5 (6 was
+  "further"). In the air his legs keep their pose (a standing stance there
+  looked wrong). Its look (`GustWind`): three ribbons of wind ending in
+  curls (the swoosh shader), the fan's arc, dust along the ground, flecks
+  and petals. Settings in `Ronin` "Fan Gust". Sound `fan_gust`; sheet
+  `gust`; `--gust` gives it.
+- **The Lantern Makers' Rise** (`rise_quarter.gd`, 2026-11-23; not yet
+  played by Julian): the market runs to `END` 372. Out of the Ward's east
+  gate (its door now open) a burning barricade (`FireBarrier`: a heap of
+  screens and lantern frames on fire, light flickering, it burns him; only
+  the Fan Gust puts it out, `SaveGame.shortcuts` "rise_gate_fire"; a hint
+  shows once he has the fan). Steps up to the kiln yard (`T1`, 10 m): two
+  brick kilns, mouths glowing, chimneys smoking; in front of each an iron
+  grate over the flue with hot air rising (`Updraft` with `kiln`: embers
+  and ash instead of leaves) to glide up on to the drying deck
+  (`HIGH_DECK`), where a second burning barricade hides cranes
+  `rise_deck`. A great paper windmill (`Windmill`): gusted it spins
+  (`gust_spin`) and while it turns fast it winds the lantern cage
+  (`RiseQuarter.CageHoist`) up the cliff to the workshops (`T2`, 15 m):
+  giant bare lantern frames, drying paper, shrine 8 (`kilns`), a lantern
+  husk and chōchin-obake (`ChochinObake`: a torn-open paper lantern, one
+  eye, a long tongue, its candle glowing; floats, swells and cackles as its
+  tell, lunges and burns; parried it tumbles; cuts make its candle gutter;
+  the gust blows it back). Steps to the top (`T3`, 18.5 m) and the gold-
+  leafed gate onward to the Gilded Terraces (shut: next). The cliff between
+  the yard and the workshops can also be climbed or glided past. Sounds
+  `kiln_fire` (loop), `chochin_cackle`, `windmill_creak`. Not built: the
+  hoist shortcut back down to Festival Square.
+  The chōchin-obake is a Meshy model now (Julian: "use a meshy generated
+  model"; `models/chochin.glb`, picture `docs/reference/chochin_front.png`,
+  ids in `chochin_obake.gd`, 39 credits), its tongue's tip on a bone
+  (`ProceduralSkin`), the old folded one behind `use_model`; sheet `chochin`.
+- **The burning store** (`LanternMarket.STORE_X` 79, Upper Market): a
+  `SecretRoom` (now with `crane_id`, `crane_count`, `start_open`) whose
+  door is barred by a `FireBarrier` (`market_store_fire`): only the Fan
+  Gust, learned much later, opens it; cranes `market_store` inside. (The
+  booth at 80 was taken out for it.) The fire's flames were dimmed
+  (`FireBarrier.FLAME_STRENGTH` 0.5; stacked, they burned out to a white
+  rectangle) and the flame shader fades before its quad's sides.
 - **The whole region is planned** (`docs/lantern_market_plan.md`, map
   `docs/market_map.png` from `tools/market_map.py`; proposed, for Julian):
   about 450 m (double the grove), three layers (street, roofs, canals),
   the built 150 m as its first third; a flying mini-boss in the middle
   (a ryū, Julian's choice; proposed: the Festival Dragon 祭龍, a parade dragon the Rain drove mad), the Fan Gust after it.
-- **Hōshō** (the Lantern Market's general; not built yet): Julian's four
+- **Gates are flanked by walls** (Julian: a gate alone looks as though you
+  could walk round it): `GateWalls.build` (`gate_walls.gd`), a plastered
+  wall on a tiled base running back from the gate and a wing in front to a
+  post with a lantern. Used at the Ward's gate, the Rise's gate, the
+  Terraces' gate and Hōshō's Gate. Every new gate gets them.
+- **The Gilded Terraces** (`terraces_quarter.gd`; the market runs to `END`
+  482): three gilded terraces (`G1` 18.5 m, `G2` 21.5, `G3` 24) climbing
+  east, a red arched bridge between towers over a drop (`BRIDGE`, falling in
+  = back to the last shrine), gilded guards (`GildedGuard`: a husk under gold
+  leaf; front cuts glance off until a parried swipe cracks the gold),
+  shrine 9 (`hosho_gate`), and Hōshō's Gate (`open_gate`/`close_gate`).
+  Under the bridge, the **back alley** (`_build_drop`, floor `DROP_FLOOR`
+  4): paving, a lantern on a bracket, crates, cranes `terraces_alley`, and a
+  lacquered back door (`DOOR_X`): W there fades him up through the cliff to
+  the far terrace (`_process_door`; the bridge roofs the alley, so its walls
+  cannot be climbed out of). Falling there no longer sends him to a shrine.
+- **Hōshō, 宝照, the Gilded General** (`hosho.gd`, `hosho_hall.gd`; not
+  played by Julian): Meshy `models/hosho.glb` posed by hand, a folded
+  naginata. His hall (`HoshoHall`, `HALL` 444 to 480): a red-pillared hall,
+  a lit shoji wall behind, its east end closed by a gold folding screen
+  with a vermilion sun (`_build_end_screen`; open, it showed a house and a
+  bare sheet) (his shadow on the shoji was REMOVED: Julian "I don't
+  really like it"; do not bring back), banners, lanterns that light one by
+  one. 40 health, 8 posture. Moves: sweep high (duck) or low (jump), double
+  when enraged; thrust (parry); lanterns thrown (`BurningPaper`, parry back);
+  gold storm (the Fan Gust breaks it for posture); leap and slam (a gold
+  ring shows where); from half health **his second wind** (`rouse`: the
+  naginata raised, its butt slammed down, every lantern flares, gold leaf
+  bursts, the camera shakes; his blade sheds more gold after) and **the gold
+  wave** (`wave_tell`: lanterns gutter, a gleam gathers at the blade tip;
+  then a crescent of molten gold rolls along the floor from his blade, high
+  (duck) or low (jump), lighting the floor as it goes). His blade sheds gold
+  flecks as it cuts (`_trail`), and gleams before a cut (`_glint`). Intro
+  13 s (`CineCamera`: the lanterns light, a tilt up his figure, his title
+  宝照 with its seal); ending 15 s (he kneels, gold washes from him, the roof
+  tears open and he looks up into the rain: "I can feel it. The rain.",
+  `SaveGame.seals` "hosho"). Dying resets him; coming back skips the intro.
+  Music `music_hosho_fight.ogg`. `--hosho` starts at shrine 9; sheet
+  `hosho`. Fight camera `fight_camera_distance` 16.
+  Tuned after Julian's first look: wind-ups faster (`sweep_tell` 0.46,
+  `thrust_tell` 0.52, `lantern_tell` 0.45, `storm_tell` 0.6, `leap_tell`
+  0.38, `wave_tell` 0.72; the first values, slower, were "too slow"); the
+  leap's landing spot follows him at `leap_track_speed` 11 m/s and holds
+  `leap_lock` 0.14 s before the slam, shown by a glowing gold oval as wide
+  as `slam_reach` with a light on the boards; the spin holds the naginata
+  level at his chest (jump it); calling the lanterns he holds the naginata
+  upright in both hands (an open palm beside it looked wrong); the thrust's
+  sound is `hosho_lunge` (Akane's draw there was not liked).
+- **Speed in the market** (Julian: "laggier with lag spikes"):
+  `Village.set_place` hides and stops the two places he is not in (town,
+  grove, market), deciding what belongs where by where it STANDS
+  (`Village._place_of`: the market's paving is built straight into the
+  village; hidden with the town, the market's street went bare: Julian),
+  keeping their solid bodies in the physics (a body that
+  stops processing leaves the physics: he fell through). Creatures, keepers,
+  fires, windmills etc. far from BOTH the camera and him sleep
+  (`Main._sleepers`, `sleep_reach` 60 m), checked at once when he is moved
+  far. Never put something he stands on to sleep.
+- **The Fan Gust in the air** works once until he lands, clings or pogoes
+  (Julian).
+- `tools/area_sweep.py` takes 4 pictures at a time (separate copies of the
+  game; Julian's idea), `PARALLEL`.
+- **Hōshō** (the Lantern Market's general; built, see above): Julian's four
   views `docs/reference/hosho_*`; Meshy `models/hosho.glb` (3.0 m, 39,430
   triangles, 4K texture, the usual 24 bones; multi-image-to-3d from all four
   views, meshy-7.1 + meshy-7 4K, remeshed to 40,000:

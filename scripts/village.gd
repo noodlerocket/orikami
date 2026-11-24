@@ -392,6 +392,58 @@ func set_daylight(on: bool) -> void:
 
 ## The warm night of the Lantern Market (on), or back to the town's (off).
 ## Switched while the screen is black.
+## Only the place he is in runs and is drawn: the town, the bamboo grove or
+## the Lantern Market (Julian: the market grew laggy; the whole town and
+## grove were still running and being culled every frame there). The moon
+## and the world's settings are shared and stay.
+func set_place(place: StringName) -> void:
+	if place == _place:
+		return
+	_place = place
+	for c: Node in get_children():
+		# (Solid ground and walls stay: the grove's and the market's are kept
+		# here too, and a resting body leaves the physics: he fell through.)
+		if c is WorldEnvironment or c is DirectionalLight3D or c is CollisionObject3D:
+			continue
+		var on := _place_of(c) == place
+		c.process_mode = Node.PROCESS_MODE_INHERIT if on else Node.PROCESS_MODE_DISABLED
+		if c is Node3D:
+			(c as Node3D).visible = on
+
+
+var _place := &""
+var _places := {}
+
+
+## Which place a piece of the level belongs to, by where it stands (some of
+## the market's paving and splashes are built here, not in the market: hidden
+## with the town they left the market's street bare).
+func _place_of(c: Node) -> StringName:
+	if c == bamboo:
+		return &"grove"
+	if c == lantern_market:
+		return &"market"
+	if _places.has(c):
+		return _places[c]
+	var x := 0.0
+	var found := false
+	for m: Node in [c] + c.find_children("*", "VisualInstance3D", true, false):
+		if m is VisualInstance3D and is_instance_valid(m):
+			var box: AABB = (m as VisualInstance3D).global_transform * (m as VisualInstance3D).get_aabb()
+			x = box.get_center().x
+			found = true
+			break
+	if not found and c is Node3D:
+		x = (c as Node3D).global_position.x
+	var where := &"town"
+	if x > LanternMarket.SHIFT - 100.0:
+		where = &"market"
+	elif x > BambooGrove.SHIFT - 100.0:
+		where = &"grove"
+	_places[c] = where
+	return where
+
+
 func set_market(on: bool) -> void:
 	set_daylight(false)
 	if on:

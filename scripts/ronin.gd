@@ -19,6 +19,8 @@ signal fell_in_pit
 signal died
 ## He dashed (the village stirs fallen petals in his wake).
 signal dashed(at: Vector3, direction: float)
+## The Fan Gust: from where, which way.
+signal gusted(at: Vector3, direction: Vector3)
 
 @export_group("Run")
 @export var run_speed := 7.5
@@ -157,6 +159,28 @@ signal dashed(at: Vector3, direction: float)
 ## How much the wind carries him while gliding (gusts push the wings).
 @export var glide_wind := 0.35
 
+@export_group("Fan Gust")
+## Learned from the fan-maker in the Ward of Shut Doors (SaveGame "gust").
+@export var has_gust := false
+## Seconds before it can be used again.
+@export var gust_cooldown := 0.7
+## How far in front of him it reaches, and how tall it is (m). (Julian:
+## further; 6 was the first.)
+@export var gust_reach := 8.5
+@export var gust_height := 2.2
+## In the air, gusting downward lifts him (m/s up), once until he lands,
+## clings to a wall or bounces off something. (Julian: higher and airier
+## than the first, 8 m/s with full gravity: now he is set rising and then
+## floats, gravity light for `gust_float_time`, easing back to full.)
+@export var gust_lift := 7.5
+@export var gust_float_time := 1.1
+## Gravity while he floats on his own gust (1 = as usual), and how fast he
+## may sink then.
+@export var gust_float_gravity := 0.3
+@export var gust_float_fall := 2.2
+## In the air, a gust forward pushes him back a little.
+@export var gust_recoil := 2.5
+
 @export_group("Forgiveness")
 ## Jumping up into the corner of a ledge: if he would have cleared it with
 ## his head this far to one side, he is nudged round it.
@@ -240,6 +264,11 @@ var _jump_buffer := 0.0
 var _jumping := false
 var _dash_time := 0.0
 var _dash_cooldown_left := 0.0
+var _gust_cooldown_left := 0.0
+var _gust_lift_ready := true
+var _gust_float := 0.0
+## Set the first time he uses the Fan Gust (its card goes then).
+var has_gusted := false
 var _dash_dir := 1.0
 var _can_dash := true
 var _slash_time := 0.0
@@ -369,6 +398,8 @@ func _physics_process(delta: float) -> void:
 	if grounded:
 		_coyote = coyote_time
 		_glide_left = glide_time
+		_gust_lift_ready = true
+		_gust_float = 0.0
 		if _dash_time <= 0.0:
 			_can_dash = true
 		_grounded_time += delta
@@ -388,6 +419,12 @@ func _physics_process(delta: float) -> void:
 		_start_dash(move)
 	if Input.is_action_just_pressed("parry") and _parry_cooldown_left <= 0.0 and _dash_time <= 0.0 and not busy:
 		_start_parry()
+	# (In the air only once, any way, until he lands, clings or bounces:
+	# Julian.)
+	if Input.is_action_just_pressed("gust") and has_gust and _gust_cooldown_left <= 0.0 and not busy \
+			and _dash_time <= 0.0 and _slash_time <= 0.0 and not _iai and _drawing <= 0.0 \
+			and (is_on_floor() or _gust_lift_ready):
+		_gust()
 	# Holding down on the ground: duck. A cut, parry, draw or jump ends it.
 	var duck := (grounded and Input.is_action_pressed("aim_down") and not busy and _dash_time <= 0.0
 			and _slash_time <= 0.0 and not _iai and _drawing <= 0.0 and _parrying <= 0.0
@@ -600,6 +637,7 @@ func _count_down(delta: float) -> void:
 	_invulnerable = maxf(_invulnerable - delta, 0.0)
 	_parry_time = maxf(_parry_time - delta, 0.0)
 	_parry_cooldown_left = maxf(_parry_cooldown_left - delta, 0.0)
+	_gust_cooldown_left = maxf(_gust_cooldown_left - delta, 0.0)
 	_combo = maxf(_combo - delta, 0.0)
 	_draw_safe = maxf(_draw_safe - delta, 0.0)
 	_parrying = maxf(_parrying - delta, 0.0)
@@ -615,7 +653,14 @@ func _apply_gravity(delta: float, grounded: bool) -> void:
 			velocity.y = maxf(velocity.y - gravity * glide_gravity * delta, -glide_fall_speed)
 		return
 	var pull := gravity * (fall_gravity_multiplier if velocity.y < 0.0 else 1.0)
-	velocity.y = maxf(velocity.y - pull * delta, -max_fall_speed)
+	var deepest := max_fall_speed
+	if _gust_float > 0.0:
+		# Floating on his own gust: light, easing back to full weight.
+		_gust_float = maxf(_gust_float - delta, 0.0)
+		var ease_back := 1.0 - _gust_float / gust_float_time
+		pull *= lerpf(gust_float_gravity, 1.0, ease_back * ease_back)
+		deepest = lerpf(gust_float_fall, max_fall_speed, ease_back * ease_back)
+	velocity.y = maxf(velocity.y - pull * delta, -deepest)
 
 
 func _start_dash(move: float) -> void:
@@ -730,6 +775,50 @@ func _land_draw() -> void:
 		_hit_stop(finish_hit_stop)
 
 
+## The Fan Gust: he snaps open a paper fan in his free hand and sweeps it:
+## a gust rolls out in front of him (or, in the air with S held, down under
+## him, lifting him once). Everything in it that the wind can move is told
+## (`gusted` on the "gust_target" group: burning paper is blown back, paper
+## creatures shoved away, pinwheels whir), and what hangs in the street
+## swings with it (Wind.puff).
+func _gust() -> void:
+	_gust_cooldown_left = gust_cooldown
+	has_gusted = true
+	var down := not is_on_floor() and Input.is_action_pressed("aim_down")
+	var direction := Vector3.DOWN if down else Vector3(facing, 0.0, 0.0)
+	if not is_on_floor():
+		_gust_lift_ready = false
+	if down:
+		velocity.y = maxf(velocity.y, gust_lift)
+		_jumping = false
+		_gust_float = gust_float_time
+	elif not is_on_floor():
+		velocity.x -= facing * gust_recoil
+	_puppet.play_fan(down)
+	Sound.play(self, &"fan_gust")
+	var origin := global_position + BODY_CENTER
+	var wind := GustWind.new()
+	wind.direction = direction
+	wind.reach = gust_reach
+	wind.grounded = is_on_floor()
+	get_parent().add_child(wind)
+	wind.global_position = origin + direction * 0.35
+	if not down:
+		Wind.puff(origin.x, facing)
+	for node: Node in get_tree().get_nodes_in_group(&"gust_target"):
+		if not node.has_method("gusted") or not (node is Node3D):
+			continue
+		var rel: Vector3 = (node as Node3D).global_position - origin
+		var inside := false
+		if down:
+			inside = rel.y < 0.8 and rel.y > -gust_reach and absf(rel.x) < 1.6
+		else:
+			inside = rel.x * facing > -0.4 and rel.x * facing < gust_reach and absf(rel.y) < gust_height
+		if inside:
+			node.gusted(direction, origin)
+	gusted.emit(origin, direction)
+
+
 func _start_parry() -> void:
 	_parry_time = parry_window
 	_parry_cooldown_left = parry_cooldown
@@ -792,6 +881,7 @@ func _on_slash_connected(finishing: bool = false, inky: bool = true) -> void:
 		velocity.y = pogo_velocity
 		_jumping = false
 		_can_dash = true
+		_gust_lift_ready = true
 		_glide_left = glide_time
 	elif _slash_dir.x != 0.0:
 		velocity.x = -_slash_dir.x * recoil_speed
@@ -1049,6 +1139,7 @@ func _update_wall(delta: float, grounded: bool, move: float) -> void:
 	velocity.y = maxf(velocity.y, -wall_slide_speed)
 	facing = _wall_normal  # back to the wall, looking out, feet braced on it
 	_can_dash = true
+	_gust_lift_ready = true
 	if not was_sliding:
 		Sound.play(self, &"land", -6.0)
 

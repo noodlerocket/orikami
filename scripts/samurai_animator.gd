@@ -477,6 +477,29 @@ static func parry(u: float) -> Dictionary:
 
 
 
+## The Fan Gust. `u` goes 0 to 1. The sword stays sheathed (right hand on
+## the hilt); the paper fan is in his LEFT hand: brought back shut by his
+## left shoulder, body turned away, then flung open and swept out in front,
+## arm straight, braced low; held a moment; drawn back. `down`: in the air,
+## swept down under him instead.
+static func fan(u: float, down: bool) -> Dictionary:
+	var feet := {"foot_r": Vector3(-0.14, 0.0, 0.3), "foot_l": Vector3(0.15, 0.0, -0.28), "toe_l": 20.0}
+	var back := stance({
+		"hips": Vector3(0.0, -0.1, 0.0), "hips_rot": Vector3(6.0, -14.0, 0.0),
+		"spine": Vector3(4.0, -20.0, 0.0), "head": Vector3(-6.0, 12.0, 0.0),
+		"reach_l": Vector3(0.3, 0.24, -0.06), "aim_l": 1.0, "hand_r": HILT}, feet)
+	var out := stance({
+		"hips": Vector3(0.0, -0.16, 0.05), "hips_rot": Vector3(10.0, 16.0, 0.0),
+		"spine": Vector3(8.0, 22.0, 0.0), "head": Vector3(-8.0, -14.0, 0.0),
+		"reach_l": Vector3(-0.02, 0.08, 0.6), "aim_l": 1.0, "hand_r": HILT}, feet)
+	if down:
+		out = stance({
+			"hips": Vector3(0.0, -0.05, 0.0), "hips_rot": Vector3(18.0, 6.0, 0.0),
+			"spine": Vector3(24.0, 8.0, 0.0), "head": Vector3(14.0, -4.0, 0.0),
+			"reach_l": Vector3(0.06, -0.42, 0.26), "aim_l": 1.0, "hand_r": HILT}, feet)
+	return along([[0.0, back], [0.28, out], [0.78, out], [1.0, back]], u)
+
+
 ## The iai stance: crouched low and still, front foot forward, body turned to
 ## hide the sword, head bowed so the hat hides his eyes. Right hand on the
 ## hilt, left thumb on the guard. `charge` goes 0 to 1 as he settles lower;

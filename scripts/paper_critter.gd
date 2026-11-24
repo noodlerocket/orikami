@@ -47,6 +47,7 @@ var _dir := -1.0
 
 
 func _ready() -> void:
+	add_to_group(&"gust_target")
 	health = max_health
 	collision_layer = 4  # "enemies"
 	collision_mask = 1   # the world only
@@ -104,6 +105,16 @@ func take_hit(damage: int, direction: Vector2) -> void:
 		queue_free()
 		return
 	_on_hit(direction)
+
+
+## The Fan Gust: blown back off its feet (or out of the air), its attack
+## broken off.
+func gusted(direction: Vector3, _from: Vector3) -> void:
+	velocity.x = direction.x * 10.0
+	velocity.y = maxf(velocity.y, 2.5) if direction.y > -0.5 else -6.0
+	if mode != &"stagger":
+		_set_mode(&"recover")
+	Sound.play(self, &"paper_fold", -4.0)
 
 
 ## What it does when cut but not killed. Each kind decides.

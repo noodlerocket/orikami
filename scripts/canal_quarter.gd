@@ -62,7 +62,7 @@ static func ground_at(x: float) -> float:
 	if x >= STAIRS_UP.x and x <= STAIRS_UP.y:
 		return lerpf(QUAY_Y, BANK_Y, (x - STAIRS_UP.x) / (STAIRS_UP.y - STAIRS_UP.x))
 	if x > STAIRS_UP.y:
-		return BANK_Y
+		return RiseQuarter.ground_at(x)   # (the bank, the Ward, then the Rise)
 	for w: Vector2 in WATERS:
 		if x > w.x and x < w.y:
 			return WATER_Y

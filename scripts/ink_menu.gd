@@ -289,6 +289,7 @@ const CONTROLS := [
 	["Dash", "L  /  Shift", "RB"],
 	["Parry  (hold to block)", "I", "LB"],
 	["Heal  (hold, 3 ink)", "U", "B"],
+	["Fan Gust  (once learned)", "O", "RT"],
 	["Pause", "Esc", "Start"],
 	["Mute", "M", ""],
 ]

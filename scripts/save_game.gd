@@ -25,7 +25,7 @@ static var slot := 1
 ## The names of the shrines, for the slots' summaries.
 const SHRINE_NAMES := {"paper_maker": "the Paper-Maker's door", "warehouse": "the river warehouse",
 	"steps": "the Shrine Steps", "bamboo": "the bamboo altar", "mill": "the paper mill", "market": "the Mist Gate",
-	"teahouse": "the canal teahouse"}
+	"teahouse": "the canal teahouse", "kilns": "the lantern kilns", "hosho_gate": "Hōshō's Gate"}
 
 static var last_shrine := ""
 static var rested: Array[String] = []
@@ -46,6 +46,10 @@ static var akane_dueled := false
 static var ward_open := false
 static var dragon_met := false
 static var dragon_beaten := false
+## Hōshō: met, beaten; the generals' seals he has ("hosho").
+static var hosho_met := false
+static var hosho_beaten := false
+static var seals: Array[String] = []
 ## The houses in the Ward it crushed (their places in WardQuarter.HOUSES): ruins for good.
 static var ward_ruins: Array[int] = []
 static var smudge_ink := 0
@@ -123,6 +127,9 @@ static func reset() -> void:
 	ward_open = false
 	dragon_met = false
 	dragon_beaten = false
+	hosho_met = false
+	hosho_beaten = false
+	seals.clear()
 	ward_ruins.clear()
 
 
@@ -144,6 +151,9 @@ static func write() -> void:
 	cfg.set_value("game", "ward_open", ward_open)
 	cfg.set_value("game", "dragon_met", dragon_met)
 	cfg.set_value("game", "dragon_beaten", dragon_beaten)
+	cfg.set_value("game", "hosho_met", hosho_met)
+	cfg.set_value("game", "hosho_beaten", hosho_beaten)
+	cfg.set_value("game", "seals", seals)
 	cfg.set_value("game", "ward_ruins", ward_ruins)
 	cfg.set_value("game", "explored", explored.keys())
 	cfg.save(file)
@@ -170,6 +180,9 @@ static func read() -> bool:
 	ward_open = cfg.get_value("game", "ward_open", false)
 	dragon_met = cfg.get_value("game", "dragon_met", false)
 	dragon_beaten = cfg.get_value("game", "dragon_beaten", false)
+	hosho_met = cfg.get_value("game", "hosho_met", false)
+	hosho_beaten = cfg.get_value("game", "hosho_beaten", false)
+	seals.assign(cfg.get_value("game", "seals", []))
 	ward_ruins.assign(cfg.get_value("game", "ward_ruins", []))
 	explored = {}
 	for key: String in cfg.get_value("game", "explored", []):
