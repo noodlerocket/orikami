@@ -1424,6 +1424,7 @@ func _lantern_market(village: Village, ronin: Ronin) -> void:
 	_check("falling into a canal takes him under", went_under)
 	await _frames(150)
 	boat.set_physics_process(true)
+	await _ward(ronin)
 	for node: Node in held:
 		if is_instance_valid(node):
 			node.set_physics_process(true)
@@ -1560,3 +1561,166 @@ func _check(label: String, passed: bool) -> void:
 	print("PASS  " if passed else "FAIL  ", label)
 	if not passed:
 		_failures += 1
+
+
+## The Ward of Shut Doors and the Festival Dragon: the gate's charms cut
+## away open it; walking into the square starts the meeting; its body never
+## leaves the square or goes through a walkway, whatever it does; a parried
+## dive knocks it down; a coil pierces a house and the house falls into a
+## ruin; dying puts everything back; beating it opens the shutters.
+func _ward(ronin: Ronin) -> void:
+	var ward: WardQuarter = get_first_node_in_group(&"ward")
+	var quarter := ward.quarter
+	var dragon := ward.dragon
+	var saved := [SaveGame.ward_open, SaveGame.dragon_met, SaveGame.dragon_beaten]
+	# The gate: three cuts tear its charms away and it swings open.
+	var wall: Node = quarter.get(&"_gate_wall")
+	var target: PropTarget = quarter.get(&"_gate_target")
+	if target:
+		for k in 3:
+			target.take_hit(1, Vector2.RIGHT)
+		await _frames(10)
+	_check("cutting the charms off the Ward's gate opens it", SaveGame.ward_open and (wall == null or not is_instance_valid(wall) or wall.is_queued_for_deletion()))
+	# Into the square: the meeting begins.
+	SaveGame.dragon_met = false
+	ronin.global_position = Vector3(LanternMarket.SHIFT + WardQuarter.ARENA.x + 4.0, CanalQuarter.BANK_Y + 0.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(30)
+	_check("walking into the dragon's square begins the meeting (%s)" % ward.get(&"_state"), ward.get(&"_state") == &"intro")
+	await _frames(240)
+	ward.call("_end_intro")
+	await _frames(10)
+	_check("then the fight: the dragon is loose and walls of rain close the square",
+			dragon.active and (ward.get(&"_walls") as Array).size() == 2)
+	# Every move in turn, him untouchable: it never leaves the square and
+	# never passes through a walkway.
+	var outside := 0
+	var through := 0
+	var holes := 0
+	var crushed := false
+	for move: StringName in [&"dive", &"breath", &"bolts", &"coil", &"ribbons", &"dive", &"breath"]:
+		dragon.start_move(move)
+		for f in 600:
+			ronin.set("_draw_safe", 5.0)
+			await process_frame
+			for seg: Node3D in dragon.get(&"_segments"):
+				if seg.position.x < WardQuarter.RAIN_WALLS.x or seg.position.x > WardQuarter.RAIN_WALLS.y:
+					outside += 1
+				for box: AABB in dragon.obstacles:
+					if box.has_point(seg.position):
+						through += 1
+			for box: AABB in dragon.obstacles:
+				if box.grow(0.6).has_point(dragon.head):
+					through += 1
+			if move == &"coil" and dragon.get(&"_house") >= 0:
+				var house: Node3D = dragon.houses[dragon.get(&"_house")]
+				holes = maxi(holes, house.get_children().filter(func(c: Node) -> bool: return c.has_meta(&"hole")).size())
+				crushed = crushed or house.has_meta(&"ruin")
+			if f > 30 and dragon.mode() == &"hover":
+				break
+		if move == &"coil":
+			await _frames(30)   # (it becomes a ruin as the house drops)
+			crushed = (dragon.houses[dragon.get(&"_house")] as Node3D).has_meta(&"ruin")
+		if move == &"coil":
+			await _frames(30)   # (the house turns to a ruin as it finishes falling)
+			crushed = (dragon.houses[dragon.get(&"_house")] as Node3D).has_meta(&"ruin")
+	_check("the dragon's body never leaves the square (%d times out)" % outside, outside == 0)
+	_check("nor goes through a walkway (%d times)" % through, through == 0)
+	_check("its coils pierce the house (%d holes), and the house falls into a ruin" % holes, holes > 0 and crushed)
+	# A parried dive: the head is knocked down, stunned, and can be cut.
+	ronin.global_position = Vector3(LanternMarket.SHIFT + 250.0, CanalQuarter.BANK_Y + 0.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(20)
+	var stunned := false
+	dragon.start_move(&"dive")
+	for f in 600:
+		ronin.facing = signf(dragon.global_position.x + dragon.head.x - ronin.global_position.x)
+		if dragon.mode() == &"dive":
+			ronin.set("_parry_time", 0.2)
+		await physics_frame
+		if dragon.mode() == &"stun":
+			stunned = true
+			break
+	_check("parrying its dive knocks it down, stunned (posture %d)" % dragon.posture, stunned and dragon.posture >= 2)
+	await _frames(40)
+	var before := dragon.health
+	(dragon.get(&"_parts")[0] as Node).take_hit(1, Vector2.RIGHT)
+	_check("its head can be cut while it lies stunned (%d to %d)" % [before, dragon.health], dragon.health < before)
+	# Its body is hard paper: a cut glances off it and does no harm.
+	before = dragon.health
+	var hard: Node = (dragon.get(&"_hard") as Array)[0]
+	hard.take_hit(1, Vector2.RIGHT)
+	_check("a cut on its hard body glances off (%d to %d)" % [before, dragon.health], dragon.health == before and hard.has_method("is_prop"))
+	# Touching its head when it is not attacking: it bites.
+	await _frames(200)
+	dragon.set(&"_mode", &"hover")
+	dragon.set(&"_bite_clock", 0.0)
+	ronin.set("_invulnerable", 0.0)
+	ronin.set("_draw_safe", 0.0)
+	ronin.health = ronin.max_health
+	dragon.head = dragon.to_local(ronin.global_position) + Vector3(0.6, 1.0, 0.0)
+	dragon.call("_bite_check")
+	_check("touching its head, it bites him (health %d of %d)" % [ronin.health, ronin.max_health], ronin.health < ronin.max_health)
+	# Its head, set back from the street as it calls lightning, can still be
+	# cut (Julian: some cuts at its head did nothing).
+	await _frames(90)
+	dragon.start_move(&"bolts")
+	await _frames(70)
+	ronin.global_position = dragon.to_global(Vector3(dragon.head.x - 1.4, dragon.head.y - 1.2, 0.0))
+	ronin.velocity = Vector3.ZERO
+	ronin.facing = 1.0
+	before = dragon.health
+	dragon.set(&"_hit_clock", 0.0)
+	Input.action_press("slash")
+	await _frames(2)
+	Input.action_release("slash")
+	await _frames(15)
+	_check("a cut reaches its head while it calls lightning (head z %.1f; %d to %d)" % [dragon.head.z, before, dragon.health], dragon.health < before)
+	ronin.global_position = Vector3(LanternMarket.SHIFT + 250.0, CanalQuarter.BANK_Y + 0.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(150)
+	# Lightning goes through a walkway onto him, burning a hole in it.
+	await _frames(90)
+	ronin.set("_invulnerable", 0.0)
+	ronin.health = ronin.max_health
+	var walk: Array = WardQuarter.WALKS[2]
+	ronin.global_position = Vector3(LanternMarket.SHIFT + walk[0], walk[1] + 0.1, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(20)
+	dragon.call("_bolt", Vector3(walk[0], CanalQuarter.BANK_Y, 0.0))
+	_check("its lightning goes through the walkway he stands on (health %d, %d scorches)" % [ronin.health, (dragon.get(&"_scorches") as Array).size()],
+			ronin.health < ronin.max_health and (dragon.get(&"_scorches") as Array).size() > 0)
+	ronin.health = ronin.max_health
+	ronin.global_position = Vector3(LanternMarket.SHIFT + 250.0, CanalQuarter.BANK_Y + 0.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	# He falls: the fight starts over, the crushed house stands again. (He
+	# is carried back out of the square, as to a shrine.)
+	ronin.global_position = Vector3(LanternMarket.SHIFT + WardQuarter.WARD.x + 1.0, CanalQuarter.BANK_Y + 0.2, 0.0)
+	ward.call("_on_ronin_died")
+	# (as after the fade: he wakes at the teahouse shrine, outside the square)
+	ronin.global_position = Vector3(LanternMarket.SHIFT + CanalQuarter.SHRINE_X + 1.0, CanalQuarter.BANK_Y + 0.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(120)
+	var ruins := 0
+	for h: Node3D in dragon.houses:
+		if h.has_meta(&"ruin"):
+			ruins += 1
+	_check("if he falls, it is whole again (%d), the rain walls fall (%d), the houses stand (%d ruins), it waits (%s)" % [dragon.health,
+			(ward.get(&"_walls") as Array).size(), ruins, ward.get(&"_state")],
+			dragon.health == dragon.max_health and (ward.get(&"_walls") as Array).is_empty() and ruins == 0 and ward.get(&"_state") == &"before")
+	# Beaten: it comes apart, the rain stops, the shutters slide open.
+	ronin.global_position = Vector3(LanternMarket.SHIFT + 250.0, CanalQuarter.BANK_Y + 0.2, 0.0)
+	await _frames(30)
+	dragon.health = 1
+	dragon.call("_struck", 1, Vector2.RIGHT, null)
+	await _frames(60 * 9)
+	var opened := (ward.get(&"_windows") as Array).filter(func(w: Dictionary) -> bool: return w["open"]).size()
+	var nearest := -INF
+	for seg: Node3D in dragon.get(&"_segments"):
+		nearest = maxf(nearest, seg.position.z)
+	_check("it lies back, off his path (head z %.1f, nearest of its body z %.1f)" % [dragon.head.z, nearest], dragon.head.z < -1.5 and nearest < -1.0)
+	_check("beating it: it falls apart, the rain walls stop, %d shutters slide open" % opened,
+			SaveGame.dragon_beaten and dragon.mode() == &"dead" and (ward.get(&"_walls") as Array).is_empty() and opened > 5)
+	SaveGame.ward_open = saved[0]
+	SaveGame.dragon_met = saved[1]
+	SaveGame.dragon_beaten = saved[2]

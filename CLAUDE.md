@@ -46,7 +46,7 @@ Bamboo of Folded Wind after it (see "The expanded village"), with:
 Pause, settings and controls pages share one UI style. Downloads for
 Windows and Mac carry Julian's icon.
 
-**Next:** Julian looks at the Lantern Market (built, not yet played); then Hōshō's hall and fight. Julian plays the overnight work and judges it (the report lists
+**Next:** Julian plays the Ward of Shut Doors and the Festival Dragon; then the Fan Gust and the rest of the Lantern Market region; then Hōshō's hall and fight. Julian plays the overnight work and judges it (the report lists
 what only he can judge). Then: Julian judges Akane's duel (built: proposed lore, she yields
 rather than dies; her music and sounds are in); the road on past the bamboo (the
 open middle of the game); the endings (the ink marks are saved; nothing
@@ -733,6 +733,50 @@ has its own script, built from `Village._ready`:
   Moving platforms here are `AnimatableBody3D` with `sync_to_physics` OFF,
   moved in `_physics_process`, AND given `constant_linear_velocity` so he
   rides them (with sync on they did not move at all).
+- **The Ward of Shut Doors and the Festival Dragon** (`ward_quarter.gd`,
+  `festival_dragon.gd`, 2026-11-23; not yet played by Julian): the market
+  runs to `END` 300. The Ward's gate (`CanalQuarter.WARD_GATE`) is pasted
+  over with charms: three cuts tear them off and the door swings back
+  (`SaveGame.ward_open`). Shuttered houses with charms and claw gouges,
+  dropped festival lanterns, a cart. The square (`WardQuarter.ARENA` 228 to
+  270): red walkways low and high toward its ends (`WALKS`), two houses it
+  can crush (`HOUSES` flag), a stone lantern (`LANTERN`); walls of pouring
+  rain close it while it lives (`RAIN_WALLS`, outside the square).
+  **The dragon, 祭龍** (a ryū, Julian's choice): a Meshy HEAD
+  (`models/dragon_head.glb`, picture `docs/reference/dragon_head.png`;
+  image `01a20abf-392c-7735-bac9-e065776f1da7`, model
+  `01a20abf-fcce-75d2-8061-f8ebebf27390`, meshy-7.1 + meshy-7 2K, 20,000
+  triangles) with a jaw given in code (`ProceduralSkin`); the long body is
+  folded in code (drums, gold rims and fins, parade poles, legs, ribbons)
+  and follows the trail of points the head has left, so it writhes like a
+  serpent. 30 health, 6 posture. Moves (`start_move`): dive across at chest
+  height (duck; parry the head: stunned, `stun_time`), rain breath from low
+  (jump) or high (duck), lightning in a rhythm (stains first), coil THROUGH
+  a house (each wall it bursts through: `wall_pierce` sound, the house
+  jolts, a torn hole stays) and the house falls at once (`collapse_tell`
+  0.3 s; Julian: no long squeeze) into a ruin (`WardQuarter._ruin`: fallen
+  roof slabs, snapped posts, rubble, torn wall; Julian: a squashed house
+  was not enough); from half health ribbons (parry). Rules from Julian:
+  it never crosses the rain walls (`keep_inside`), and it never goes
+  through a walkway: `obstacles` (the walkways' boxes) are solid to its
+  head, every drum and its ribbons (`_clear_of`, `_route` goes over them);
+  its low moves stay in `LANE`. More from Julian: touching its head when it
+  is not attacking, it bites (`_bite_check`, `dragon_snap`); its body is
+  hard paper (`HardPart`: cuts glance off with `hard_paper`, no damage,
+  except while it coils through a house or lies knocked down); lightning
+  leads him and goes through walkways, burning holes (`_burn_hole`); the
+  ribbons lead him too; dead, it lies back off his path, never on the
+  stone lantern (`avoid_x`). The laugh is the first one pitched down 5
+  semitones with an octave-down growl and an echo. The camera stands back (`fight_camera_distance`
+  20) and leans toward its head (`FollowCamera.focus`). Intro: the open
+  shutters slam, it pours off the roofs, coils round the stone lantern and
+  laughs; title and seal 祭龍. After: it comes apart into wet paper, the rain
+  walls stop, the shutters slide open (not a ruin's), people come back to
+  their windows; ruins are saved (`SaveGame.ward_ruins`). Its music
+  `music_dragon_fight.ogg` (75 s loop) and sounds (`dragon_*`,
+  `thunder_crack`, `whisker_crackle`, `house_crush`, `wall_pierce`,
+  `shutter_*`). `--ward` starts in the Ward; sheet `dragon`. The Fan Gust
+  (its reward in the plan) is not built yet.
 - **The whole region is planned** (`docs/lantern_market_plan.md`, map
   `docs/market_map.png` from `tools/market_map.py`; proposed, for Julian):
   about 450 m (double the grove), three layers (street, roofs, canals),

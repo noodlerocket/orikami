@@ -138,5 +138,24 @@ The bamboo's creatures (2026-11-22): the red panda and the kite husk.
 | `husk_rasp.mp3` | the paper husk's tell, as it raises its arms | Rasping breath of a soaked paper creature raising its arms to strike, a short wet crinkle of sodden paper and a low hollow hiss, eerie, starts quietly, no music. *(Very quiet: raised 10x to a peak of about 0.8; none of it below 300 Hz; 15 ms fade-in.)* |
 | `kite_wail.mp3` | the kite husk's tell, before it swoops | Ghostly wail of a haunted paper kite about to dive, a thin eerie rising whistle of wind over taut paper with a soft papery hiss, mournful, starts quietly, no music. *(No pop: 1% of its energy in the first 50 ms, none below 300 Hz. Quiet: raised 2.4x to a peak of about 0.8.)* |
 
+The Ward of Shut Doors and the Festival Dragon (2026-11-23). Every sound was
+levelled to a peak of about 0.85, with an 8 ms fade-in and a 60 ms fade-out.
+Those that start loud are cracks and crashes, mostly above 300 Hz and lasting
+far longer than 50 ms: not pops.
+
+| File | Plays when | Words used to generate it, and what was done |
+| --- | --- | --- |
+| `music_dragon_fight.ogg` | the dragon fight (loops; fades as it falls or he falls: `WardQuarter.music_volume`, `music_fade_time`) | music_v2, 84 s: Japanese boss battle music against a mad paper festival dragon in a rainy night market; festival taiko and odaiko, frantic shinobue and shamisen, clanging bells gone wrong, dark strings and brass, about 150 bpm. *(Its fade-out cut off at 77 s; its last 2 s blended into its start (equal power): a 75 s loop. rms 0.10 to 0.25 second by second; peak 0.85.)* |
+| `dragon_roar.mp3` | its dive's tell, enraged, staggered, its death | Roaring giant paper dragon, a deep crackling bellow of stiff paper and a hollow wooden throat, monstrous and unhinged. *(21% below 300 Hz, building from quiet to its loudest at 1 s.)* |
+| `dragon_laugh.mp3` | the intro on the stone lantern, a house falling | Laughter of a mad monster like a cracked bronze temple bell, a jangling hollow cackle. *(Quiet: raised 1.9x.)* |
+| `dragon_breath_in.mp3` | ink gathering in its jaws (the breath's tell) | Inhale of a huge creature drawing in a deep wet gurgling breath. |
+| `dragon_breath.mp3` | the gout of rainwater | Gushing torrent of water blasted from a monster's mouth, a splattering spray with a growl underneath. |
+| `whisker_crackle.mp3` | before lightning | Static electricity crackling and fizzing, small sparks snapping. *(1% below 300 Hz.)* |
+| `thunder_crack.mp3` | each bolt | Thunderbolt striking close, a sharp electric crack then a short heavy rumble. *(It clipped at 1.32: levelled.)* |
+| `wall_pierce.mp3` | each time its head bursts through a house wall | Crunch of a huge beast bursting through a thin wooden wall, boards splintering and paper ripping. *(Energy over the first 0.5 s; 24% below 300 Hz.)* |
+| `house_crush.mp3` | a house falls; it comes apart | Collapse of a wooden house, beams snapping, paper walls crumpling, tiles clattering. |
+| `shutter_slam.mp3` | the shutters slam in the intro | Slam of a wooden sliding storm shutter, a quick slide and a sharp wooden knock. *(Raised 2x.)* |
+| `shutter_open.mp3` | the shutters slide open after the fight | Opening a wooden sliding shutter gently, a soft rolling slide. *(Very quiet: raised 9x.)* |
+
 Measuring tip: decode each channel separately (or `-ac 1` overstates the
 peak of a stereo file: ffmpeg's down-mix sums the channels).

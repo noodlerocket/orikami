@@ -22,9 +22,10 @@ extends Node3D
 
 ## How far along x the market really is.
 const SHIFT := 2000.0
-## Its east end, as far as it is built: the Ward's gate, shut (the region
-## is planned to about 450 m: docs/lantern_market_plan.md).
-const END := 216.0
+## Its east end, as far as it is built: the end of the Ward of Shut Doors,
+## at the gate up to the Lantern Makers' Rise (shut). The region is planned
+## to about 450 m: docs/lantern_market_plan.md.
+const END := 300.0
 ## Where he arrives (local x), and how far west he may walk before he is
 ## taken back to the bamboo.
 const ARRIVE_X := 3.0

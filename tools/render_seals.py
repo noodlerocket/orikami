@@ -11,7 +11,7 @@ import random
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 FONT = "art_source/fonts/YujiSyuku-Regular.ttf"
-SEALS = [("hannya", "般若"), ("akane", "朱狐"), ("orikami", "折神")]
+SEALS = [("hannya", "般若"), ("akane", "朱狐"), ("orikami", "折神"), ("dragon", "祭龍")]
 SIZE = 512
 INK = (178, 40, 30)
 PAPER = (240, 226, 206)

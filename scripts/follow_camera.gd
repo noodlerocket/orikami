@@ -66,6 +66,14 @@ extends Camera3D
 ## How high his middle is above his feet.
 @export var body_center := 0.8
 
+## A second thing to keep in view (a boss: the Festival Dragon's head), set
+## each frame by whoever needs it; NAN for none. The view leans toward it by
+## `focus_weight`, but never so far that he is less than `focus_margin`
+## metres inside the edge of the picture.
+var focus := Vector3(NAN, NAN, NAN)
+@export var focus_weight := 0.45
+@export var focus_margin := 3.0
+
 @export_group("Smoothing")
 @export var follow_speed_x := 6.0
 @export var follow_speed_y := 4.0
@@ -160,4 +168,12 @@ func _goal() -> Vector3:
 		y = clampf(at.y + climb_height, y, maxf(climb_max_y, y))
 	if keep_below_center:
 		y = maxf(y, _lowest_y_keeping_center(at))
-	return Vector3(clampf(at.x + _lead, min_x, max_x), y, distance)
+	var x := at.x + _lead
+	if not is_nan(focus.x):
+		# Lean toward the second thing, keeping him well inside the picture.
+		var half_h := distance * tan(deg_to_rad(fov * 0.5))
+		var half_w := half_h * 16.0 / 9.0
+		x = clampf(lerpf(x, focus.x, focus_weight), at.x - half_w + focus_margin, at.x + half_w - focus_margin)
+		var up := clampf(lerpf(y, focus.y - 1.0, focus_weight * 0.6), y, at.y + half_h - 1.5)
+		y = maxf(y, up)
+	return Vector3(clampf(x, min_x, max_x), y, distance)

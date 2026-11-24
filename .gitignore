@@ -18,3 +18,4 @@ Thumbs.db
 # Personal Claude Code settings
 .claude/settings.local.json
 docs/screenshots/sweep/
+docs/screenshots/sweep_high/

@@ -42,6 +42,12 @@ static var papermaker_told := false
 ## Akane: met (her warning seen), and her first duel won.
 static var akane_met := false
 static var akane_dueled := false
+## The Lantern Market: the Ward's gate cut open, the Festival Dragon met and beaten.
+static var ward_open := false
+static var dragon_met := false
+static var dragon_beaten := false
+## The houses in the Ward it crushed (their places in WardQuarter.HOUSES): ruins for good.
+static var ward_ruins: Array[int] = []
 static var smudge_ink := 0
 ## Explored map cells: "layer:x" keys (layers "under", "street", "roofs").
 static var explored := {}
@@ -114,6 +120,10 @@ static func reset() -> void:
 	papermaker_told = false
 	akane_met = false
 	akane_dueled = false
+	ward_open = false
+	dragon_met = false
+	dragon_beaten = false
+	ward_ruins.clear()
 
 
 static func write() -> void:
@@ -131,6 +141,10 @@ static func write() -> void:
 	cfg.set_value("game", "papermaker_told", papermaker_told)
 	cfg.set_value("game", "akane_met", akane_met)
 	cfg.set_value("game", "akane_dueled", akane_dueled)
+	cfg.set_value("game", "ward_open", ward_open)
+	cfg.set_value("game", "dragon_met", dragon_met)
+	cfg.set_value("game", "dragon_beaten", dragon_beaten)
+	cfg.set_value("game", "ward_ruins", ward_ruins)
 	cfg.set_value("game", "explored", explored.keys())
 	cfg.save(file)
 
@@ -153,6 +167,10 @@ static func read() -> bool:
 	papermaker_told = cfg.get_value("game", "papermaker_told", false)
 	akane_met = cfg.get_value("game", "akane_met", false)
 	akane_dueled = cfg.get_value("game", "akane_dueled", false)
+	ward_open = cfg.get_value("game", "ward_open", false)
+	dragon_met = cfg.get_value("game", "dragon_met", false)
+	dragon_beaten = cfg.get_value("game", "dragon_beaten", false)
+	ward_ruins.assign(cfg.get_value("game", "ward_ruins", []))
 	explored = {}
 	for key: String in cfg.get_value("game", "explored", []):
 		explored[key] = true

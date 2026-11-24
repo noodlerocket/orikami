@@ -47,6 +47,11 @@ var market: LanternMarket
 var _rng := RandomNumberGenerator.new()
 var _floaters: Array[Node3D] = []
 var _ronin: Ronin
+var _gate_door: Node3D
+var _gate_wall: StaticBody3D
+var _gate_target: PropTarget
+var _charms: Array[Node3D] = []
+var _hint: ActionHint
 
 
 ## Height of the ground (or of the water, over a canal) at a market x past
@@ -96,6 +101,10 @@ func _ready() -> void:
 	_build_teahouse()
 	_build_ward_gate()
 	_floating_lanterns()
+	var ward := WardQuarter.new()
+	ward.market = market
+	ward.quarter = self
+	add_child(ward)
 	for spot: Vector2 in DOGS:
 		var dog := PaperDog.new()
 		dog.position = Vector3(spot.x, spot.y, 0.0)
@@ -113,6 +122,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	_process_gate_hint()
 	# Floating lanterns drift slowly downstream (west), bobbing, and come
 	# round again from the other end of their canal.
 	var t := Time.get_ticks_msec() * 0.001
@@ -553,8 +563,10 @@ func _build_teahouse() -> void:
 
 
 ## The gate into the Ward of Shut Doors, where the festival dragon is loose:
-## barred and pasted over with paper charms (ofuda), a straw rope across it,
-## the sky beyond dark with its storm.
+## its door shut and pasted over with paper charms (ofuda), a straw rope
+## across it. Cut the charms away (three cuts, three charms torn off with
+## each, fluttering down to the stones) and the door swings back into the
+## Ward (SaveGame.ward_open).
 func _build_ward_gate() -> void:
 	var g := BANK_Y
 	var gx := WARD_GATE
@@ -564,22 +576,29 @@ func _build_ward_gate() -> void:
 	for pz: float in [1.6, -2.6]:
 		b.box(Vector3(gx, g + 2.9, pz), Vector3(0.4, 5.8, 0.4))
 	b.box(Vector3(gx, g + 5.4, -0.5), Vector3(0.5, 0.35, 5.2))
-	b.color = Scenery.WOOD.darkened(0.25)
-	b.box(Vector3(gx, g + 2.5, -0.5), Vector3(0.18, 5.0, 4.0))
-	b.color = Color(0.09, 0.08, 0.1)
-	for y: float in [1.0, 2.6, 4.2]:
-		b.box(Vector3(gx - 0.1, g + y, -0.5), Vector3(0.06, 0.16, 4.0))
 	add_child(b.build())
 	add_child(Scenery.tiled_roof(_rng, gx - 1.2, gx + 1.2, Vector2(g + 5.6, 2.4), Vector2(g + 6.8, -0.5), 3))
 	add_child(Scenery.tiled_roof(_rng, gx - 1.2, gx + 1.2, Vector2(g + 5.6, -3.4), Vector2(g + 6.8, -0.5), 3, false))
-	# Paper charms pasted crosswise over the doors, each brushed, a few
-	# torn loose and flapping.
+	_build_ward_walls()
+	# The door, hinged on the back post, and the bars across it.
+	_gate_door = Node3D.new()
+	_gate_door.position = Vector3(gx, g, -2.4)
+	add_child(_gate_door)
+	var d := PaperMesh.new(_rng.randi())
+	d.shade_jitter = 0.14
+	d.color = Scenery.WOOD.darkened(0.25)
+	d.box(Vector3(0.0, 2.5, 1.9), Vector3(0.18, 5.0, 3.8))
+	d.color = Color(0.09, 0.08, 0.1)
+	for y: float in [1.0, 2.6, 4.2]:
+		d.box(Vector3(-0.1, y, 1.9), Vector3(0.06, 0.16, 3.8))
+	_gate_door.add_child(d.build())
+	# Paper charms pasted crosswise over it, each brushed, a few flapping.
 	for k in 9:
-		var at := Vector3(gx - 0.2, g + _rng.randf_range(0.6, 4.6), _rng.randf_range(-2.2, 1.2))
+		var at := Vector3(-0.2, _rng.randf_range(0.6, 4.6), _rng.randf_range(0.3, 3.5))
 		var charm := Node3D.new()
 		charm.position = at
 		charm.rotation = Vector3(0.0, -PI * 0.5, _rng.randf_range(-0.5, 0.5))
-		add_child(charm)
+		_gate_door.add_child(charm)
 		var c := PaperMesh.new(_rng.randi())
 		c.color = LanternMarket.CREAM
 		c.polygon(PaperMesh.tear(PackedVector2Array([Vector2(-0.14, 0.4), Vector2(0.14, 0.4), Vector2(0.14, -0.4), Vector2(-0.14, -0.4)]), 0.15, 0.02, _rng), 0.0)
@@ -589,7 +608,8 @@ func _build_ward_gate() -> void:
 		charm.add_child(c.build())
 		if k % 3 == 0:
 			Scenery.windswept(charm, 0.08, _rng)
-	# The straw rope with its zigzag paper streamers.
+		_charms.append(charm)
+	# The straw rope with its zigzag paper streamers (high over the way).
 	var rope := PaperMesh.new(_rng.randi())
 	for k in 8:
 		var t := (k + 0.5) / 8.0
@@ -599,8 +619,150 @@ func _build_ward_gate() -> void:
 			rope.color = LanternMarket.CREAM
 			rope.box(Vector3(gx - 0.45, g + 4.25 - 0.5 * 4.0 * t * (1.0 - t), lerpf(1.5, -2.5, t)), Vector3(0.02, 0.5, 0.16))
 	add_child(rope.build())
-	# The storm over the Ward beyond: dark cloud low over its roofs, rain.
-	var storm := PaperMesh.new(1)
-	storm.fade_quad(Vector3(gx + 1.0, g + 2.0, -6.0), Vector3(gx + 1.0, g + 22.0, -6.0), Vector3(gx + 40.0, g + 22.0, -6.0), Vector3(gx + 40.0, g + 2.0, -6.0),
-			Color(0.05, 0.05, 0.1, 0.0), Color(0.05, 0.05, 0.1, 0.85))
-	add_child(storm.build_veil())
+	if SaveGame.ward_open:
+		_open_gate(false)
+		return
+	_gate_wall = market._solid(Vector3(gx, g + 15.0, 0.0), Vector3(0.5, 30.0, 4.0))
+	_gate_wall.set_meta(&"no_climb", true)
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(0.8, 3.6, 2.0)
+	_gate_target = PropTarget.make(self, shape, Vector3(gx - 0.35, g + 1.9, 0.0))
+	_gate_target.struck.connect(_on_gate_struck)
+
+
+## The Ward's wall, flanking its gate (Julian: the gate stood alone with
+## empty gaps either side): behind, a plastered wall on a dark tiled base
+## runs back from the gate's post and then along between the teahouse and the
+## Ward's first house, capped with tiles, charms pasted on it; in front, a
+## low wing of the same wall ends at a stout post (low, so it never hides him).
+func _build_ward_walls() -> void:
+	var g := BANK_Y
+	var gx := WARD_GATE
+	var w := PaperMesh.new(_rng.randi())
+	w.shade_jitter = 0.12
+	var plaster := Color(0.6, 0.57, 0.53)
+	var base := Color(0.15, 0.14, 0.18)
+	# Along z: from the back post to the house line.
+	w.color = base
+	w.box(Vector3(gx, g + 0.6, -3.85), Vector3(0.5, 1.2, 2.5))
+	w.color = plaster
+	w.box(Vector3(gx, g + 2.8, -3.85), Vector3(0.44, 3.2, 2.5))
+	# Along x, between the teahouse and the Ward's first house, at the line
+	# of their fronts.
+	var left := 212.0
+	var right := WardQuarter.HOUSES[0][0] - WardQuarter.HOUSES[0][1] * 0.5 - 0.05
+	w.color = base
+	w.box(Vector3((left + right) * 0.5, g + 0.6, -5.1), Vector3(right - left, 1.2, 0.5))
+	w.color = plaster
+	w.box(Vector3((left + right) * 0.5, g + 2.8, -5.1), Vector3(right - left, 3.2, 0.44))
+	# Namako tiles: a lattice of pale grout on the dark base, facing us.
+	w.color = Color(0.5, 0.49, 0.5)
+	var x := left + 0.3
+	while x < right - 0.2:
+		w.box(Vector3(x, g + 0.6, -4.84), Vector3(0.04, 1.1, 0.02))
+		x += 0.55
+	for y: float in [0.25, 0.6, 0.95]:
+		w.box(Vector3((left + right) * 0.5, g + y, -4.84), Vector3(right - left - 0.1, 0.04, 0.02))
+	# A dark timber band under the coping.
+	w.color = PaperMesh.TIMBER
+	w.box(Vector3((left + right) * 0.5, g + 4.3, -4.86), Vector3(right - left, 0.14, 0.06))
+	# The wing in front, out to a stout post: long and high enough that no
+	# one could just walk round the gate (Julian).
+	w.color = base
+	w.box(Vector3(gx, g + 0.6, 3.4), Vector3(0.5, 1.2, 3.6))
+	w.color = plaster
+	w.box(Vector3(gx, g + 2.1, 3.4), Vector3(0.44, 1.8, 3.6))
+	w.color = PaperMesh.TIMBER
+	w.box(Vector3(gx + 0.24, g + 2.9, 3.4), Vector3(0.06, 0.12, 3.6))
+	w.color = PaperMesh.TIMBER.lightened(0.1)
+	w.box(Vector3(gx, g + 1.8, 5.3), Vector3(0.4, 3.6, 0.4))
+	add_child(w.build())
+	# Tiled coping on each stretch.
+	add_child(Scenery.tiled_roof(_rng, left - 0.1, right + 0.1, Vector2(g + 4.35, -4.6), Vector2(g + 4.85, -5.1), 2))
+	add_child(Scenery.tiled_roof(_rng, left - 0.1, right + 0.1, Vector2(g + 4.35, -5.6), Vector2(g + 4.85, -5.1), 2, false))
+	var cope := Scenery.tiled_roof(_rng, -1.25, 1.25, Vector2(g + 4.35, 0.5), Vector2(g + 4.85, 0.0), 2)
+	cope.rotation.y = PI * 0.5
+	cope.position = Vector3(gx, 0.0, -3.85)
+	add_child(cope)
+	var cope_back := Scenery.tiled_roof(_rng, -1.25, 1.25, Vector2(g + 4.35, -0.5), Vector2(g + 4.85, 0.0), 2, false)
+	cope_back.rotation.y = PI * 0.5
+	cope_back.position = Vector3(gx, 0.0, -3.85)
+	add_child(cope_back)
+	for side: float in [1.0, -1.0]:
+		var wing := Scenery.tiled_roof(_rng, -1.8, 1.8, Vector2(g + 3.0, 0.45 * side), Vector2(g + 3.35, 0.0), 2, side > 0.0)
+		wing.rotation.y = PI * 0.5
+		wing.position = Vector3(gx, 0.0, 3.4)
+		add_child(wing)
+	# Charms on the wall too.
+	for k in 4:
+		var charm := Node3D.new()
+		charm.position = Vector3(_rng.randf_range(left + 0.5, right - 0.5), g + _rng.randf_range(1.8, 3.6), -4.86)
+		charm.rotation.z = _rng.randf_range(-0.4, 0.4)
+		add_child(charm)
+		var c := PaperMesh.new(_rng.randi())
+		c.color = LanternMarket.CREAM
+		c.polygon(PaperMesh.tear(PackedVector2Array([Vector2(-0.1, 0.3), Vector2(0.1, 0.3), Vector2(0.1, -0.3), Vector2(-0.1, -0.3)]), 0.12, 0.015, _rng), 0.0)
+		c.color = LanternMarket.RED_CLOTH
+		c.ellipse(Vector2(0.0, 0.18), Vector2(0.045, 0.045), 8, 0.002)
+		market._writing(c, Vector2(0.0, 0.06), 3, 0.08, 0.003)
+		charm.add_child(c.build())
+	# A lantern on the wing's post (hung from a bracket on it).
+	var bracket := PaperMesh.new(_rng.randi())
+	bracket.color = PaperMesh.TIMBER
+	bracket.box(Vector3(gx - 0.37, g + 3.3, 5.3), Vector3(0.74, 0.07, 0.07))
+	add_child(bracket.build())
+	market._hang(Vector3(gx - 0.62, g + 3.27, 5.3), 0.8, 0.12)
+
+
+func _process_gate_hint() -> void:
+	if _gate_target == null or _ronin == null:
+		if _hint:
+			_hint.near = false
+		return
+	if _hint == null:
+		var hud := get_tree().get_first_node_in_group(&"hud")
+		if hud == null:
+			return
+		_hint = ActionHint.new()
+		_hint.items = [["J", "X", "Cut away the charms"]]
+		_hint.point = market.to_global(Vector3(WARD_GATE - 0.3, BANK_Y + 3.2, 0.0))
+		hud.get_parent().add_child(_hint)
+	var x := _ronin.global_position.x - market.global_position.x
+	_hint.near = x > WARD_GATE - 6.0 and x < WARD_GATE + 0.5 and absf(_ronin.global_position.y - BANK_Y - market.global_position.y) < 3.0
+
+
+func _on_gate_struck(_direction: Vector2) -> void:
+	Sound.play(self, &"paper_rip", -2.0)
+	for k in 3:
+		if _charms.is_empty():
+			break
+		var charm: Node3D = _charms.pop_back()
+		# Torn off, it flutters down to the stones and lies there.
+		var where := charm.global_position
+		charm.reparent(self)
+		charm.global_position = where
+		var lie := Vector3(WARD_GATE - _rng.randf_range(0.5, 1.6), BANK_Y + 0.03, _rng.randf_range(-1.6, 1.0))
+		var t := create_tween().set_parallel()
+		t.tween_property(charm, "position", lie, _rng.randf_range(0.8, 1.2)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		t.tween_property(charm, "rotation", Vector3(-PI * 0.5, _rng.randf_range(-PI, PI), 0.0), 1.0)
+	if _charms.is_empty():
+		_open_gate(true)
+
+
+func _open_gate(slow: bool) -> void:
+	SaveGame.ward_open = true
+	if _gate_wall:
+		_gate_wall.queue_free()
+		_gate_wall = null
+	if _gate_target:
+		_gate_target.queue_free()
+		_gate_target = null
+	if slow:
+		var t := create_tween()
+		t.tween_interval(0.3)
+		t.tween_property(_gate_door, "rotation:y", PI * 0.5, 1.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		Sound.play(self, &"plank_creak", 2.0)
+	else:
+		for c: Node3D in _charms:
+			c.visible = false
+		_gate_door.rotation.y = PI * 0.5

@@ -567,6 +567,13 @@ func _apply_debug_start() -> void:
 			SaveGame.akane_dueled = true
 			_ronin.has_glide = true
 			_ronin.position = Vector3(LanternMarket.SHIFT + LanternMarket.ARRIVE_X, 0.1, 0.0)
+		elif arg == "--ward":
+			# Into the Ward of Shut Doors, its gate open (Akane met, the glide
+			# learned): just inside the lane, before the dragon's square.
+			SaveGame.akane_dueled = true
+			SaveGame.ward_open = true
+			_ronin.has_glide = true
+			_ronin.position = Vector3(LanternMarket.SHIFT + WardQuarter.WARD.x + 3.0, CanalQuarter.BANK_Y + 0.1, 0.0)
 		elif arg == "--glide":
 			_ronin.has_glide = true  # (as if learned in the bamboo)
 		elif arg == "--map":

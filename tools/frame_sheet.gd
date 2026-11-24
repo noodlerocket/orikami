@@ -66,6 +66,7 @@ extends SceneTree
 ##   papermaker the Paper-Maker at her vat, close up: working, then turning to him
 ##   tale      the Paper-Maker's pictures for him, 8 moments
 ##   akane     Akane: the meeting, her title, then the duel running, 12 moments
+##   dragon    the Festival Dragon: the intro, then each move in turn, 24 moments
 ##   gates     the gate between the town and the bamboo grove, from both sides
 ##   iai       close-up of the stance: settling, half-way, ready, and the
 ##             pose he ends the draw in (use --zoom=4.6)
@@ -182,6 +183,8 @@ func _initialize() -> void:
 			sheet = await _akane_poses()
 		"akane_cut":
 			sheet = await _akane_cut()
+		"dragon":
+			sheet = await _dragon()
 		_:
 			push_error("Unknown sheet: " + args[0])
 			quit(1)
@@ -1208,4 +1211,68 @@ func _akane_cut() -> Image:
 		await create_timer(t).timeout
 		sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((shot % 4) * tile.x, (shot / 4) * tile.y))
 		shot += 1
+	return sheet
+
+
+## The Festival Dragon in the Ward of Shut Doors: its intro (six moments),
+## then each move in turn, photographed as it goes (he cannot be hurt).
+func _dragon() -> Image:
+	var ward: WardQuarter = get_first_node_in_group(&"ward")
+	var dragon := ward.dragon
+	SaveGame.ward_open = true
+	_ronin.global_position = Vector3(LanternMarket.SHIFT + WardQuarter.ARENA.x + 3.5, CanalQuarter.BANK_Y + 0.1, 0.0)
+	_main.call("_set_camera_limits")
+	_main.get_node("Camera").snap_to_target()
+	_ronin.set("_draw_safe", 999.0)
+	var tile := Vector2i(480, 270)
+	var sheet := Image.create(tile.x * 4, tile.y * 7, false, Image.FORMAT_RGB8)
+	var shot := [0]
+	var take := func() -> void:
+		var i: int = shot[0]
+		sheet.blit_rect(await _snap(Rect2i(0, 0, 1280, 720), tile), Rect2i(Vector2i.ZERO, tile), Vector2i((i % 4) * tile.x, (i / 4) * tile.y))
+		var span := Vector2(INF, -INF)
+		var inside := 0
+		for seg: Node3D in dragon.get(&"_segments"):
+			span = Vector2(minf(span.x, seg.position.x), maxf(span.y, seg.position.x))
+			for box: AABB in dragon.obstacles:
+				if box.grow(0.3).has_point(seg.position):
+					inside += 1
+		if inside > 0:
+			print("  INSIDE A WALKWAY: %d drums" % inside)
+		print("dragon shot %d: %s health %d head %s body x %.1f to %.1f jet %s %s" % [i, dragon.mode(), dragon.health, dragon.head, span.x, span.y, dragon.get(&"_jet").visible, dragon.get(&"_jet").position])
+		shot[0] = i + 1
+	await create_timer(0.3).timeout
+	var t0 := 0.0
+	for t: float in [1.2, 3.0, 4.2, 5.6, 7.0, 9.0]:
+		await create_timer(t - t0).timeout
+		t0 = t
+		await take.call()
+	while ward.get(&"_state") != &"fight":
+		await process_frame
+	_ronin.set("_draw_safe", 999.0)
+	for step: Array in [[&"dive", [1.6, 0.9, 0.35]], [&"breath", [1.5, 0.7, 0.35]], [&"bolts", [1.2, 0.55, 0.6]],
+			[&"coil", [1.7, 0.8, 0.7, 1.2]], [&"ribbons", [2.0, 0.5, 0.5]]]:
+		dragon.start_move(step[0])
+		for wait: float in step[1]:
+			await create_timer(wait).timeout
+			_ronin.set("_draw_safe", 999.0)
+			await take.call()
+		while dragon.mode() != &"hover":
+			await process_frame
+	dragon.call("_parried", 6)
+	await create_timer(1.0).timeout
+	await take.call()
+	dragon.health = 1
+	dragon.call("_struck", 1, Vector2.RIGHT, null)
+	await create_timer(1.6).timeout
+	await take.call()
+	await create_timer(1.5).timeout
+	await take.call()
+	await create_timer(4.0).timeout
+	await take.call()
+	# Close to the house it crushed: the ruin.
+	_ronin.global_position = Vector3(LanternMarket.SHIFT + 238.0, CanalQuarter.BANK_Y + 0.1, 0.0)
+	_main.get_node("Camera").snap_to_target()
+	await create_timer(1.0).timeout
+	await take.call()
 	return sheet

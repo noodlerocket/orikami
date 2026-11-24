@@ -15,6 +15,9 @@ const LINES := [
 	["title_akane_subtitle", "folded from the Emperor's own sleeve", 40],
 	["akane_warning", "You do not know what you are.", 56],
 	["akane_parting", "Not yet. Learn what you are, little blank one.", 52],
+	["title_dragon_kanji", "祭龍", 220],
+	["title_dragon_name", "The Festival Dragon", 84],
+	["title_dragon_subtitle", "the parade the Rain drove mad", 40],
 ]
 
 
