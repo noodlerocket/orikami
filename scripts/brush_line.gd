@@ -36,7 +36,7 @@ func _draw() -> void:
 	var view := size
 	var h := view.y * 0.06
 	var w := texture.get_width() * h / texture.get_height()
-	var at := Vector2((view.x - w) * 0.5, view.y * 0.86)
+	var at := Vector2((view.x - w) * 0.5, view.y * 0.78)
 	# The band behind, fading at its ends.
 	var band := Rect2(at.x - h, at.y - h * 0.1, w + h * 2.0, h * 1.2)
 	var alpha := 1.0 - _off

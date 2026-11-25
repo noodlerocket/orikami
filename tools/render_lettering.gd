@@ -15,6 +15,8 @@ const LINES := [
 	["title_akane_subtitle", "folded from the Emperor's own sleeve", 40],
 	["akane_warning", "You do not know what you are.", 56],
 	["akane_parting", "Not yet. Learn what you are, little blank one.", 52],
+	["akane_warning_2", "Still you do not know what you are.", 56],
+	["akane_parting_2", "Higher, then. The Gates will show you.", 52],
 	["title_dragon_kanji", "祭龍", 220],
 	["title_dragon_name", "The Festival Dragon", 84],
 	["title_dragon_subtitle", "the parade the Rain drove mad", 40],
@@ -22,6 +24,11 @@ const LINES := [
 	["title_hosho_name", "Hōshō, the Gilded General", 84],
 	["title_hosho_subtitle", "who hid from the Rain under gold", 40],
 	["hosho_line", "I can feel it. The rain.", 56],
+	["title_shimeri_kanji", "湿将", 220],
+	["title_shimeri_name", "Shimeri, the Sodden General", 84],
+	["title_shimeri_subtitle", "who endured the Rain at his post", 40],
+	["shimeri_warning", "Who goes. ... This gate is kept.", 56],
+	["shimeri_line", "Shimeri. That was my name.", 56],
 ]
 
 

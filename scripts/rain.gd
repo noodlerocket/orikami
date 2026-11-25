@@ -3,10 +3,12 @@ extends Node3D
 ## The Rain. A cloud of thin streaks that follows the camera, spread across
 ## several depths so some drops fall in front of the Ronin and some behind.
 
-@export var drop_count := 1500
+@export var drop_count := 2250
 @export var fall_speed := 26.0
 ## Size of the box the drops start in: (width, thickness, depth).
-@export var area := Vector3(44.0, 1.0, 10.0)
+## (Deep enough to fall on the near ground in front of him too, up to 8 m
+## toward the camera: Julian, "the rain doesn't rain on the near ground".)
+@export var area := Vector3(44.0, 1.0, 15.0)
 @export var height_above_camera := 10.0
 ## How much each metre-per-second of wind tips the rain over.
 @export var wind_slant := 0.05
@@ -55,7 +57,7 @@ func _process(_delta: float) -> void:
 	if camera:
 		# Underground, the drops start no lower than above the street.
 		global_position = Vector3(camera.global_position.x,
-				maxf(camera.global_position.y, 4.2) + height_above_camera, -2.0)
+				maxf(camera.global_position.y, 4.2) + height_above_camera, 0.5)
 		_look.set_shader_parameter(&"clip_on", camera.global_position.y < 3.5)
 	# The rain slants further over in a gust.
 	_drops.direction = Vector3(-0.04 - Wind.speed_at(global_position.x) * wind_slant, -1.0, 0.0)

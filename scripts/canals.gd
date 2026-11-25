@@ -63,7 +63,18 @@ var _hushed := false
 var _chamber_seen := 0.0
 
 
+var _was_wading := false
+
+
 func _ready() -> void:
+	# Waxed (the Wax Coat), he floats in the deep water.
+	Ronin.float_surface(self, DEEP.x, DEEP.y, Village.CANAL_WATER)
+	# Out on the deep water, cranes on a floating shutter: only swum to.
+	var cache := SwimCache.new()
+	cache.id = "canals_deep_swim"
+	cache.count = 5
+	cache.position = Vector3((DEEP.x + DEEP.y) * 0.5, Village.CANAL_WATER, 0.0)
+	add_child(cache)
 	process_physics_priority = -5  # before the Ronin moves: the water pushes him
 	_rng.seed = 5501
 	_build_solids()
@@ -908,7 +919,10 @@ func _physics_process(delta: float) -> void:
 		var fall := -_ronin.velocity.y
 		WaterFx.splash(get_parent(), Vector3(at.x, Village.CANAL_WATER, 0.0), clampf(fall / 10.0, 0.4, 1.5))
 		Sound.play(self, &"splash", -2.0 if fall > big_splash_from else -8.0)
-	_ronin.wading = in_canal and at.y < Village.CANAL_WATER + 0.05 and _ronin.is_on_floor()
+	# (Only while he is in the canal, so other water can set it too.)
+	if in_canal or _was_wading:
+		_ronin.wading = in_canal and at.y < Village.CANAL_WATER + 0.05 and _ronin.is_on_floor()
+		_was_wading = _ronin.wading
 	if _ronin.wading and absf(_ronin.velocity.x) > 0.5:
 		_wade_clock += delta
 		if _wade_clock >= wade_splash_every:
@@ -920,13 +934,14 @@ func _physics_process(delta: float) -> void:
 		if not _carried_off:
 			_carried_off = true
 			WaterFx.splash(get_parent(), Vector3(at.x, Village.CANAL_WATER, 0.0), 1.4)
-			_ronin.fall_in()
+			_ronin.deep_water()  # (waxed, he floats)
 	elif at.y > Village.CANAL_WATER + 1.0 or at.x < DEEP.x or at.x > DEEP.y:
 		_carried_off = false
 	# Under a sluice: pressed down, and spray off his hat.
 	for x: float in SLUICES:
 		if absf(at.x - x) < sluice_half and at.y < ceiling_at(x) and at.y > Village.CANAL_WATER - 1.0:
-			_ronin.push.y -= sluice_press
+			if not _ronin.has_wax:  # (waxed, the water runs off him)
+				_ronin.push.y -= sluice_press
 			if _ronin.is_on_floor():
 				_ronin.wading = true
 			_spray_clock += delta

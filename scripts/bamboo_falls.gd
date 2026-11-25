@@ -25,6 +25,14 @@ var _cliff_top := 13.5
 
 
 func _ready() -> void:
+	# Waxed (the Wax Coat), he floats in the pool.
+	Ronin.float_surface(self, BambooGrove.POOL.x, BambooGrove.POOL.y, WATER)
+	# Under the falls, a broken plank with cranes, turning in the pool.
+	var cache := SwimCache.new()
+	cache.id = "falls_pool_swim"
+	cache.count = 6
+	cache.position = Vector3(BambooGrove.POOL.x + 6.5, WATER, 0.0)
+	add_child(cache)
 	_rng.seed = 1010
 	_cliff_top = float(BambooGrove.GROUND[5][2])
 	var ground := float(BambooGrove.GROUND[4][2])
@@ -248,6 +256,6 @@ func _physics_process(_delta: float) -> void:
 		if not _carried_off:
 			_carried_off = true
 			WaterFx.splash(get_parent(), Vector3(at.x, WATER, 0.0), 1.4)
-			_ronin.fall_in()
+			_ronin.deep_water()  # (waxed, he floats)
 	elif at.y > WATER + 1.0:
 		_carried_off = false

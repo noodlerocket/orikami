@@ -105,15 +105,18 @@ var _town_gate: Node3D   # the gate in the courtyard (in the town's place)
 
 ## True when this x (a real, world x) is in the grove rather than the town.
 static func in_grove(x: float) -> bool:
-	return x > SHIFT * 0.5 and not LanternMarket.in_market(x)
+	return x > SHIFT * 0.5 and not LanternMarket.in_market(x) and not SumiMarsh.in_marsh(x)
 
 
 func _ready() -> void:
 	_rng.seed = 2601
 	position.x = SHIFT
+	# (The gate stands in the town, so it belongs to the town: under the grove
+	# it was hidden with the grove whenever he was in the town, and the gate
+	# was invisible after the Hannya: Julian.)
 	_town_gate = Node3D.new()
-	_town_gate.position.x = -SHIFT
-	add_child(_town_gate)
+	_town_gate.name = "CourtyardFarGate"
+	village.add_child(_town_gate)
 	_build_gate()
 	_build_beyond_gate()
 	_build_mist_way()

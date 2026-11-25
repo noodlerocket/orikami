@@ -374,6 +374,8 @@ func begin() -> void:
 
 func reset(at: Vector3) -> void:
 	active = false
+	collision_layer = 4
+	fallen = 0.0
 	health = max_health
 	posture = 0
 	_enraged = false
@@ -446,6 +448,10 @@ func _parried(cost: int) -> void:
 
 func _fall() -> void:
 	active = false
+	velocity = Vector3.ZERO
+	# (Beaten, his body is not something to cut.)
+	collision_layer = 0
+	remove_from_group(&"gust_target")
 	_storm.emitting = false
 	_ring.visible = false
 	_swoosh.visible = false
@@ -786,6 +792,9 @@ func _update_swoosh(u: float, alpha: float) -> void:
 
 func _process(delta: float) -> void:
 	_model.rotation.y = 0.0 if facing > 0.0 else PI
+	# Fallen: he topples forward from his knees onto the floor, lifeless.
+	_model.rotation.z = -fallen * 1.45
+	_model.position.y = fallen * 0.3
 	if _mode == &"storm":
 		_model.rotation.y += _mode_time * 14.0
 	_animator.apply(_pose())
@@ -881,6 +890,14 @@ func _pose() -> Dictionary:
 
 ## How far his head lifts as he kneels beaten (the ending: he looks up into
 ## the rain). 0 head bowed, 1 looking up.
+## 0 kneeling, 1 fallen forward on his face (the end of him).
+var fallen := 0.0
+
+
+func set_fallen(amount: float) -> void:
+	fallen = amount
+
+
 func set_kneel(lift: float) -> void:
 	_kneel = lift
 

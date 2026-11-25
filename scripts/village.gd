@@ -95,6 +95,20 @@ const MOSS := Color(0.3, 0.34, 0.18)
 @export_range(0.0, 1.0) var splash_strength := 0.5
 @export var fog_density := 0.006
 @export var glow_intensity := 0.7
+## The game draws with Forward+ on Windows and Mac (much faster) and the
+## simpler renderer in the browser. Forward+ lights paper about a fifth
+## darker, so there the sun (or moon) is made this much stronger...
+@export var forward_plus_sun := 1.25
+## ...and the fill (ambient) light this much (measured against the old
+## renderer's pictures, so it looks as Julian judged it).
+@export var forward_plus_ambient := 1.4
+## Daylight (the bamboo, the Skies, the Gates) needs more still, and the
+## marsh, whose fog Forward+ draws lighter, less.
+@export var forward_plus_day := 1.5
+@export var forward_plus_marsh := 0.75
+## Forward+ blooms glows wider: this much of the glow there.
+@export var forward_plus_glow := 0.7
+var _marsh_lit := false
 ## 1 = full colour, 0 = black and white.
 @export var color_saturation := 0.8
 @export var color_contrast := 1.05
@@ -114,6 +128,29 @@ const MOSS := Color(0.3, 0.34, 0.18)
 @export var market_ambient := 0.55
 @export var market_ambient_color := Color(0.86, 0.66, 0.52)
 @export var market_fog_color := Color(0.36, 0.25, 0.22)
+
+@export_group("Day in Koinobori Skies")
+## High, bright and windy: a pale washed daylight, cool, a white sun.
+@export var skies_sun := 0.5
+@export var skies_ambient := 0.26
+@export var skies_fog := 0.003
+@export var skies_saturation := 0.9
+
+@export_group("Late sun on the Thousand Gates")
+@export var gates_sun := 0.45
+@export var gates_ambient := 0.24
+
+@export_group("Dusk in Sumi Marsh")
+## The marsh (docs/sumi_marsh_plan.md): a cold drowned dusk, grey-green fog,
+## colour drained; only the candles are warm.
+@export var marsh_saturation := 0.85
+@export var marsh_contrast := 1.06
+@export var marsh_ambient := 0.42
+@export var marsh_ambient_color := Color(0.58, 0.66, 0.64)
+@export var marsh_fog_color := Color(0.22, 0.26, 0.26)
+@export var marsh_fog := 0.01
+@export var marsh_light := Color(0.62, 0.7, 0.68)
+@export var marsh_light_energy := 0.42
 
 @export_group("Wind")
 ## The steady breeze, in metres per second.
@@ -173,6 +210,9 @@ var fallen: FallenStreet
 var rooftops: RooftopRoad
 var bamboo: BambooGrove
 var lantern_market: LanternMarket
+var marsh: SumiMarsh
+var skies: KoinoboriSkies
+var gates: ThousandGates
 ## The invisible wall at the courtyard's far end (gone when its gate opens).
 var east_wall: StaticBody3D
 var market: MarketStreet
@@ -225,6 +265,18 @@ func _ready() -> void:
 	lantern_market = LanternMarket.new()
 	lantern_market.village = self
 	add_child(lantern_market)
+	# Sumi Marsh, past Hōshō's hall (its own place).
+	marsh = SumiMarsh.new()
+	marsh.village = self
+	add_child(marsh)
+	# Koinobori Skies, past Shimeri's gate (its own place).
+	skies = KoinoboriSkies.new()
+	skies.village = self
+	add_child(skies)
+	# The Thousand Gates, past the Skies (its own place).
+	gates = ThousandGates.new()
+	gates.village = self
+	add_child(gates)
 	_rng.state = saved_rng
 	_build_foreground()
 	for spot: Vector2 in enemy_positions:
@@ -333,12 +385,12 @@ func _build_light_and_air() -> void:
 	env.background_color = Color(0.04, 0.045, 0.12)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.5, 0.55, 0.8)
-	env.ambient_light_energy = ambient_energy
+	env.ambient_light_energy = (ambient_energy) * _fill_boost()
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.2, 0.24, 0.46)
 	env.fog_density = fog_density
 	env.glow_enabled = true
-	env.glow_intensity = glow_intensity
+	env.glow_intensity = glow_intensity * (forward_plus_glow if RenderingServer.get_current_rendering_method() == "forward_plus" else 1.0)
 	env.glow_hdr_threshold = 0.9
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	# Colour grading: the reference is a muted indigo, not a bright blue.
@@ -354,7 +406,7 @@ func _build_light_and_air() -> void:
 	# shadow onto the layer behind it. That is what sells the diorama look.
 	var moon := DirectionalLight3D.new()
 	moon.light_color = Color(0.64, 0.72, 0.96)
-	moon.light_energy = moon_energy
+	moon.light_energy = (moon_energy) * _sun_boost()
 	moon.rotation_degrees = Vector3(-42.0, 24.0, 0.0)
 	moon.shadow_enabled = true
 	moon.directional_shadow_max_distance = 45.0
@@ -366,27 +418,28 @@ func _build_light_and_air() -> void:
 ## golden haze). Switched at once, while the screen is black between them.
 func set_daylight(on: bool) -> void:
 	daylight = on
+	_marsh_lit = false
 	if on:
 		_env.background_color = Color(0.93, 0.87, 0.72)
 		_env.ambient_light_color = Color(1.0, 0.93, 0.8)
-		_env.ambient_light_energy = day_ambient
+		_env.ambient_light_energy = (day_ambient) * _fill_boost()
 		_env.fog_light_color = Color(0.9, 0.86, 0.72)
 		_env.fog_density = day_fog
 		_env.adjustment_saturation = day_saturation
 		_env.adjustment_contrast = day_contrast
 		_moon.light_color = Color(1.0, 0.86, 0.62)
-		_moon.light_energy = sun_energy
+		_moon.light_energy = (sun_energy) * _sun_boost()
 		_moon.rotation_degrees = Vector3(-38.0, -28.0, 0.0)
 	else:
 		_env.background_color = Color(0.04, 0.045, 0.12)
 		_env.ambient_light_color = Color(0.5, 0.55, 0.8)
-		_env.ambient_light_energy = ambient_energy
+		_env.ambient_light_energy = (ambient_energy) * _fill_boost()
 		_env.fog_light_color = Color(0.2, 0.24, 0.46)
 		_env.fog_density = fog_density
 		_env.adjustment_saturation = color_saturation
 		_env.adjustment_contrast = color_contrast
 		_moon.light_color = Color(0.64, 0.72, 0.96)
-		_moon.light_energy = moon_energy
+		_moon.light_energy = (moon_energy) * _sun_boost()
 		_moon.rotation_degrees = Vector3(-42.0, 24.0, 0.0)
 
 
@@ -415,6 +468,15 @@ var _place := &""
 var _places := {}
 
 
+## Shows and hides every piece again for the place he is in (after new
+## pieces were added, e.g. the joined scenery).
+func refresh_place() -> void:
+	var was := _place
+	_place = &""
+	if was != &"":
+		set_place(was)
+
+
 ## Which place a piece of the level belongs to, by where it stands (some of
 ## the market's paving and splashes are built here, not in the market: hidden
 ## with the town they left the market's street bare).
@@ -423,6 +485,12 @@ func _place_of(c: Node) -> StringName:
 		return &"grove"
 	if c == lantern_market:
 		return &"market"
+	if c == marsh:
+		return &"marsh"
+	if c == skies:
+		return &"skies"
+	if c == gates:
+		return &"gates"
 	if _places.has(c):
 		return _places[c]
 	var x := 0.0
@@ -436,7 +504,13 @@ func _place_of(c: Node) -> StringName:
 	if not found and c is Node3D:
 		x = (c as Node3D).global_position.x
 	var where := &"town"
-	if x > LanternMarket.SHIFT - 100.0:
+	if x > ThousandGates.SHIFT - 100.0:
+		where = &"gates"
+	elif x > KoinoboriSkies.SHIFT - 100.0:
+		where = &"skies"
+	elif x > SumiMarsh.SHIFT - 100.0:
+		where = &"marsh"
+	elif x > LanternMarket.SHIFT - 100.0:
 		where = &"market"
 	elif x > BambooGrove.SHIFT - 100.0:
 		where = &"grove"
@@ -444,11 +518,73 @@ func _place_of(c: Node) -> StringName:
 	return where
 
 
+## The bright windy day of Koinobori Skies. Switched while the screen is black.
+func set_skies() -> void:
+	set_daylight(true)
+	_env.background_color = KoinoboriSkies.SKY_LOW
+	_env.ambient_light_color = Color(0.86, 0.9, 1.0)
+	_env.ambient_light_energy = (skies_ambient) * _fill_boost()
+	_env.fog_light_color = Color(0.86, 0.9, 0.95)
+	_env.fog_density = skies_fog
+	_env.adjustment_saturation = skies_saturation
+	_moon.light_color = Color(1.0, 0.97, 0.9)
+	_moon.light_energy = (skies_sun) * _sun_boost()
+
+
+## The sun's (moon's) and fill light's strength for the renderer in use
+## (see forward_plus_sun): more again in daylight, less in the marsh's fog.
+func _sun_boost() -> float:
+	return forward_plus_sun * _place_boost() if _forward_plus() else 1.0
+
+
+func _fill_boost() -> float:
+	return forward_plus_ambient * _place_boost() if _forward_plus() else 1.0
+
+
+func _place_boost() -> float:
+	if _marsh_lit:
+		return forward_plus_marsh
+	return forward_plus_day if daylight else 1.0
+
+
+func _forward_plus() -> bool:
+	return RenderingServer.get_current_rendering_method() == "forward_plus"
+
+
+## The low warm sun on the Thousand Gates. Switched while the screen is black.
+func set_gates() -> void:
+	set_daylight(true)
+	_env.background_color = ThousandGates.SKY_LOW
+	_env.ambient_light_color = Color(1.0, 0.86, 0.74)
+	_env.ambient_light_energy = (gates_ambient) * _fill_boost()
+	_env.fog_light_color = Color(0.9, 0.72, 0.56)
+	_moon.light_color = Color(1.0, 0.78, 0.56)
+	_moon.light_energy = (gates_sun) * _sun_boost()
+	_moon.rotation_degrees = Vector3(-18.0, -40.0, 0.0)
+
+
+## The drowned dusk of Sumi Marsh (on). Switched while the screen is black.
+func set_marsh(on: bool) -> void:
+	if not on:
+		return
+	set_daylight(false)
+	_marsh_lit = true
+	_env.ambient_light_color = marsh_ambient_color
+	_env.ambient_light_energy = (marsh_ambient) * _fill_boost()
+	_env.fog_light_color = marsh_fog_color
+	_env.fog_density = marsh_fog
+	_env.adjustment_saturation = marsh_saturation
+	_env.adjustment_contrast = marsh_contrast
+	_env.background_color = SumiMarsh.SKY_MID
+	_moon.light_color = marsh_light
+	_moon.light_energy = (marsh_light_energy) * _sun_boost()
+
+
 func set_market(on: bool) -> void:
 	set_daylight(false)
 	if on:
 		_env.ambient_light_color = market_ambient_color
-		_env.ambient_light_energy = market_ambient
+		_env.ambient_light_energy = (market_ambient) * _fill_boost()
 		_env.fog_light_color = market_fog_color
 		_env.adjustment_saturation = market_saturation
 		_env.adjustment_contrast = market_contrast
@@ -532,6 +668,10 @@ func _hang_lantern(hook: Vector3, string_length: float, size: float, shine: bool
 		light.shadow_bias = 0.08
 		light.shadow_normal_bias = 1.5
 		light.shadow_blur = 1.5
+		# (Two passes instead of six: a hung lantern's shadows fall down and
+		# out, which the two halves cover well; measured about 300 draw calls
+		# a frame saved in Market Street.)
+		light.omni_shadow_mode = OmniLight3D.SHADOW_DUAL_PARABOLOID
 	light.reparent(lantern)
 	light.position = (lantern.get_meta("light_at") as Vector3) + Vector3(0.0, 0.0, 0.7)
 	if shine:
@@ -1352,12 +1492,15 @@ func _add_falling_petals(from: Vector2, z: float) -> void:
 ## Raindrops hitting the wet paving. Each hit throws up a little crown of
 ## water: a short jet straight up, and round droplets flung outward that
 ## arc over and fall back. (No ripple rings: Julian did not like them.)
-func _add_rain_splashes(left: float, right: float, top: float) -> void:
-	var count := int((right - left) * splashes_per_metre)
+## `front`: how far toward the camera the ground goes there (the street's
+## edge by default; the market's paving runs on to its railing).
+func _add_rain_splashes(left: float, right: float, top: float, front: float = STREET_FRONT) -> void:
+	var back := STREET_BACK + 3.2
+	var count := int((right - left) * splashes_per_metre * (front - back) / (STREET_FRONT - back))
 	if count < 1:
 		return
-	var area := Vector3((right - left) * 0.5, 0.0, (STREET_FRONT - STREET_BACK) * 0.5 - 1.6)
-	var middle := Vector3((left + right) * 0.5, top, (STREET_FRONT + STREET_BACK) * 0.5 + 1.6)
+	var area := Vector3((right - left) * 0.5, 0.0, (front - back) * 0.5)
+	var middle := Vector3((left + right) * 0.5, top, (front + back) * 0.5)
 
 	# The jet: a thin streak of water that shoots up and drops.
 	var jets := CPUParticles3D.new()

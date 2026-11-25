@@ -162,6 +162,12 @@ extends Node3D
 
 ## Set by ronin.gd: idle, run, jump, fall, dash, hurt or heal.
 var state: StringName = &"idle"
+## The Shuriken Dash: 0 to 1 through the spin, below 0 when not spinning.
+var spin := -1.0
+## The Flat Fold: 1 while he is folded flat (squashed thin along the
+## ground), 0 otherwise; eased quickly between.
+var flat_target := 0.0
+var _flat := 0.0
 var facing := 1.0
 var blinking := false
 ## Set by ronin.gd: how fast he is moving up (positive) or down (negative),
@@ -274,6 +280,19 @@ func _process(delta: float) -> void:
 	if _climb_turn > 0.0:
 		_rig.rotation.y = lerp_angle(_rig.rotation.y, PI * 0.5, smoothstep(0.0, 1.0, _climb_turn))
 	_clock += delta
+	# Spinning like a thrown shuriken round his middle (the Shuriken Dash).
+	if spin >= 0.0 and state == &"dash":
+		var a := -facing * TAU * smoothstep(0.0, 1.0, spin) * 2.0
+		rotation.z = a
+		# (Round his middle: Ronin._process has just set where the puppet is.)
+		position += Vector3(0.0, 0.9, 0.0) + Basis(Vector3.BACK, a) * Vector3(0.0, -0.9, 0.0)
+	elif rotation.z != 0.0:
+		rotation.z = 0.0
+	# Folded flat: pressed thin to the ground and drawn out long.
+	_flat = move_toward(_flat, flat_target, delta / 0.08)
+	if _flat > 0.0 or _rig.scale.y != 1.0:
+		var f := smoothstep(0.0, 1.0, _flat)
+		_rig.scale = Vector3(1.0 + 0.45 * f, 1.0 - 0.8 * f, 1.0 + 0.45 * f)
 	_update_wings(delta)
 	if _shake_clock >= 0.0:
 		_shake_clock += delta

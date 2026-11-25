@@ -73,6 +73,16 @@ signal defeated   # (for the boss bar: she leaves)
 @export var fire_gap := 0.28
 @export var fire_recover := 0.7
 
+@export_group("Gale dive (in the Skies)")
+## In Koinobori Skies she rides the wind: a gust lifts her (a swirl of paper
+## at her feet is the tell), she hangs at the top, then dives at him blade
+## first (parry it: double posture).
+@export var gale := false
+@export var gale_tell := 0.6
+@export var gale_lift := 14.0
+@export var gale_hang := 0.28
+@export var gale_speed := 15.0
+
 @export_group("Slash effect")
 ## The tint of her swooshes: vermilion paper, hers (the Ronin's are white). A faint
 ## rose did not show against the grove's pale sky.
@@ -529,7 +539,7 @@ func leave() -> void:
 func _physics_process(delta: float) -> void:
 	_clock += delta
 	_mode_time += delta
-	if not is_on_floor():
+	if not is_on_floor() and _mode not in [&"gale_hang", &"gale_dive"]:
 		velocity.y -= 30.0 * delta
 	if ronin == null:
 		ronin = get_tree().get_first_node_in_group(&"player") as Ronin
@@ -600,6 +610,34 @@ func _physics_process(delta: float) -> void:
 				_mode_time = 0.0
 			if _fires_left <= 0 and _mode_time >= fire_recover:
 				_set_mode(&"guard")
+		&"gale_tell":
+			velocity.x = move_toward(velocity.x, 0.0, 20.0 * delta)
+			if _mode_time >= gale_tell:
+				_set_mode(&"gale_rise")
+				velocity = Vector3(0.0, gale_lift, 0.0)
+				Sound.play(self, &"gale_lift", 0.0)
+				Confetti.burst(get_parent(), global_position + Vector3(0.0, 0.2, 0.0), 20, [Color(0.92, 0.9, 0.84), Color(0.84, 0.3, 0.24)])
+		&"gale_rise":
+			velocity.x = 0.0
+			if velocity.y <= 0.0:
+				_set_mode(&"gale_hang")
+				velocity = Vector3.ZERO
+		&"gale_hang":
+			velocity = Vector3.ZERO
+			if ronin:
+				facing = signf(ronin.global_position.x - global_position.x) if absf(ronin.global_position.x - global_position.x) > 0.2 else facing
+			if _mode_time >= gale_hang:
+				var aim := (ronin.global_position + Vector3(0.0, 0.8, 0.0) - global_position) if ronin else Vector3(facing, -1.0, 0.0)
+				velocity = aim.normalized() * gale_speed
+				_set_mode(&"gale_dive")
+				Sound.play(self, &"akane_slash", 0.0)
+		&"gale_dive":
+			if not _hit_this_cut:
+				_dive_hit()
+			if is_on_floor() or _mode_time > 0.9:
+				velocity = Vector3(facing * 2.0, 0.0, 0.0)
+				Sound.play(self, &"land", 0.0)
+				_set_mode(&"recover")
 		&"recover":
 			velocity.x = move_toward(velocity.x, 0.0, 12.0 * delta)
 			if _mode_time >= cut_recover:
@@ -634,7 +672,10 @@ func _guard(gap: float, delta: float) -> void:
 		return
 	_guard_for = _rng.randf_range(guard_time.x, guard_time.y)
 	var roll := _rng.randf()
-	if dist > draw_from and roll < 0.45:
+	if gale and dist > 1.8 and dist < 8.0 and _rng.randf() < 0.3:
+		_set_mode(&"gale_tell")
+		Sound.play(self, &"paper_fold", -2.0)
+	elif dist > draw_from and roll < 0.45:
 		_set_mode(&"draw_tell")
 		Sound.play(self, &"draw_gleam", -6.0)
 	elif dist > 2.6 and roll < 0.8:
@@ -662,6 +703,26 @@ func _swing(reach: float, height: float, cost: int, back: float = 0.0) -> void:
 		if target.receive_strike(1, global_position, &"cut"):
 			_parried(cost)
 			_spark(Color(1.0, 0.82, 0.4))
+		return
+
+
+## Her dive, blade first: anything of his at her. Parried: double posture.
+func _dive_hit() -> void:
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(1.2, 1.6, 2.0)
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = shape
+	query.collision_mask = 2
+	query.transform = Transform3D(Basis.IDENTITY, global_position + Vector3(facing * 0.3, 0.8, 0.0))
+	for result: Dictionary in get_world_3d().direct_space_state.intersect_shape(query, 4):
+		var target: Object = result["collider"]
+		if not target.has_method("receive_strike"):
+			continue
+		_hit_this_cut = true
+		if target.receive_strike(1, global_position + Vector3(0.0, 0.8, 0.0), &"cut"):
+			_parried(2)
+			_spark(Color(1.0, 0.82, 0.4))
+			velocity = Vector3(-facing * 4.0, 4.0, 0.0)
 		return
 
 
@@ -732,6 +793,12 @@ func _pose() -> Dictionary:
 			return SamuraiAnimator.slash(0.35 + 0.65 * clampf(t / cut_strike, 0.0, 1.0), Vector2.ZERO)
 		&"between":
 			return SamuraiAnimator.mix(SamuraiAnimator.slash(1.0, Vector2.ZERO), _raised(), smoothstep(0.0, 1.0, t / cut_gap))
+		&"gale_tell":
+			return SamuraiAnimator.iai(clampf(t / gale_tell, 0.0, 1.0), _clock)
+		&"gale_rise", &"gale_hang":
+			return _raised()
+		&"gale_dive":
+			return SamuraiAnimator.slash(0.35 + 0.65 * clampf(t / 0.3, 0.0, 1.0), Vector2(0.0, -1.0))
 		&"draw_tell":
 			return SamuraiAnimator.iai(clampf(t / draw_tell, 0.0, 1.0), _clock)
 		&"draw":

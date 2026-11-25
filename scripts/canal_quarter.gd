@@ -79,6 +79,7 @@ func _ready() -> void:
 	_quay(BANK.x, BANK.y + 2.0, BANK_Y)
 	for w: Vector2 in WATERS:
 		_canal(w.x, w.y)
+		Ronin.float_surface(self, w.x, w.y, WATER_Y)  # (waxed, he floats)
 	for p: Vector2 in PILINGS:
 		_piling(p.x, p.y)
 	# A boat across the first canal. (The second is crossed on its pilings:
@@ -90,6 +91,12 @@ func _ready() -> void:
 		boat.position = Vector3(b[0], WATER_Y - 0.05, 0.0)
 		add_child(boat)
 	_canal_houses()
+	# Out on the second canal, wreckage with cranes: only swum to (the Wax Coat).
+	var cache := SwimCache.new()
+	cache.id = "market_canal_swim"
+	cache.count = 6
+	cache.position = Vector3(178.3, WATER_Y, 0.0)
+	add_child(cache)
 	# The gold-leaf workshop on the middle quay, its cranes behind the counter.
 	market._booth(172.0, "fans", Color(0.6, 0.48, 0.24))
 	var bundle := CraneBundle.new()
@@ -146,6 +153,8 @@ func _physics_process(_delta: float) -> void:
 	var x := _ronin.global_position.x - market.global_position.x
 	for w: Vector2 in WATERS:
 		if x > w.x and x < w.y and _ronin.global_position.y < WATER_Y - 0.35:
+			if _ronin.has_wax:
+				return  # (waxed, he floats)
 			Sound.play(self, &"splash", 2.0)
 			_ronin.fall_in()
 			return

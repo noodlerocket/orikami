@@ -181,6 +181,43 @@ signal gusted(at: Vector3, direction: Vector3)
 ## In the air, a gust forward pushes him back a little.
 @export var gust_recoil := 2.5
 
+@export_group("Shuriken Dash")
+## Learned in the Kite-Makers' Eyrie in Koinobori Skies (SaveGame
+## "shuriken"): in the air, the dash becomes a spin like a thrown shuriken:
+## longer and faster, it tears through paper walls (PaperWall) and cuts the
+## small creatures in its path.
+@export var has_shuriken := false
+## How much faster than a dash, and how long it lasts (s).
+@export var shuriken_speed := 1.25
+@export var shuriken_time := 0.26
+
+@export_group("Flat Fold")
+## Learned on the Thousand Gates (SaveGame "fold"): ducked, the dash folds
+## him paper-thin and he slides along flat, under shut doors and through
+## the slits between things. Under anything too low even to duck he stays
+## folded and slides on until there is room.
+@export var has_fold := false
+## How thin he is folded (m), how fast he slides (m/s) and for how long (s).
+@export var fold_height := 0.32
+@export var fold_speed := 7.5
+@export var fold_time := 0.42
+
+@export_group("Wax Coat")
+## Learned from the Wax-Maker in Sumi Marsh (SaveGame "wax"): waxed paper
+## floats. Deep water and ink no longer carry him off: he floats in it,
+## waist-deep, and wades along slowly; ink does not stain or slow him; the
+## Rain's weight (sluices, ink curtains) runs off him.
+@export var has_wax := false:
+	set(value):
+		has_wax = value
+		collision_mask = 1 | (FLOAT_LAYER_MASK if value else 0)
+## Floating, how fast he moves through the water (a share of his run).
+@export var swim_speed := 0.5
+## How deep his feet hang below the surface while he floats (m).
+@export var swim_depth := 1.0
+## Ink soaked into his paper per second of wading in it, unwaxed.
+@export var ink_soak_rate := 0.8
+
 @export_group("Forgiveness")
 ## Jumping up into the corner of a ledge: if he would have cleared it with
 ## his head this far to one side, he is nudged round it.
@@ -262,6 +299,12 @@ var facing := 1.0
 var _coyote := 0.0
 var _jump_buffer := 0.0
 var _jumping := false
+## True while he spins (the Shuriken Dash).
+var spinning := false
+## Folded flat (the Flat Fold).
+var folding := false
+var _fold_left := 0.0
+var _spun_hits: Array = []
 var _dash_time := 0.0
 var _dash_cooldown_left := 0.0
 var _gust_cooldown_left := 0.0
@@ -333,6 +376,12 @@ var _skid := 0.0
 var _gliding := false
 var _glide_left := 0.0   # how long the wings can still hold him (glide_time)
 var _wet := 0.0       # > 0: he is still wet from the water (seconds left)
+## True while he floats in deep water (on a float surface, Wax Coat).
+var swimming := false
+## Was anything set this frame that the water does to him, in ink
+## (Sumi Marsh): it stains, unless waxed.
+var in_ink := false
+var _ink_soak := 0.0
 var _still := 0.0     # how long he has stood still on dry ground
 
 @onready var _puppet: RoninPuppet = $Puppet
@@ -415,7 +464,9 @@ func _physics_process(delta: float) -> void:
 	if Input.is_action_just_pressed("jump"):
 		_jump_buffer = jump_buffer_time
 	var busy := _hurt_lock > 0.0 or _healing or _climbing != null
-	if Input.is_action_just_pressed("dash") and _can_dash and _dash_cooldown_left <= 0.0 and not busy:
+	if Input.is_action_just_pressed("dash") and has_fold and _ducking and grounded and not folding and not busy:
+		_start_fold(move)
+	elif Input.is_action_just_pressed("dash") and _can_dash and _dash_cooldown_left <= 0.0 and not busy and not folding:
 		_start_dash(move)
 	if Input.is_action_just_pressed("parry") and _parry_cooldown_left <= 0.0 and _dash_time <= 0.0 and not busy:
 		_start_parry()
@@ -432,14 +483,17 @@ func _physics_process(delta: float) -> void:
 	# Under a low ceiling he cannot stand up again (a crawlspace).
 	if _ducking and not duck and grounded and _low_ceiling():
 		duck = true
-	_set_ducking(duck)
+	if not folding:
+		_set_ducking(duck)
 	_crawling = false
 	if _ducking:
 		if move != 0.0:
 			facing = signf(move)
 			_crawling = true
 		move *= crawl_speed / run_speed
-	elif wading:
+	elif swimming:
+		move *= swim_speed
+	elif wading and not (has_wax and in_ink):
 		move *= wading_speed
 	# Holding parry keeps the guard up (after the parry stance).
 	_guarding = (Input.is_action_pressed("parry") and not busy and _dash_time <= 0.0
@@ -480,11 +534,26 @@ func _physics_process(delta: float) -> void:
 		if move != 0.0:
 			facing = move
 		_apply_gravity(delta, grounded)
+	elif folding:
+		# Folded flat, sliding along the ground.
+		velocity.x = _dash_dir * fold_speed
+		_apply_gravity(delta, grounded)
+		_fold_left -= delta
+		if _fold_left <= 0.0 or is_on_wall():
+			if _fold_ceiling():
+				_fold_left = 0.05   # (no room yet even to duck: slide on)
+				if is_on_wall():
+					velocity.x = 0.0
+			else:
+				_end_fold()
 	elif _dash_time > 0.0:
 		# Dashing: a straight horizontal burst that ignores gravity.
-		velocity = Vector3(_dash_dir * dash_speed, 0.0, 0.0)
+		velocity = Vector3(_dash_dir * dash_speed * (shuriken_speed if spinning else 1.0), 0.0, 0.0)
+		if spinning:
+			_spin_cut()
 		if _dash_time - delta <= 0.0:
 			velocity.x = _dash_dir * run_speed
+			spinning = false
 	elif _hurt_lock > 0.0:
 		# Knocked back: no control for a moment.
 		_apply_gravity(delta, grounded)
@@ -532,6 +601,7 @@ func _physics_process(delta: float) -> void:
 
 	push = Vector3.ZERO
 	drift = 0.0
+	in_ink = false
 	var rising := velocity.y
 	var heading := velocity.x
 	move_and_slide()
@@ -539,6 +609,7 @@ func _physics_process(delta: float) -> void:
 	_forgive(rising, heading, move)
 	_find_wall()
 	_update_wet(delta)
+	_update_swim()
 
 	_update_slash()
 	if global_position.y < fall_limit_y:
@@ -668,6 +739,11 @@ func _start_dash(move: float) -> void:
 	_dash_dir = move if move != 0.0 else facing
 	facing = _dash_dir
 	_dash_time = dash_duration
+	spinning = has_shuriken and not is_on_floor()
+	if spinning:
+		_dash_time = shuriken_time
+		_spun_hits.clear()
+		Sound.play(self, &"shuriken_spin", 0.0)
 	_dash_cooldown_left = dash_cooldown
 	_can_dash = false
 	_jumping = false
@@ -1023,6 +1099,92 @@ func is_in_pit() -> bool:
 	return _in_pit
 
 
+## Spinning (the Shuriken Dash): just ahead of him, paper walls tear and
+## small creatures are cut (once each per spin).
+func _spin_cut() -> void:
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(1.3, 1.8, 2.0)
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = shape
+	query.collision_mask = 1 | ENEMY_LAYER_MASK
+	query.transform = Transform3D(Basis.IDENTITY, global_position + Vector3(_dash_dir * 0.9, 0.9, 0.0))
+	for result: Dictionary in get_world_3d().direct_space_state.intersect_shape(query, 8):
+		var target: Object = result["collider"]
+		if target in _spun_hits:
+			continue
+		if target.has_method("tear"):
+			_spun_hits.append(target)
+			target.tear()
+		elif target.has_method("take_hit") and not target.has_method("is_prop") and target is PaperCritter:
+			_spun_hits.append(target)
+			target.take_hit(1, Vector2(_dash_dir, 0.0))
+			slash_landed.emit()
+
+
+## The float layer: water surfaces he stands in once waxed (made with
+## `Ronin.float_surface`). Only his mask, with the Wax Coat, meets it.
+const FLOAT_LAYER_MASK := 16
+
+
+## A deep stretch of water or ink he can float in once waxed: an invisible
+## floor `swim_depth` under its surface, on the float layer (local to
+## `parent`).
+static func float_surface(parent: Node3D, left: float, right: float, surface: float, depth: float = 1.0) -> StaticBody3D:
+	var body := StaticBody3D.new()
+	body.collision_layer = FLOAT_LAYER_MASK
+	body.collision_mask = 0
+	body.set_meta(&"float", true)
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(right - left, 0.4, 4.0)
+	shape.shape = box
+	body.add_child(shape)
+	body.position = Vector3((left + right) * 0.5, surface - depth - 0.2, 0.0)
+	parent.add_child(body)
+	return body
+
+
+## Deep water reaching him: waxed, he floats; otherwise it carries him off.
+## Returns true if it carried him off.
+func deep_water() -> bool:
+	if has_wax:
+		return false
+	fall_in()
+	return true
+
+
+## Is he standing on a float surface (floating, waxed)?
+func _update_swim() -> void:
+	var was := swimming
+	swimming = false
+	if has_wax and is_on_floor():
+		# (A ray down to the float layer: a moving body's slide collisions
+		# can come back empty on a frame.)
+		var from := global_position + Vector3(0.0, 0.2, 0.0)
+		var query := PhysicsRayQueryParameters3D.create(from, from + Vector3.DOWN * 0.5, FLOAT_LAYER_MASK)
+		swimming = not get_world_3d().direct_space_state.intersect_ray(query).is_empty()
+	if swimming:
+		wading = true
+		_wet = maxf(_wet, 1.0)
+	if swimming and not was:
+		WaterFx.splash(get_parent(), global_position + Vector3(0.0, swim_depth, 0.0), 0.9, SumiMarsh.in_marsh(global_position.x))
+		Sound.play(self, &"splash", -4.0)
+
+
+## Wading in ink (Sumi Marsh): unless waxed, it soaks into his paper a
+## little at a time (it counts toward the endings, like ink taken in a
+## fight). Called each frame by the ink.
+func soak_ink(delta: float) -> void:
+	in_ink = true
+	if has_wax:
+		return
+	_ink_soak += delta * ink_soak_rate
+	if _ink_soak >= 1.0:
+		_ink_soak -= 1.0
+		ink_absorbed += 1
+
+
+
 ## True while he is on a ladder.
 func is_climbing() -> bool:
 	return _climbing != null
@@ -1035,6 +1197,39 @@ func fall_in() -> void:
 		return
 	_sinking = true
 	_fell_out_of_world()
+
+
+## The Flat Fold: folded paper-thin, he slides along the ground.
+func _start_fold(move: float) -> void:
+	folding = true
+	_fold_left = fold_time
+	_dash_dir = move if move != 0.0 else facing
+	facing = _dash_dir
+	var holder: CollisionShape3D = $CollisionShape3D
+	_body_shape.height = fold_height
+	_body_shape.radius = fold_height * 0.5
+	holder.position.y = fold_height * 0.5
+	Sound.play(self, &"paper_fold", 0.0)
+	dashed.emit(global_position, _dash_dir)
+
+
+## Unfolded again, into a duck (he stands up from it if there is room and
+## down is not held).
+func _end_fold() -> void:
+	folding = false
+	_ducking = false
+	_set_ducking(true)
+	Sound.play(self, &"paper_fold", -4.0)
+
+
+## Too low even to duck under, just over him?
+func _fold_ceiling() -> bool:
+	var from := global_position + Vector3(0.0, fold_height * 0.6, 0.0)
+	for offset: float in [-0.3, 0.0, 0.3]:
+		var query := PhysicsRayQueryParameters3D.create(from + Vector3(offset, 0.0, 0.0), from + Vector3(offset, duck_height - fold_height * 0.6 + 0.05, 0.0), 1)
+		if not get_world_3d().direct_space_state.intersect_ray(query).is_empty():
+			return true
+	return false
 
 
 ## Is there something solid just over his head, too low to stand up under?
@@ -1063,6 +1258,10 @@ func set_checkpoint(at: Vector3) -> void:
 ## put back at the start of the level, a point of health lighter. No ink:
 ## he was not struck, he fell.
 func respawn_at_checkpoint() -> void:
+	if folding:
+		folding = false
+		_ducking = true
+		_set_ducking(false)
 	health = maxi(health - pit_damage, 0)
 	if health <= 0:
 		health = max_health  # falling to the end of your health is a death; a death respawns here too
@@ -1173,6 +1372,10 @@ func _die() -> void:
 
 ## Back at the start, whole again, at full health.
 func revive() -> void:
+	if folding:
+		folding = false
+		_ducking = true
+		_set_ducking(false)
 	global_position = _spawn_position
 	_safe_position = _spawn_position
 	velocity = Vector3.ZERO
@@ -1204,6 +1407,7 @@ func _update_puppet() -> void:
 	_puppet.guarding = _guarding
 	_puppet.heal_charge = clampf(_heal_progress / heal_hold_time, 0.0, 1.0) if _healing else -1.0
 	_puppet.marks = clampf(float(ink_absorbed) / maxf(marks_full_at, 1.0), 0.0, 1.0)
+	_puppet.flat_target = 0.0
 	if _dead or _hurt_lock > 0.0:
 		_puppet.state = &"hurt"
 	elif _climbing:
@@ -1212,12 +1416,16 @@ func _update_puppet() -> void:
 		_puppet.state = &"draw"
 	elif _sliding:
 		_puppet.state = &"wall"
+	elif folding:
+		_puppet.state = &"crawl"
+		_puppet.flat_target = 1.0
 	elif _ducking:
 		_puppet.state = &"crawl" if _crawling else &"duck"
 	elif _iai:
 		_puppet.state = &"iai"
 	elif _dash_time > 0.0:
 		_puppet.state = &"dash"
+		_puppet.spin = (1.0 - _dash_time / shuriken_time) if spinning else -1.0
 	elif _healing:
 		_puppet.state = &"heal"
 	elif _gliding and not is_on_floor():

@@ -25,6 +25,10 @@ screen, but Begin there offers the downloads instead of starting.
 - **Overnight 2026-11-23/24** (Hōshō tuning, the Meshy lantern ghost, the
   back alley, the burning store, the market floor fix):
   `docs/overnight_report_2026-11-24.md`.
+- **Overnight 2026-11-24/25** (Sumi Marsh, Shimeri and the Wax Coat; the
+  market's canal lock and porters' lift; swim-only cranes back in the town,
+  grove and market): `docs/overnight_report_2026-11-25.md`. Plan:
+  `docs/sumi_marsh_plan.md`.
 
 **Before changing anything, read "Working with Julian" and "What Julian
 likes".** They were learned the slow way and save rounds of rework.
@@ -38,7 +42,10 @@ three layers (canals, street, Rooftop Road); the whole Bamboo of Folded
 Wind in daylight, ending with Akane's duel; and the whole Lantern Market
 (about 480 m: the Night Bazaar, Festival Square, the Canal Quarter, the Ward
 of Shut Doors with the Festival Dragon, the Lantern Makers' Rise, the
-Gilded Terraces and Hōshō's hall and fight), with:
+Gilded Terraces and Hōshō's hall and fight); and past Hōshō's hall the whole
+of **Sumi Marsh** (about 404 m: the Weeping Steps, the Reed Shallows, the
+Drowned Village, the Wax-Maker's island, the Black Mere, the Causeway of
+Lost Names and Shimeri's Post), with:
 - the Blank Ronin: run, jump, dash, wall slide and wall jump, duck, a 4-way
   iaijutsu cut with pogo, parry (gold) and block, the charged iaijutsu draw,
   healing with ink, ink marks that build up on his paper, shredding death;
@@ -52,19 +59,22 @@ Gilded Terraces and Hōshō's hall and fight), with:
 - in the grove red pandas and kite husks; in the market lantern ghosts
   (chōchin-obake) and gilded guards; three more bosses: Akane (a duel),
   the Festival Dragon (a mini-boss) and Hōshō, the Lantern Market's
-  general.
+  general; in the marsh ink frogs, ink eels and sodden husks, the Wax
+  Coat, and Shimeri, the Sodden General (thirteen shrines in all).
 Pause, settings and controls pages share one UI style. Downloads for
 Windows and Mac carry Julian's icon.
 
-**Next:** Julian plays and judges the overnight work of 2026-11-24
-(`docs/overnight_report_2026-11-24.md`: Hōshō tuned, the Meshy lantern
-ghost, the back alley, the burning store). Not built from the market plan:
-the hoist shortcut from the Rise to Festival Square (a rope over the roofs
-would hit the drying deck, the drum tower and the Ward's gate: plan it with
-Julian), the canal lock shortcut, the other Fan Gust ideas (blowing an
-awning round, a waterwheel raising a boat). After the market: the rest of
-the open middle (Sumi Marsh, Koinobori Skies, the Thousand Gates, Yukiyama
-Peaks; `docs/lore.md`, proposed), which waits for Julian's go. Julian plays the overnight work and judges it (the report lists
+**Also waiting for Julian (late 2026-11-25):** the way out of Hōshō's hall
+(back garden and Rain Gate, `back_court.gd`), Shimeri's Meshy drowned
+soldiers, the Thousand Gates' stone foxes, summit lookout and Flat Fold,
+changeable keys, and new ElevenLabs sounds (all in the 2026-11-25 report).
+**Next:** Julian plays and judges the overnight work of 2026-11-25
+(`docs/overnight_report_2026-11-25.md`: Sumi Marsh, Shimeri, the Wax Coat,
+the market's two shortcuts) and of 2026-11-24 (Hōshō tuned, the Meshy
+lantern ghost, the back alley, the burning store). Not built from the market
+plan: the Fan Gust's awning and waterwheel. After the marsh: the rest of
+the open middle (Koinobori Skies, the Thousand Gates, Yukiyama Peaks;
+`docs/lore.md`, proposed). Julian plays the overnight work and judges it (the report lists
 what only he can judge). Then: Julian judges Akane's duel (built: proposed lore, she yields
 rather than dies; her music and sounds are in); the road on past the bamboo (the
 open middle of the game); the endings (the ink marks are saved; nothing
@@ -330,12 +340,22 @@ Julian owns them. The art references are in `docs/reference/`.
 
 Keyboard (gamepad): A/D move; S duck (on the ground); Space jump (also off
 walls) (A); J cut, W/S to aim it up/down (X); hold K, let go, for the
-iaijutsu draw (Y); L or Shift dash (right shoulder); I parry, hold
+iaijutsu draw (Y); L or Shift dash (right shoulder; ducked, once learned, the Flat Fold); I parry, hold
 I to block (left shoulder or trigger); hold U heal (B); O Fan Gust, once
 learned (right trigger; it used to dash too); Esc or P pause
 (Start); M mute. W is aim-up
 only. The table is in `tools/setup_input.gd`: edit it, re-run it, and update
-the Controls page (`InkMenu.CONTROLS`) and the tutorial (`Tutorial.STEPS`).
+the tutorial (`Tutorial.STEPS`) and `KeyBinds.ACTIONS`/`InkMenu.PAD`.
+**The player can change his keyboard keys** on the Controls page
+(`key_binds.gd`, `KeyBinds`; Julian asked): W/S or arrows choose a row,
+Enter or a click listens, the next key is bound (a key another action had is
+swapped to it), Esc cancels; the last line resets. Saved in
+`user://settings.cfg` section "keys", applied at start
+(`UiStyle.load_settings`). Kept whatever is chosen: the arrows on move/aim,
+Esc on pause; never bindable: Esc, Enter, Backspace, the arrows, M. Every
+prompt (tutorial, ability cards) names the key as it is now
+(`KeyBinds.live`, inside `UiStyle.prompts`). Gamepad buttons are not
+changeable.
 There is no controls line along the bottom of the game screen any more
 (Julian had it removed).
 
@@ -343,8 +363,17 @@ There is no controls line along the bottom of the game screen any more
 
 ### Engine rules
 - **Godot 4 syntax only**, never Godot 3. GDScript, typed where practical.
-- **Compatibility renderer** (`gl_compatibility`). No Forward+/Mobile-only
-  features (no volumetric fog, SDFGI, real translucency).
+- **Renderer: Forward+ on Windows and Mac** (`rendering_method`
+  "forward_plus", speed session 2026-11-25: 53 -> about 75-100 fps); the
+  browser keeps `gl_compatibility` (`rendering_method.web`; it only shows
+  the title). Forward+ lit the paper darker than the old renderer Julian
+  judged everything in, so `Village` "forward_plus_*" settings strengthen
+  the sun/moon (`forward_plus_sun`), fill (`forward_plus_ambient`), more in
+  daylight (`forward_plus_day`), less in the marsh (`forward_plus_marsh`),
+  and soften glow (`forward_plus_glow`); measured against pictures of the
+  old renderer, region by region (`_sun_boost`, `_fill_boost`). Every
+  ambient or sun/moon setting must go through those. Still avoid
+  volumetric fog, SDFGI etc. (keep the look).
 - **Web:** single-threaded (the Web preset has thread support OFF). Use
   `CPUParticles3D`, never GPU particles.
 - **All numbers that affect feel are `@export` variables**, grouped with
@@ -544,8 +573,8 @@ There is no controls line along the bottom of the game screen any more
   **Cherry trees** are rooted (`Scenery.sakura_tree`); the foreground one
   keeps its limbs clear of play.
 - **Light:** lanterns are real `OmniLight3D`s plus glowing paper and a halo.
-  About 8 lights may touch one mesh (Compatibility limit): build long things
-  (paving) in short lengths. Wet-street reflections are faked warm smears
+  (The old 8-lights-per-mesh limit was the Compatibility renderer's; the
+  desktop game no longer has it.) Wet-street reflections are faked warm smears
   (`Village.wet_shine`). Colour grading: `color_saturation` /
   `color_contrast` keep the night muted; tune there first.
 - **Wind** (`scripts/wind.gd`): one breeze plus gusts rolling along the
@@ -855,7 +884,9 @@ has its own script, built from `Village._ready`:
   model"; `models/chochin.glb`, picture `docs/reference/chochin_front.png`,
   ids in `chochin_obake.gd`, 39 credits), its tongue's tip on a bone
   (`ProceduralSkin`), the old folded one behind `use_model`; sheet `chochin`.
-- **The burning store** (`LanternMarket.STORE_X` 79, Upper Market): a
+- **The burning store** (`LanternMarket.STORE_X` 79, Upper Market;
+  Julian: a fan-only fire before the fan looked like a mistake): boarded
+  shut until `SaveGame.dragon_beaten`, then burning (`_light_store`): a
   `SecretRoom` (now with `crane_id`, `crane_count`, `start_open`) whose
   door is barred by a `FireBarrier` (`market_store_fire`): only the Fan
   Gust, learned much later, opens it; cranes `market_store` inside. (The
@@ -1084,8 +1115,217 @@ through:
 - **Roof back slopes** (`Scenery.tiled_roof`): their tiles used to face
   DOWN, so a low roof seen from above showed a bare blue board. Fixed for
   every roof.
+- **The courtyard's far gate is the town's** (`BambooGrove._town_gate`,
+  a child of the Village, "CourtyardFarGate"): under the grove's node it was
+  hidden with the grove whenever he was in town, so the gate was invisible
+  after the Hannya. Anything the grove builds in the town must be parented to
+  the village. `--hannya-beaten` starts with her beaten and the gate open.
 - Not built yet in Market Street: the ladder shortcut from the roofs, the
   paper birds, collecting cranes.
+
+### Sumi Marsh (`sumi_marsh.gd`; built overnight 2026-11-24/25, not yet played by Julian)
+Plan `docs/sumi_marsh_plan.md`. Its own place at `SumiMarsh.SHIFT` (3000),
+`in_marsh` (x > 2700; `LanternMarket.in_market` and `BambooGrove.in_grove`
+both exclude it: the grove's test once switched the daylight sun on in the
+marsh). Entered once Hōshō is beaten: the gold screen at his hall's east end
+folds back (`HoshoHall.open_way`) onto a back stair (`_build_back_stair`), and
+walking east fades into the marsh (`Main._travel`); west up the marsh's steps
+returns to the hall. Its grading: `Village.set_marsh`, settings "Dusk in Sumi
+Marsh" (`marsh_ambient` 0.42, `marsh_light_energy` 0.42, `marsh_fog` 0.01;
+0.3 and 0.5 were too dark and too bright).
+- **The look:** a drowned dusk, a low ceiling of torn cloud, a pale jade fog
+  band, no moon (a faint smear); everything that was water is black ink
+  (`MarshKit.INK`), with the fog's light lying on it in streaks, lotus
+  leaves and paper scraps floating in the foreground; bone-white dead trees
+  with soaked shide (`MarshKit.dead_tree`), reeds (`MarshKit.reeds`; the
+  ones in his path part as he goes, `_reeds`), thatched stilt houses
+  (`MarshKit.thatch`: laid in courses with straws), dressed stone
+  (`MarshKit.masonry`: every face the camera sees from below), grave posts,
+  stone lanterns, will-o'-wisps (cold lights drifting), ash-like motes. Warm
+  light only from candles, windows and the Wax-Maker's hearth. The props
+  are `MarshKit`'s constants.
+- **The ground** is `SumiMarsh.GROUND`: "bank" (mud, solid), "shallow"
+  (the bed at `SHALLOW_BED`: he wades; wading in ink soaks into his paper,
+  `Ronin.soak_ink`, `ink_soak_rate` 0.8 per second, counting toward the
+  endings, and slows him) and "deep" (unwaxed it carries him back to the
+  shrine; waxed he floats). `ground_at`, `kind_at`. Boardwalks `WALKS`,
+  sinking planks and lotus pads (`SinkingPlank`: they settle under him,
+  over deep ink that is a way in), sunken roofs to step on (`SUNKEN`).
+- **Areas:** the Weeping Steps (shrine 10 `marsh`, a half-sunk torii, a
+  drowned jizō); the Reed Shallows (frogs, the dead tree whose solid
+  branches climb to a heron's nest with cranes `marsh_nest`); the Drowned
+  Village (`marsh_village.gd`: stilt houses whose thatched porch roofs are
+  the high route, climbed by crate stacks; one slumped; shrine 11
+  `stilt_house`; cranes `marsh_roofs` on a roof, `marsh_sunken` floating
+  under the first porch (swim only), `marsh_niche` in a broken niche under
+  a pour of ink (only waxed can he jump into it)); the Wax-Maker's island
+  (`WaxMaker`, `wax_maker.gd`: an old paper doll in a straw rain cape
+  stirring a pot; she pours wax over him: the Wax Coat); the Black Mere
+  (swum; the broken aqueduct's piers and channel are a high route, cranes
+  `mere_aqueduct`; ink pours from its broken ends; shrine 12 `mere` in a
+  reed hut on an island); the Causeway of Lost Names (grave posts, limp
+  banners, soaked husk guards, the aqueduct pouring through a broken span;
+  shrine 13 `causeway`); Shimeri's Post (`shimeri_post.gd`).
+- **InkCurtain** (`ink_curtain.gd`, `shaders/ink_pour.gdshader`): ink
+  pouring from a height; it presses him down (`press` 70) unless waxed,
+  when it runs off his hat in a spray.
+- **Creatures:** `InkFrog` (`ink_frog.gd`, Meshy `models/inkfrog.glb`
+  with bones in code; croaks, its tell rocks it back with the throat
+  swelling, then a leaping bite; never leaps into deep ink; parried it flips
+  over); `InkEel` (`ink_eel.gd`, folded in code from
+  `docs/reference/inkeel_side.png`: a chain of segments following its
+  head; a fin cuts toward him, the ink bulges, it bursts out over him (or,
+  from its pool's edge at him on the bank, out and back); parried it falls
+  back belly-up); `InkRiser` (`ink_riser.gd`: a soaked husk lying under the
+  ink, out of the tree until it rises as he comes near). Sounds
+  `frog_croak`, `frog_leap`, `frog_splat`, `eel_hiss`, `wax_pour`,
+  `shimeri_groan`; the night loop `marsh_night.ogg`.
+- **Shimeri, 湿将, the Sodden General** (`shimeri.gd`, `shimeri_post.gd`):
+  Meshy `models/shimeri.glb` (4 m, rigged; picture
+  `docs/reference/shimeri_front.png`; ids in the script) posed with
+  `SamuraiAnimator` in Hōshō's measure scaled up (several of Hōshō's
+  stances reused); a folded nodachi. 36 health, 7 posture. Moves: the
+  cleave (raised high over his shoulder, `_raised_pose`; parry; a wave of
+  ink runs out both ways: jump), the low sweep (a wake as he drags the
+  blade: jump), the charge (parry, double posture), the weeping sky
+  (`InkDrop`s); **forgetting** (`forget_chance` 0.25, 0.4 from half
+  health): part-way through a tell he stops, sags, head tilted
+  (`_sag_pose`), then begins another move with its own tell. From half
+  health he calls two soldiers (`InkRiser`s). Intro 12 s and ending 14 s
+  (`CineCamera`), lines `shimeri_warning`, `shimeri_line`, title and seal
+  湿将 (`seal_shimeri.png`), `SaveGame.shimeri_met/beaten`, seal "shimeri".
+  A pour of ink seals the way back while he fights. Music
+  `music_shimeri_fight.ogg` (40 s loop). The court is kept clear of reeds
+  in front. `--shimeri` starts at shrine 13 (waxed), `--met` skips his
+  intro, `--pose=cleave_tell` (etc.) holds him in a move, `--beat` beats
+  the nearest general at once (his ending plays; with `--wait=SECONDS` the
+  screenshot is taken later).
+  From Julian's notes: the **Drowned Muster** (`_start_muster`, the
+  `muster` signal: the nodachi driven into the ink, the ink bubbles, then
+  warriors rise there; `most_soldiers` 3, `muster_cooldown` 9 s); the
+  weeping sky has an ink cloud overhead (`_cloud`) and bigger drops
+  (`drop_radius`, `drop_warning`), and he breaks off it to swing if the
+  Ronin closes in (he stood still being cut: it looked like a stun);
+  forgetting never within 1.2 s of a cut.
+- **Generals' endings (Shimeri, Hōshō):** the seal rises glowing (a Sprite3D
+  of its `seal_*.png`), flies to the Ronin, and **SealCard** (`seal_card.gd`)
+  stamps it across the screen with its name and the count of the three
+  seals; then he falls forward lifeless (`set_fallen`; Shimeri half-sunk in
+  the ink); beaten, `collision_layer` 0 (no cutting the body). Intros: more
+  drama (lightning, eyes kindling in Shimeri's helmet, a low towering
+  shot, slow motion on the strike).
+- **The Wax Coat** (`Ronin.has_wax`, SaveGame ability "wax", group "Wax
+  Coat"): waxed paper floats. Every deep water calls `Ronin.deep_water()`
+  (the town's canals, the river, the bamboo falls' pool, the market's
+  canals, the marsh): waxed it does not carry him off; instead he stands
+  on an invisible floor `swim_depth` (1.0 m) under the surface, on the float
+  layer (`Ronin.float_surface`, layer 5, mask 16, only in his mask once
+  waxed) and swims (`swim_speed` 0.5, `swimming`); he can jump out. Ink
+  does not stain or slow him; sluices and ink pours do not press him.
+  Swim-only cranes (`SwimCache`, `CraneBundle.swim_only`): the town's deep
+  canal water (`canals_deep_swim`), the falls' pool (`falls_pool_swim`),
+  the market's second canal (`market_canal_swim`), under the marsh's first
+  porch. `--mere` starts on the Wax-Maker's island, waxed; `--wax` gives it.
+- **The Drowned Muster's soldiers** are a Meshy model
+  (`models/drowned_warrior.glb`, picture
+  `docs/reference/drowned_warrior_front.png`; ids in `ink_riser.gd`) on the
+  husk's poses: `InkRiser.warrior`. `--warrior` raises one beside him.
+- **Eels check their arc** (`InkEel._arc_clear`) before leaping: never
+  through a deck or roof (Julian). `tools/eel_probe.gd` watches one.
+- **Behind Hōshō's hall** (`back_court.gd`, `BackCourt`): beaten, the hall's
+  end wall goes; a covered stair down (`STAIR`) to the palace's back garden
+  (`COURT_Y` 20.8) and the Rain Gate (`GATE_X` 522, one leaf swung open on
+  the far side so it never hides him); past `EXIT_X` 528.5 is the marsh.
+  The market's `END` is 536.
+- **Stone foxes of the Thousand Gates** (`kitsune_statue.gd`,
+  `KitsuneStatue`; Meshy `models/kitsune_statue.glb`, picture
+  `docs/reference/kitsune_statue_side.png`, ids in the script, three bones
+  in code): asleep on a plinth beside the path (stone: cuts do nothing);
+  as he nears, its eyes kindle red (`kindle_time`), it leaps down at him;
+  awake it stalks in stiff hops, crouches (eyes flare), lunges and bites;
+  parried it cracks, stunned. `ThousandGates.FOXES`. The still foxes by the
+  tunnels are the same model (`KitsuneStatue.still`). Sounds `stone_grind`,
+  `fox_snarl`, `stone_thud`.
+- **The summit lookout** (end of the Gates' top terrace): a `PrayerWheel`
+  (`prayer_wheel.gd`, gust target; `turning()` while fast) winds a
+  `GustLift` (`gust_lift.gd`: a stone slab on ropes from a gantry; sync off,
+  velocity set) up beside a no-climb pillar (`ThousandGates.PILLAR`) to a
+  pavilion at `LOOKOUT_Y` with cranes `gates_lookout`. Reusable: any wheel
+  can drive any lift.
+- **The Flat Fold** (`Ronin.has_fold`, SaveGame ability "fold", group
+  "Flat Fold"; `--fold` gives it): ducked, the dash folds him paper-thin
+  (`fold_height` 0.32 m body, `fold_speed`, `fold_time`; the puppet is
+  pressed flat, `RoninPuppet.flat_target`). Under anything too low even to
+  duck he stays folded and slides on (`_fold_ceiling`); then he unfolds
+  into a duck. Learned at the altar on the summit lookout
+  (`ThousandGates.learn_fold`); first used at the pillar's store chamber
+  (`STORE_DOOR_X`, slit `STORE_SLIT` 0.38 m) with cranes `gates_lookout`.
+  Controls page row: "S + L". Not built yet: fold gaps in earlier regions.
+- `MarshKit.masonry(..., stains)`: ink trickles only in the marsh (soft runs
+  ending in a drop); everywhere else plain stone. Never hard black strips.
+- `tools/blockage_scan.gd FROM_X TO_X` lists solids he would bump his head
+  on (LOW), jump (STEP) or meet as a wall (WALL), for checking an area.
+- **The market's shortcuts** (`market_shortcuts.gd`): the canal lock (cut
+  its windlass on the first quay three times; W at the culvert takes him
+  under the Upper Market to the canal under the red bridge, and back) and
+  the porters' lift (cut its brake rope by shrine 8 on the Rise; W in its
+  cage takes him down to a porters' storehouse in Festival Square, and
+  back). SaveGame shortcuts "canal_lock", "porters_lift".
+- `tools/area_sweep.py` takes more debug flags in `SWEEP_ARGS` (e.g.
+  `SWEEP_ARGS=--wax`, so deep ink holds him up). `tools/model_bounds.gd`
+  prints a model's size by slices (for placing bones in code).
+
+### Koinobori Skies (`koinobori_skies.gd`; begun overnight 2026-11-24/25, not yet played by Julian)
+Plan `docs/koinobori_skies_plan.md`. Its own place at `KoinoboriSkies.SHIFT`
+(4000), `in_skies` (x > 3700; `SumiMarsh.in_marsh` excludes it). Entered
+once Shimeri is beaten: his gate swings open (`ShimeriPost.open_gate`, the
+marsh's `end_wall` removed) and walking east through it fades up into the
+Skies. Grading `Village.set_skies` ("Day in Koinobori Skies": `skies_sun`
+1.35, `skies_ambient` 0.72); a thin drizzle (`Rain.ease_off(0.3)`).
+- **The look:** a pale washed sky, a white sun behind thin torn cloud, snowy
+  peaks far off (Yukiyama), a sea of torn-paper cloud below with layers in
+  front of the cliffs' feet; cliff tops (`CLIFFS`) with faceted rock faces,
+  cracks and strata, grass; tall poles (`POLES`) with spinning wind-wheels
+  and carp streamers that hang downwind and lift toward level in a gust
+  (`_streamers`, every frame); paper scraps blown along. Falling off is into
+  the cloud (`Ronin.fall_limit_y`): back to the last shrine.
+- **SkyCarp** (`sky_carp.gd`): giant carp streamers cut loose, drifting
+  between cliffs (`CARP`): moving platforms (AnimatableBody3D, sync off,
+  `constant_linear_velocity`), turning at their ends, dipping when landed
+  on, body rippling. Rising air at some cliff edges (`UPDRAFTS`).
+- **The Kite-Makers' Eyrie** (`_build_eyrie`, 110 to 156): an open timber
+  hall of giant kite frames, a bench of paper rolls, a winch; the altar
+  (`ALTAR_X` 150) with a great folded shuriken: coming to it teaches the
+  **Shuriken Dash** (`learn_shuriken`, SaveGame ability "shuriken").
+- **The Shuriken Dash** (`Ronin.has_shuriken`, group "Shuriken Dash"): in
+  the air the dash becomes a spin (`spinning`; the puppet turns round his
+  middle, `RoninPuppet.spin`), `shuriken_speed` 1.25 times faster for
+  `shuriken_time` 0.26 s; it tears **PaperWall**s (`paper_wall.gd`: kite
+  paper on a bamboo frame with a red ring, `WALLS`; a plain dash or a cut
+  does nothing to them; torn walls with an id are saved) and cuts small
+  paper creatures in its path (`_spin_cut`). `--shuriken` gives it.
+- Shrines 14 `cloudbreak`, 15 `eyrie`, 16 `wind_shrine`; cranes
+  `skies_pole` (top of the tallest pole), `skies_ledge`; kite husks
+  (`KITES`).
+- **Akane's second duel** (`akane_skies.gd`, the Kite-Fighters' Ring, 342 to
+  378): her first duel's script made harder (32 health, yields at 14,
+  quicker wind-ups, `deflect_chance` 0.45, four fox-fires); she drops off
+  her post; lines `akane_warning_2` ("Still you do not know what you
+  are.") and `akane_parting_2` ("Higher, then. The Gates will show you.");
+  a wall of whirling paper scraps closes the ring.
+  `SaveGame.akane_skies_met/dueled`. Her new move here, the **gale dive**
+  (`Akane.gale`, group "Gale dive"): paper swirls at her feet (`gale_tell`
+  0.6 s), a gust lifts her, she hangs (`gale_hang`), then dives at him blade
+  first (parry: double posture). `--akane-pose=gale_tell` holds her in it.
+- **Kamaitachi** (`kamaitachi.gd`, folded in code; `KAMAITACHI`): a
+  sickle-weasel of paper riding a whirl of scraps in a loop in the sky; its
+  tell is a whistle (`kite_wail`) and coiling where it will come from beside
+  him; then it streaks past, blades out (parry: it tumbles); the spin cuts
+  it. **The Wind Shrine** (`_build_wind_shrine`): a red-posted hall with
+  wind-bells along its eave, a bell rope, pinwheels along its fence, ropes
+  from the cliff down into the cloud. The Thousand Gates stand on the far
+  eastern skyline (a mountain climbed by rows of torii).
+- Not built yet: the way on to the Thousand Gates. `--skies` starts there.
 
 ### The loading screen
 - `loading_screen.gd` (`LoadingScreen.go(get_tree(), path)`): used after the
@@ -1275,6 +1515,47 @@ through:
 - The workflow's actions are on their Node 24 versions (checkout v7,
   configure-pages v6, upload-pages-artifact v5, deploy-pages v5).
 
+## Speed session (Julian: "address all of those issues", 2026-11-25)
+`tools/speed_probe.gd` (windowed, vsync off) stands him at 20 spots in
+every region and prints fps, worst frame, graphics card and processor time,
+draw calls; `SPEED_OFF=particles|veils|lights|shadows|grain|range` switches
+one kind of thing off to price it; `SPEED_SPOTS=0,1,7` picks spots. Runs
+vary by 10-15 fps on this laptop: repeat and compare pairs.
+`tools/load_probe.gd` prints build time, memory and nodes per region.
+- **Forward+** (see Engine rules): the biggest win (average 53 -> 75 fps in
+  the first pair; worst frames 70-120 ms -> about 20 ms).
+- **Rain on the near ground** (Julian): the rain's box now reaches 8 m in
+  front of the path (`Rain.area` depth 15, 2,250 drops, same density), and
+  `Village._add_rain_splashes(..., front)` splashes to a place's own front
+  edge (the market's paving: `LanternMarket.NEAR_Z`).
+- **Lantern shadows** use dual-paraboloid (2 passes, not 6): about 80
+  fewer draw calls where two lanterns cast.
+- **Still scenery is joined** (`mesh_merger.gd`, `MeshMerger`, run once by
+  `Main._merge_scenery`; `Main.merge_scenery`, env `NO_MERGE=1` to compare):
+  2,196 pieces into 419 meshes; draw calls in Market Street 721 -> 531,
+  Well Square 497 -> 315, the Lower Market 744 -> 447. **Rule for new
+  work:** a piece is joined unless a script keeps it (or its material or a
+  node above it) in a variable or meta, or it or a node above it has a
+  script or a group. So ANYTHING a script will later move, fade, swap or
+  free must be kept in a variable (or be under a scripted node or in a
+  group), or it will be frozen into the scenery.
+- **The Skies and the Gates are now lit by their own daylight**: a check in
+  `Main._process` meant for the grove used to switch the town's night
+  lighting back on there every time (they were built under night light).
+  Their sun and fill were lowered to keep the look they were built with
+  (`skies_sun` 0.5, `skies_ambient` 0.26, `gates_sun` 0.45,
+  `gates_ambient` 0.24): for Julian to judge.
+- Measured, not changed: with all the above, frames are bound by the
+  graphics card. Priced by switching off: lights about +20% fps, the
+  see-through mist/glow layers about +7%, particles about +5%, the grain
+  nothing measurable, a 25% shorter light reach nothing. Moving particles
+  to the graphics card would not help (it is the busy side). The places he
+  is not in cost no frame time (hidden, paused) but memory and load time:
+  building takes about 8.8 s behind the loading screen, about 390 MB, and
+  11,000 of the 14,400 nodes are other places; building each place only on
+  first travel would fix that (a big change: saves, travel, tests).
+  Removing a place while running crashes Godot (lights): do not.
+
 ## Speed (Julian: "laggy, several fps drops", 2026-11-23)
 Measured with a script that stands him at spots across the world and times
 frames (Intel graphics on this computer):
@@ -1343,6 +1624,9 @@ frames (Intel graphics on this computer):
 | `scripts/market_keeper.gd`, `chochin_obake.gd`, `gilded_guard.gd`, `lantern_boat.gd` | Shopkeepers, lantern ghosts, gilded guards, lantern boats |
 | `scripts/fire_barrier.gd`, `windmill.gd`, `pinwheel.gd`, `gate_walls.gd`, `action_hint.gd` | Burning barricades, the windmill, pinwheels, the walls beside gates, on-screen hints |
 | `scripts/paper_fan.gd`, `gust_wind.gd`, `cine_camera.gd` | The Fan Gust's fan and its wind; the directed-cutscene camera |
+| `scripts/sumi_marsh.gd`, `marsh_village.gd`, `marsh_kit.gd`, `shimeri_post.gd` | Sumi Marsh: the place, its stilt village, its props, Shimeri's fort and fight |
+| `scripts/shimeri.gd`, `wax_maker.gd`, `ink_frog.gd`, `ink_eel.gd`, `ink_riser.gd` | Shimeri; the Wax-Maker; the marsh's creatures |
+| `scripts/sinking_plank.gd`, `ink_curtain.gd`, `swim_cache.gd`, `market_shortcuts.gd` | Sinking planks and lotus pads; pouring ink; swim-only cranes; the market's lock and lift |
 | `scripts/paper_maker.gd` | The Paper-Maker at her vat (Meshy model `models/papermaker.glb`, posed by hand) |
 | `scripts/save_game.gd`, `crane_bundle.gd`, `smudge.gd`, `ability_card.gd`, `hannya_ending.gd` | Saving, cranes, the Smudge, ability card, the ending after the Hannya |
 | `scripts/water_fx.gd`, `villager_shadow.gd`, `perched_birds.gd` | Splashes and water, shadows behind shoji, perched birds |
@@ -1421,6 +1705,8 @@ frame sheet when the change can be seen.
       Akane's duel (built; Akane's duel awaits Julian's judgement).
 - [x] **The Lantern Market** (2026-11-23/24): the whole region, the
       Festival Dragon, the Fan Gust, Hōshō (awaiting Julian's play).
+- [x] **Sumi Marsh** (2026-11-24/25): the whole region, the Wax Coat,
+      Shimeri (awaiting Julian's play).
 - [ ] **M6:** vertical slice polish: audio balance, map.
 
 ## Known gaps

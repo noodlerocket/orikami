@@ -46,6 +46,7 @@ static func load_settings() -> void:
 	if file.load(SETTINGS_FILE) == OK:
 		fullscreen = bool(file.get_value("display", "fullscreen", false))
 	_apply_fullscreen()
+	KeyBinds.apply_saved()   # (the player's own keys)
 
 
 static func set_setting(key: String, value: bool) -> void:
@@ -188,7 +189,7 @@ static func prompts(canvas: CanvasItem, right: Vector2, items: Array, font_size:
 	var total := 0.0
 	var widths: Array[float] = []
 	for item: Array in items:
-		var cap: String = item[1] if using_pad else item[0]
+		var cap: String = item[1] if using_pad else KeyBinds.live(item[0])
 		var cap_wide := maxf(font_size * 1.45, width(cap, font_size) + font_size * 0.9)
 		if using_pad and cap.length() == 1:
 			cap_wide = font_size * 1.45
@@ -198,7 +199,7 @@ static func prompts(canvas: CanvasItem, right: Vector2, items: Array, font_size:
 	var x := right.x - total + gap
 	for i in items.size():
 		var item: Array = items[i]
-		var cap: String = item[1] if using_pad else item[0]
+		var cap: String = item[1] if using_pad else KeyBinds.live(item[0])
 		var used := keycap(canvas, Vector2(x, right.y), cap, font_size, alpha, using_pad and cap.length() == 1)
 		text(canvas, Vector2(x + used + font_size * 0.45, right.y), item[2], font_size, Color(WASHI.r, WASHI.g, WASHI.b, 0.8 * alpha), 0.0, 0.8)
 		x += widths[i] + gap

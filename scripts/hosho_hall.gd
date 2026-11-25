@@ -66,6 +66,8 @@ var _in_hall := false
 var _wash: ShaderMaterial
 var _held := false
 var _focused := false
+var _end: Node3D
+var _end_wall: StaticBody3D
 
 
 func _ready() -> void:
@@ -92,14 +94,23 @@ func _ready() -> void:
 	(_music.stream as AudioStreamOggVorbis).loop = true
 	add_child(_music)
 	# The end wall of the market, behind the hall.
-	market._solid(Vector3(HALL.y + 0.5, HALL.z + 15.0, 0.0), Vector3(1.0, 30.0, 4.0)).set_meta(&"no_climb", true)
+	_end_wall = market._solid(Vector3(HALL.y + 0.5, HALL.z + 15.0, 0.0), Vector3(1.0, 30.0, 4.0))
+	_end_wall.set_meta(&"no_climb", true)
+	# Behind the hall: the covered stair down, the back garden and the Rain
+	# Gate, the way on to Sumi Marsh (BackCourt).
+	var court := BackCourt.new()
+	court.market = market
+	add_child(court)
 	if SaveGame.hosho_beaten:
 		_state = &"done"
 		hosho.active = false
 		hosho.set(&"_mode", &"defeated")
-		hosho.set_kneel(1.0)
+		hosho.set_kneel(0.0)
+		hosho.set_fallen(1.0)
+		hosho.collision_layer = 0
 		_tear_open(false)
 		_wash_gold(false)
+		open_way(false)
 	else:
 		# Before the fight he stands in the dark at the back of the hall,
 		# the lanterns down its length unlit.
@@ -207,10 +218,14 @@ func _build_end_screen() -> void:
 	b.box(Vector3(x - 0.66, HALL.z + 0.48, (z0 + z1) * 0.5), Vector3(0.04, 0.04, z1 - z0 + 0.2))
 	# Painted on it: a vermilion sun and drifting gold-leaf clouds, darker.
 	var screen := b.build()
+	_end = Node3D.new()
+	_end.position = Vector3(0.0, 0.0, z0)
+	add_child(_end)
 	(screen.material_override as StandardMaterial3D).metallic = 0.1
 	(screen.material_override as StandardMaterial3D).cull_mode = BaseMaterial3D.CULL_DISABLED
 	(screen.material_override as StandardMaterial3D).roughness = 0.4
-	add_child(screen)
+	_end.add_child(screen)
+	screen.position.z = -z0
 	# The sun and the clouds, as flat shapes laid on the leaves.
 	var paint := PaperMesh.new(_rng.randi())
 	paint.texture_world = false
@@ -221,8 +236,45 @@ func _build_end_screen() -> void:
 		paint.ellipse(c[0], c[1], 18, 0.01)
 	var art := paint.build()
 	art.rotation.y = -PI * 0.5
-	art.position = Vector3(x - 0.42, HALL.z + 6.2, -1.7)
-	add_child(art)
+	art.position = Vector3(x - 0.42, HALL.z + 6.2, -1.7 - z0)
+	_end.add_child(art)
+
+
+## Behind the screen: the back stair down off the market's cliff, toward
+## Sumi Marsh (docs/sumi_marsh_plan.md). Dark stone walls, steps going down
+## into a pale green-grey mist, rain falling in. Seen once the screen is
+## folded aside (open_way).
+func _build_back_stair() -> void:
+	var x := HALL.y
+	var b := PaperMesh.new(_rng.randi())
+	b.shade_jitter = 0.12
+	b.color = Color(0.1, 0.1, 0.12)
+	b.box(Vector3(x + 4.0, HALL.z + 5.0, -3.2), Vector3(8.0, 12.0, 0.4))
+	b.box(Vector3(x + 4.0, HALL.z + 10.4, 0.0), Vector3(8.0, 0.4, 6.6))
+	for k in 10:
+		b.color = Color(0.24, 0.24, 0.26).darkened(k * 0.06)
+		b.box(Vector3(x + 0.6 + k * 0.6, HALL.z - 0.15 - k * 0.32, -0.3), Vector3(0.62, 0.3, 5.2))
+	add_child(b.build())
+	var mist := PaperMesh.new(1)
+	var tint := Color(0.42, 0.47, 0.45, 0.9)
+	mist.fade_quad(Vector3(x + 7.5, HALL.z - 4.0, -3.0), Vector3(x + 7.5, HALL.z - 4.0, 2.8), Vector3(x + 7.5, HALL.z + 9.0, 2.8), Vector3(x + 7.5, HALL.z + 9.0, -3.0), tint, Color(tint, 0.2))
+	add_child(mist.build_veil())
+
+
+## The screen folds back against the hall's side, opening the way to the
+## back stair (once Hōshō is beaten).
+func open_way(slow: bool) -> void:
+	if _end_wall:
+		_end_wall.queue_free()
+		_end_wall = null
+	if _end == null:
+		return
+	if not slow:
+		_end.scale.z = 0.24
+		return
+	Sound.play(self, &"shutter_open", 0.0)
+	var t := create_tween()
+	t.tween_property(_end, "scale:z", 0.24, 2.2).set_trans(Tween.TRANS_SINE)
 
 
 func _build_banners_and_lanterns() -> void:
@@ -498,6 +550,9 @@ func _start_intro() -> void:
 			var t := create_tween()
 			t.tween_property(_lights[k], "light_energy", _light_energy[k], 0.4)
 			Sound.play(self, &"lantern_snuff", -6.0))
+	_cine.at(0.1, func() -> void:
+		Sound.play(self, &"taiko_hit", 6.0)
+		_cine.shake(0.25))
 	_cine.at(3.2, func() -> void:
 		Sound.play(self, &"taiko_hit", 2.0)
 		_cine.shake(0.3))
@@ -508,7 +563,11 @@ func _start_intro() -> void:
 	_cine.at(8.8, func() -> void:
 		hosho.set(&"_mode", &"storm_tell")
 		Sound.play(self, &"akane_slash", 2.0))
+	_cine.at(9.45, func() -> void: Engine.time_scale = 0.35)
 	_cine.at(9.6, func() -> void:
+		Engine.time_scale = 1.0
+		_cine.flash(0.5, 0.5)
+		Sound.play(self, &"thunder_crack", 0.0)
 		hosho.set(&"_mode", &"wait")
 		Sound.play(self, &"taiko_hit", 4.0)
 		Confetti.burst(market, hosho.position + Vector3(0.0, 0.3, 0.0), 40, [Color(1.0, 0.82, 0.42), Color(0.86, 0.68, 0.34)])
@@ -642,7 +701,7 @@ func _on_defeated() -> void:
 	var hx := hosho.global_position.x
 	_cine = CineCamera.new()
 	_cine.game_camera = get_viewport().get_camera_3d()
-	_cine.length = 15.0
+	_cine.length = 19.5
 	_cine.shot(0.0, 1.2, func() -> Vector3: return him.call() + Vector3(-2.0, 0.6, 5.0),
 			func() -> Vector3: return him.call() + Vector3(-1.5, 0.3, 3.8), him, him, Vector2(36.0, 32.0))
 	_cine.shot(1.2, 4.6, Vector3(hx - 5.0, g + 1.4, 8.5), Vector3(hx - 4.2, g + 1.2, 7.0), him, him, Vector2(40.0, 38.0))
@@ -650,7 +709,7 @@ func _on_defeated() -> void:
 			Vector3(hx, g + 2.4, -2.0), Vector3(hx, g + 3.4, -3.0), Vector2(46.0, 42.0), Vector2(0.0, 2.0))
 	_cine.shot(8.2, 11.0, func() -> Vector3: return him.call() + Vector3(-1.2, 0.8, 2.6),
 			func() -> Vector3: return him.call() + Vector3(-1.0, 0.7, 2.2), him, him, Vector2(32.0, 30.0))
-	_cine.shot(11.0, 15.0, Vector3(hx - 6.5, g + 2.2, 10.0), Vector3(hx - 8.0, g + 3.0, 14.0),
+	_cine.shot(11.0, 19.5, Vector3(hx - 6.5, g + 2.2, 10.0), Vector3(hx - 8.0, g + 3.0, 14.0),
 			Vector3(hx - 2.5, g + 1.6, -1.5), Vector3(hx - 3.0, g + 2.0, -1.5), Vector2(40.0, 40.0), Vector2.ZERO, 0.02, 0.8)
 	_cine.at(0.0, func() -> void:
 		_cine.flash(0.7, 0.6)
@@ -676,6 +735,17 @@ func _on_defeated() -> void:
 			where.add_child(words)
 			words.show_line(2.2))
 	_cine.at(11.2, func() -> void: _give_seal())
+	# After the seal, he falls forward on his face and is still.
+	_cine.at(15.2, func() -> void:
+		var t := create_tween()
+		t.tween_method(hosho.set_kneel, 1.0, 0.0, 0.6)
+		t.parallel().tween_method(hosho.set_fallen, 0.0, 1.0, 1.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		t.tween_callback(func() -> void:
+			Sound.play(self, &"land", 6.0)
+			Sound.play(self, &"taiko_hit", 2.0)
+			Confetti.burst(market, hosho.position + Vector3(hosho.facing * 2.0, 0.3, 0.0), 40, [Color(1.0, 0.82, 0.42), Color(0.84, 0.82, 0.78)])
+			if _cine:
+				_cine.shake(0.5)))
 	_cine.finished.connect(func() -> void:
 		Engine.time_scale = 1.0
 		_cine = null
@@ -687,6 +757,7 @@ func _on_defeated() -> void:
 		if _held:
 			_held = false
 			_ronin.set_physics_process(true)
+		open_way(true)
 		SaveGame.write())
 	add_child(_cine)
 
@@ -781,24 +852,48 @@ func _tear_open(slow: bool) -> void:
 
 
 ## He holds out his seal; it flies to the Ronin's hand.
+var _seal_node: Node3D
+
+
+## His seal (宝照): it rises from his hands glowing, then flies slowly to the
+## Ronin; where it reaches him, a flash, and it is stamped across the
+## screen (SealCard).
 func _give_seal() -> void:
-	var seal := Node3D.new()
-	add_child(seal)
-	var s := PaperMesh.new(8)
-	s.color = Color(0.86, 0.68, 0.34)
-	s.frustum(8, Vector2(0.09, 0.09), Vector2(0.09, 0.09), 0.16, Vector3.ZERO)
-	s.color = Color(0.7, 0.16, 0.12)
-	s.box(Vector3(0.0, -0.01, 0.0), Vector3(0.15, 0.03, 0.15))
-	seal.add_child(s.build())
-	seal.position = hosho.position + Vector3(-hosho.facing * -0.6, 1.4, 0.4)
-	Sound.play(self, &"draw_ready", 0.0)
+	_seal_node = Node3D.new()
+	add_child(_seal_node)
+	var face := Sprite3D.new()
+	face.texture = preload("res://textures/seal_hosho.png")
+	face.pixel_size = 0.4 / maxf(face.texture.get_width(), 1.0)
+	face.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	face.shaded = false
+	face.modulate = Color(1.2, 1.1, 1.0)
+	_seal_node.add_child(face)
+	var glow := OmniLight3D.new()
+	glow.light_color = Color(1.0, 0.7, 0.4)
+	glow.light_energy = 2.2
+	glow.omni_range = 3.0
+	_seal_node.add_child(glow)
+	_seal_node.add_child(Scenery.halo(0.5, Color(1.0, 0.75, 0.4, 0.45)))
+	_seal_node.scale = Vector3.ONE * 2.4
+	_seal_node.position = hosho.position + Vector3(-hosho.facing * -0.8, 1.5, 0.5)
+	Sound.play(self, &"draw_gleam", 2.0)
 	var to := _ronin.global_position - market.global_position + Vector3(0.0, 1.1, 0.3)
 	var t := create_tween()
-	t.tween_interval(0.6)
-	t.tween_property(seal, "position", (seal.position + to) * 0.5 + Vector3(0.0, 1.0, 0.0), 0.6).set_trans(Tween.TRANS_SINE)
-	t.parallel().tween_property(seal, "rotation:y", TAU, 0.6)
-	t.tween_property(seal, "position", to, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	t.parallel().tween_property(seal, "scale", Vector3.ONE * 0.3, 0.4)
+	t.tween_property(_seal_node, "position:y", _seal_node.position.y + 1.3, 1.2).set_trans(Tween.TRANS_SINE)
+	t.tween_interval(0.4)
+	t.tween_property(_seal_node, "position", to, 1.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	t.parallel().tween_property(_seal_node, "scale", Vector3.ONE * 0.6, 1.4)
 	t.tween_callback(func() -> void:
-		seal.queue_free()
-		(_ronin.get_node("Puppet") as RoninPuppet).play_healed())
+		_seal_node.queue_free()
+		Sound.play(self, &"draw_ready", 4.0)
+		Sound.play(self, &"shrine_rest", 0.0)
+		if _cine:
+			_cine.flash(0.7, 0.6)
+		(_ronin.get_node("Puppet") as RoninPuppet).play_healed()
+		var card := SealCard.new()
+		card.seal = preload("res://textures/seal_hosho.png")
+		card.title = "The seal of Hosho"
+		card.count = SaveGame.seals.size()
+		var where := _overlay_node()
+		if where:
+			where.add_child(card))

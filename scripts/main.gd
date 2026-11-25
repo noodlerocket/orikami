@@ -42,8 +42,15 @@ var _cull_clock := 0.0
 ## them, most off screen, cost the town a third of its frames.
 @export var shadow_reach := 12.0
 @export var most_shadows := 2
+## Join the world's still scenery into big meshes once it is built
+## (MeshMerger: far fewer pieces for the graphics card each frame).
+@export var merge_scenery := true
 var _shadowed: Array[OmniLight3D] = []
 var _in_market := false
+var _in_marsh := false
+var _in_skies := false
+var _in_gates := false
+var _day_place := &""
 var _travelling := false   # fading between the town and the bamboo grove
 var _free_camera := false  # (--zoom: the camera goes anywhere)
 
@@ -54,6 +61,10 @@ var _free_camera := false  # (--zoom: the camera goes anywhere)
 
 func _ready() -> void:
 	UiStyle.load_settings()
+	# (Not in the browser: it only shows the title, and its simpler renderer
+	# lets only 8 lights touch one mesh.)
+	if merge_scenery and OS.get_environment("NO_MERGE") == "" and not OS.has_feature("web"):
+		_merge_scenery.call_deferred()
 	# Underground (the drain pipe and the canals) the camera goes down with him.
 	_camera.under_zone = Vector2(Village.CHAMBER.x - 1.0, Village.CANAL.y + 0.5)
 	_apply_debug_start()
@@ -99,17 +110,47 @@ func _process(delta: float) -> void:
 	# Day in the grove, night in the town; no rain in the grove.
 	var grove := BambooGrove.in_grove(_ronin.global_position.x)
 	var market := LanternMarket.in_market(_ronin.global_position.x)
+	var marsh := SumiMarsh.in_marsh(_ronin.global_position.x)
+	var skies := KoinoboriSkies.in_skies(_ronin.global_position.x)
+	var gates := ThousandGates.in_gates(_ronin.global_position.x)
+	village.skies.set_awake(skies)
+	village.gates.set_awake(gates)
 	village.bamboo.set_awake(grove)
 	village.lantern_market.set_awake(market)
-	village.set_place(&"market" if market else (&"grove" if grove else &"town"))
+	village.marsh.set_awake(marsh)
+	village.set_place(&"gates" if gates else &"skies" if skies else (&"marsh" if marsh else (&"market" if market else (&"grove" if grove else &"town"))))
 	if market != _in_market:
 		_in_market = market
 		village.set_market(market)
-	if grove != village.daylight:
-		village.set_daylight(grove)
-		if not grove:
+	if marsh != _in_marsh or skies != _in_skies or gates != _in_gates:
+		_in_marsh = marsh
+		_in_skies = skies
+		_in_gates = gates
+		if marsh:
+			village.set_marsh(true)
+		elif skies:
+			village.set_skies()
+		elif gates:
+			village.set_gates()
+		else:
 			village.set_market(market)
-		($Rain as Rain).ease_off(0.0 if grove else 1.0, 0.05)
+		# (A thin drizzle out of the cloud in the skies.)
+		($Rain as Rain).ease_off(0.3 if skies else 1.0, 0.05)
+	# (The Skies and the Gates are daylight too: this used to see "not the
+	# grove" there and put the town's night lighting straight back.)
+	var day := grove or skies or gates
+	if day != village.daylight or (grove and village.daylight and _day_place != &"grove") 			or (day and not grove and _day_place == &"grove"):
+		_day_place = &"grove" if grove else (&"skies" if skies else (&"gates" if gates else &""))
+		if grove:
+			village.set_daylight(true)
+		elif skies:
+			village.set_skies()
+		elif gates:
+			village.set_gates()
+		else:
+			village.set_daylight(false)
+			village.set_market(market)
+		($Rain as Rain).ease_off(0.0 if grove else (0.3 if skies else 1.0), 0.05)
 		Sound.duck_rain(grove)
 		# The paper grain over the screen is lighter in the bright bamboo
 		# (Julian: too strong there).
@@ -135,6 +176,22 @@ func _process(delta: float) -> void:
 			_travel(Vector3(LanternMarket.SHIFT + LanternMarket.ARRIVE_X, 0.05, 0.0), 1.0)
 		elif x < LanternMarket.SHIFT + LanternMarket.WEST_X and x > LanternMarket.SHIFT - 6.0:
 			_travel(Vector3(BambooGrove.SHIFT + BambooGrove.EAST_END - 4.0, 2.15, 0.0), -1.0)
+		# East out of Hōshō's hall (once he is beaten) down the back stair
+		# into Sumi Marsh; west up the marsh's steps back into the hall.
+		elif SaveGame.hosho_beaten and x > LanternMarket.SHIFT + BackCourt.EXIT_X and x < LanternMarket.SHIFT + BackCourt.EXIT_X + 5.0:
+			_travel(Vector3(SumiMarsh.SHIFT + SumiMarsh.ARRIVE_X, SumiMarsh.ground_at(SumiMarsh.ARRIVE_X) + 0.1, 0.0), 1.0)
+		# Through Shimeri's opened gate up into Koinobori Skies, and back.
+		elif SaveGame.shimeri_beaten and x > SumiMarsh.SHIFT + ShimeriPost.GATE_X + 1.5 and x < SumiMarsh.SHIFT + ShimeriPost.GATE_X + 6.0:
+			_travel(Vector3(KoinoboriSkies.SHIFT + KoinoboriSkies.ARRIVE_X, 0.1, 0.0), 1.0)
+		# Over the rope bridge from Akane's ring to the Thousand Gates, and back.
+		elif SaveGame.akane_skies_dueled and x > KoinoboriSkies.SHIFT + 379.0 and x < KoinoboriSkies.SHIFT + 384.0:
+			_travel(Vector3(ThousandGates.SHIFT + ThousandGates.ARRIVE_X, 0.1, 0.0), 1.0)
+		elif x < ThousandGates.SHIFT + ThousandGates.WEST_X and x > ThousandGates.SHIFT - 30.0:
+			_travel(Vector3(KoinoboriSkies.SHIFT + 374.0, 2.5, 0.0), -1.0)
+		elif x < KoinoboriSkies.SHIFT + KoinoboriSkies.WEST_X and x > KoinoboriSkies.SHIFT - 30.0:
+			_travel(Vector3(SumiMarsh.SHIFT + ShimeriPost.GATE_X - 3.0, SumiMarsh.SHALLOW_BED + 0.1, 0.0), -1.0)
+		elif x < SumiMarsh.SHIFT + SumiMarsh.WEST_X and x > SumiMarsh.SHIFT - 30.0:
+			_travel(Vector3(LanternMarket.SHIFT + BackCourt.EXIT_X - 3.0, BackCourt.COURT_Y + 0.1, 0.0), -1.0)
 	_cull_clock += delta
 	# (At once when he has been moved far: a respawn, a journey.)
 	var jumped := absf(_ronin.global_position.x - _cull_x) > 8.0
@@ -217,7 +274,25 @@ func _cull_far() -> void:
 func _set_camera_limits() -> void:
 	if _free_camera:
 		return
-	if LanternMarket.in_market(_ronin.global_position.x):
+	if ThousandGates.in_gates(_ronin.global_position.x):
+		_camera.min_x = ThousandGates.SHIFT - 6.0
+		_camera.max_x = ThousandGates.SHIFT + ThousandGates.END - 9.0
+		if _camera.rest_zone.x < ThousandGates.SHIFT - 300.0:
+			_camera.set(&"_rest_y", _ronin.global_position.y)  # (just arrived)
+		_camera.rest_zone = Vector2(ThousandGates.SHIFT - 30.0, ThousandGates.SHIFT + ThousandGates.END + 20.0)
+	elif KoinoboriSkies.in_skies(_ronin.global_position.x):
+		_camera.min_x = KoinoboriSkies.SHIFT - 6.0
+		_camera.max_x = KoinoboriSkies.SHIFT + KoinoboriSkies.END - 9.0
+		if _camera.rest_zone.x < KoinoboriSkies.SHIFT - 300.0:
+			_camera.set(&"_rest_y", _ronin.global_position.y)  # (just arrived)
+		_camera.rest_zone = Vector2(KoinoboriSkies.SHIFT - 30.0, KoinoboriSkies.SHIFT + KoinoboriSkies.END + 20.0)
+	elif SumiMarsh.in_marsh(_ronin.global_position.x):
+		_camera.min_x = SumiMarsh.SHIFT - 6.0
+		_camera.max_x = SumiMarsh.SHIFT + SumiMarsh.END - 9.0
+		if _camera.rest_zone.x < SumiMarsh.SHIFT - 300.0:
+			_camera.set(&"_rest_y", _ronin.global_position.y)  # (just arrived)
+		_camera.rest_zone = Vector2(SumiMarsh.SHIFT - 30.0, SumiMarsh.SHIFT + SumiMarsh.END + 20.0)
+	elif LanternMarket.in_market(_ronin.global_position.x):
 		_camera.min_x = LanternMarket.SHIFT + 6.0
 		_camera.max_x = LanternMarket.SHIFT + LanternMarket.END - 9.0
 		if _camera.rest_zone.x < LanternMarket.SHIFT - 300.0:
@@ -585,6 +660,12 @@ func _apply_debug_start() -> void:
 				await get_tree().create_timer(0.3).timeout
 				_boss.health = 0
 				_boss.call("_die")).call_deferred()
+		elif arg == "--hannya-beaten":
+			# The Hannya already beaten: her courtyard quiet, its far gate open.
+			_cutscene_played = true
+			SaveGame.hannya_fallen = true
+			($Village as Village).bamboo.open_gate(true)
+			($Village as Village).stage.show_torn()
 		elif arg == "--market":
 			# Straight into the Lantern Market (Akane met, the glide learned).
 			SaveGame.akane_dueled = true
@@ -608,6 +689,95 @@ func _apply_debug_start() -> void:
 			_ronin.has_glide = true
 			_ronin.has_gust = true
 			_ronin.position = Vector3(LanternMarket.SHIFT + TerracesQuarter.SHRINE_X + 1.5, TerracesQuarter.G3.z + 0.1, 0.0)
+		elif arg == "--marsh" or arg == "--shimeri" or arg == "--mere":
+			# Into Sumi Marsh (everything before it done; --shimeri: at the
+			# causeway's shrine before his gate, waxed; --mere: at the
+			# Wax-Maker's island, waxed).
+			SaveGame.akane_dueled = true
+			SaveGame.ward_open = true
+			SaveGame.dragon_beaten = true
+			SaveGame.hosho_beaten = true
+			_ronin.has_glide = true
+			_ronin.has_gust = true
+			var at := SumiMarsh.ARRIVE_X
+			if arg == "--shimeri":
+				at = 346.0
+			elif arg == "--mere":
+				at = 205.0
+			if arg != "--marsh":
+				_ronin.has_wax = true
+				SaveGame.abilities.append("wax")
+			_ronin.position = Vector3(SumiMarsh.SHIFT + at, SumiMarsh.ground_at(at) + 0.1, 0.0)
+		elif arg == "--warrior":
+			# One of Shimeri's drowned soldiers rises beside him (for a look).
+			(func() -> void:
+				await get_tree().create_timer(0.5).timeout
+				var riser := InkRiser.new()
+				riser.warrior = true
+				riser.wake_distance = 1000.0
+				riser.position = Vector3(_ronin.global_position.x + 2.2, SumiMarsh.SHALLOW_BED, 0.0)
+				($Village as Node3D).add_child(riser)).call_deferred()
+		elif arg.begins_with("--pose="):
+			# Shimeri held in one of his moves (for checking his poses).
+			var which := StringName(arg.trim_prefix("--pose="))
+			(func() -> void:
+				await get_tree().create_timer(1.2).timeout
+				var boss := get_tree().root.find_children("*", "Shimeri", true, false)[0] as Shimeri
+				boss.active = false
+				boss.call("_set_mode", which)).call_deferred()
+		elif arg == "--beat":
+			# Shimeri beaten at once (with --shimeri --met): his ending plays.
+			(func() -> void:
+				await get_tree().create_timer(1.0).timeout
+				# (Whichever general is nearest: Shimeri or Hōshō.)
+				var near: Node3D = null
+				for b: Node3D in get_tree().root.find_children("*", "Shimeri", true, false) + get_tree().root.find_children("*", "Hosho", true, false):
+					if near == null or absf(b.global_position.x - _ronin.global_position.x) < absf(near.global_position.x - _ronin.global_position.x):
+						near = b
+				near.set(&"health", 1)
+				near.call("take_hit", 1, Vector2.RIGHT)).call_deferred()
+		elif arg.begins_with("--akane-pose="):
+			# Akane (in the Skies' ring) held in one of her moves.
+			var which := StringName(arg.trim_prefix("--akane-pose="))
+			SaveGame.akane_skies_met = true
+			(func() -> void:
+				await get_tree().create_timer(1.2).timeout
+				var duel := get_tree().root.find_children("*", "AkaneSkies", true, false)[0] as AkaneSkies
+				duel.akane.visible = true
+				duel.akane.set_physics_process(true)
+				duel.akane.active = true
+				duel.akane.call("_set_mode", which)).call_deferred()
+		elif arg == "--met":
+			SaveGame.shimeri_met = true  # (with --shimeri: the fight starts at once)
+			SaveGame.hosho_met = true    # (with --hosho: walk into his hall, the fight starts)
+		elif arg == "--skies":
+			# Into Koinobori Skies (everything before it done).
+			SaveGame.akane_dueled = true
+			SaveGame.ward_open = true
+			SaveGame.dragon_beaten = true
+			SaveGame.hosho_beaten = true
+			SaveGame.shimeri_beaten = true
+			_ronin.has_glide = true
+			_ronin.has_gust = true
+			_ronin.has_wax = true
+			_ronin.position = Vector3(KoinoboriSkies.SHIFT + KoinoboriSkies.ARRIVE_X, 0.1, 0.0)
+		elif arg == "--gates":
+			# Into the Thousand Gates (everything before it done).
+			SaveGame.akane_dueled = true
+			SaveGame.hosho_beaten = true
+			SaveGame.shimeri_beaten = true
+			SaveGame.akane_skies_dueled = true
+			_ronin.has_glide = true
+			_ronin.has_gust = true
+			_ronin.has_wax = true
+			_ronin.has_shuriken = true
+			_ronin.position = Vector3(ThousandGates.SHIFT + ThousandGates.ARRIVE_X, 0.1, 0.0)
+		elif arg == "--shuriken":
+			_ronin.has_shuriken = true  # (as if learned in the Eyrie)
+		elif arg == "--fold":
+			_ronin.has_fold = true  # (as if learned at the summit lookout)
+		elif arg == "--wax":
+			_ronin.has_wax = true  # (as if coated by the Wax-Maker)
 		elif arg == "--gust":
 			_ronin.has_gust = true  # (as if learned from the fan-maker)
 		elif arg == "--glide":
@@ -630,7 +800,18 @@ func _apply_debug_start() -> void:
 func _debug_screenshot() -> void:
 	for arg: String in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot="):
-			await get_tree().create_timer(2.0).timeout
+			# (--wait=SECONDS: later than the usual 2 s, e.g. into a cutscene.)
+			var wait := 2.0
+			for other: String in OS.get_cmdline_user_args():
+				if other.begins_with("--wait="):
+					wait = float(other.trim_prefix("--wait="))
+			await get_tree().create_timer(wait).timeout
+			if "--fps" in OS.get_cmdline_user_args():
+				print("FPS ", Engine.get_frames_per_second(), " drawn ", RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME))
+			if "--lights" in OS.get_cmdline_user_args():
+				for l: Light3D in get_tree().root.find_children("*", "Light3D", true, false):
+					if l.is_visible_in_tree() and l.light_energy > 0.0:
+						print("LIGHT ", l.get_path(), " ", l.global_position, " e=", l.light_energy, " c=", l.light_color)
 			await RenderingServer.frame_post_draw
 			get_viewport().get_texture().get_image().save_png(arg.trim_prefix("--screenshot="))
 			get_tree().quit()
@@ -693,6 +874,12 @@ func _continue_from_save() -> void:
 		village.bamboo.learn_glide(true)
 	if "gust" in SaveGame.abilities:
 		_ronin.has_gust = true
+	if "wax" in SaveGame.abilities:
+		_ronin.has_wax = true
+	if "shuriken" in SaveGame.abilities:
+		_ronin.has_shuriken = true
+	if "fold" in SaveGame.abilities:
+		_ronin.has_fold = true
 	if SaveGame.hannya_fallen:
 		# She is gone: the courtyard is quiet, its far gate open.
 		village.bamboo.open_gate(true)
@@ -721,3 +908,14 @@ func _play_ending() -> void:
 	add_child(scene)
 	if is_instance_valid(_boss_bar):
 		_boss_bar.hide_bar()
+
+
+## Joins the still scenery of every place (see MeshMerger), then puts each
+## place's pieces back to shown or hidden.
+func _merge_scenery() -> void:
+	var village: Village = $Village
+	var builders: Array = [village, village.bamboo, village.lantern_market, village.marsh, village.skies, village.gates]
+	var started := Time.get_ticks_msec()
+	MeshMerger.merge(village, builders)
+	print("Scenery joined: %d pieces into %d meshes (%d ms)" % [MeshMerger.piece_count, MeshMerger.merged_count, Time.get_ticks_msec() - started])
+	village.refresh_place()

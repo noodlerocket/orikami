@@ -352,7 +352,9 @@ func _physics_process(_delta: float) -> void:
 	if over and at.y < WATER - 0.35 and at.y > BED - 0.3:
 		if not _carried_off:
 			_carried_off = true
-			_ronin.fall_in()
+			_ronin.deep_water()  # (waxed, he wades through it)
+		if _ronin.has_wax and _ronin.is_on_floor():
+			_ronin.wading = true
 	elif at.y > WATER + 0.5 or not over:
 		_carried_off = false
 	_last_y = at.y

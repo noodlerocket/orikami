@@ -25,7 +25,9 @@ static var slot := 1
 ## The names of the shrines, for the slots' summaries.
 const SHRINE_NAMES := {"paper_maker": "the Paper-Maker's door", "warehouse": "the river warehouse",
 	"steps": "the Shrine Steps", "bamboo": "the bamboo altar", "mill": "the paper mill", "market": "the Mist Gate",
-	"teahouse": "the canal teahouse", "kilns": "the lantern kilns", "hosho_gate": "Hōshō's Gate"}
+	"teahouse": "the canal teahouse", "kilns": "the lantern kilns", "hosho_gate": "Hōshō's Gate",
+	"marsh": "the Weeping Steps", "stilt_house": "the drowned village", "mere": "the Black Mere", "causeway": "the Causeway of Lost Names",
+	"cloudbreak": "the Cloudbreak Stair", "eyrie": "the Kite-Makers' Eyrie", "wind_shrine": "the Wind Shrine"}
 
 static var last_shrine := ""
 static var rested: Array[String] = []
@@ -42,6 +44,9 @@ static var papermaker_told := false
 ## Akane: met (her warning seen), and her first duel won.
 static var akane_met := false
 static var akane_dueled := false
+## Her second duel, in Koinobori Skies.
+static var akane_skies_met := false
+static var akane_skies_dueled := false
 ## The Lantern Market: the Ward's gate cut open, the Festival Dragon met and beaten.
 static var ward_open := false
 static var dragon_met := false
@@ -49,6 +54,9 @@ static var dragon_beaten := false
 ## Hōshō: met, beaten; the generals' seals he has ("hosho").
 static var hosho_met := false
 static var hosho_beaten := false
+## Shimeri (Sumi Marsh): met, beaten.
+static var shimeri_met := false
+static var shimeri_beaten := false
 static var seals: Array[String] = []
 ## The houses in the Ward it crushed (their places in WardQuarter.HOUSES): ruins for good.
 static var ward_ruins: Array[int] = []
@@ -124,11 +132,15 @@ static func reset() -> void:
 	papermaker_told = false
 	akane_met = false
 	akane_dueled = false
+	akane_skies_met = false
+	akane_skies_dueled = false
 	ward_open = false
 	dragon_met = false
 	dragon_beaten = false
 	hosho_met = false
 	hosho_beaten = false
+	shimeri_met = false
+	shimeri_beaten = false
 	seals.clear()
 	ward_ruins.clear()
 
@@ -148,11 +160,15 @@ static func write() -> void:
 	cfg.set_value("game", "papermaker_told", papermaker_told)
 	cfg.set_value("game", "akane_met", akane_met)
 	cfg.set_value("game", "akane_dueled", akane_dueled)
+	cfg.set_value("game", "akane_skies_met", akane_skies_met)
+	cfg.set_value("game", "akane_skies_dueled", akane_skies_dueled)
 	cfg.set_value("game", "ward_open", ward_open)
 	cfg.set_value("game", "dragon_met", dragon_met)
 	cfg.set_value("game", "dragon_beaten", dragon_beaten)
 	cfg.set_value("game", "hosho_met", hosho_met)
 	cfg.set_value("game", "hosho_beaten", hosho_beaten)
+	cfg.set_value("game", "shimeri_met", shimeri_met)
+	cfg.set_value("game", "shimeri_beaten", shimeri_beaten)
 	cfg.set_value("game", "seals", seals)
 	cfg.set_value("game", "ward_ruins", ward_ruins)
 	cfg.set_value("game", "explored", explored.keys())
@@ -177,11 +193,15 @@ static func read() -> bool:
 	papermaker_told = cfg.get_value("game", "papermaker_told", false)
 	akane_met = cfg.get_value("game", "akane_met", false)
 	akane_dueled = cfg.get_value("game", "akane_dueled", false)
+	akane_skies_met = cfg.get_value("game", "akane_skies_met", false)
+	akane_skies_dueled = cfg.get_value("game", "akane_skies_dueled", false)
 	ward_open = cfg.get_value("game", "ward_open", false)
 	dragon_met = cfg.get_value("game", "dragon_met", false)
 	dragon_beaten = cfg.get_value("game", "dragon_beaten", false)
 	hosho_met = cfg.get_value("game", "hosho_met", false)
 	hosho_beaten = cfg.get_value("game", "hosho_beaten", false)
+	shimeri_met = cfg.get_value("game", "shimeri_met", false)
+	shimeri_beaten = cfg.get_value("game", "shimeri_beaten", false)
 	seals.assign(cfg.get_value("game", "seals", []))
 	ward_ruins.assign(cfg.get_value("game", "ward_ruins", []))
 	explored = {}

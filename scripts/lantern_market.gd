@@ -24,7 +24,8 @@ extends Node3D
 const SHIFT := 2000.0
 ## Its east end: Hōshō's hall, at the top of the Gilded Terraces (the whole
 ## region: docs/lantern_market_plan.md).
-const END := 482.0
+## (Past Hōshō's hall: the back court and the Rain Gate, BackCourt.)
+const END := 536.0
 ## Where he arrives (local x), and how far west he may walk before he is
 ## taken back to the bamboo.
 const ARRIVE_X := 3.0
@@ -84,10 +85,16 @@ var _shimmer: Array[MeshInstance3D] = []   # lantern reflections on the water
 
 
 ## True when this (real, world) x is in the market.
-## A storehouse in the Upper Market whose door is barred by a burning heap
-## of stall screens: only the Fan Gust (learned later, after the dragon)
-## puts it out; inside, cranes on the shelf. A reason to come back.
+## A storehouse in the Upper Market, cranes on its shelf. Until the
+## Festival Dragon is beaten its doorway is boarded shut (Julian: a fire that
+## only the Fan Gust can put out, burning before he has the fan, looked like
+## a mistake). Once the dragon is beaten the dragon's storm has set the
+## heap of stall screens at its door alight: he learns the Fan Gust just
+## after, and coming back west he can blow it out. A reason to come back.
 const STORE_X := 79.0
+
+var _store_boards: Node3D
+var _store_lit := false
 
 
 func _build_burning_store() -> void:
@@ -97,6 +104,46 @@ func _build_burning_store() -> void:
 	room.start_open = true
 	room.position = Vector3(STORE_X, UPPER.z, 0.0)
 	add_child(room)
+	if SaveGame.dragon_beaten:
+		_light_store()
+		return
+	# Boarded shut: planks nailed across the doorway, solid.
+	_store_boards = Node3D.new()
+	add_child(_store_boards)
+	var x := STORE_X - 1.1
+	var g := UPPER.z
+	var wall := _solid(Vector3(x, g + 1.4, 0.0), Vector3(0.4, 2.8, 3.0))
+	_store_boards.set_meta(&"wall", wall)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7979
+	var b := PaperMesh.new(rng.randi())
+	b.shade_jitter = 0.16
+	for k in 6:
+		var y := g + 0.35 + k * 0.42
+		var tilt := rng.randf_range(-0.12, 0.12)
+		b.color = Scenery.WOOD.darkened(rng.randf_range(0.0, 0.3))
+		var half := 1.5
+		b.quad(Vector3(x + 0.22, y - 0.09 - tilt * half, -half), Vector3(x + 0.22, y - 0.09 + tilt * half, half),
+				Vector3(x + 0.22, y + 0.09 + tilt * half, half), Vector3(x + 0.22, y + 0.09 - tilt * half, -half), Vector3.RIGHT)
+		b.quad(Vector3(x - 0.22, y - 0.09 - tilt * half, -half), Vector3(x - 0.22, y + 0.09 - tilt * half, -half),
+				Vector3(x - 0.22, y + 0.09 + tilt * half, half), Vector3(x - 0.22, y - 0.09 + tilt * half, half), Vector3.LEFT)
+		b.color = Color(0.12, 0.12, 0.13)
+		for z: float in [-1.2, 1.2]:
+			b.box(Vector3(x - 0.23, y + tilt * z, z), Vector3(0.02, 0.05, 0.05))
+	# Two long battens nailed across them.
+	b.color = Scenery.WOOD.darkened(0.35)
+	b.box(Vector3(x - 0.25, g + 1.4, 0.0), Vector3(0.06, 2.6, 0.16))
+	b.box(Vector3(x + 0.25, g + 1.4, 0.0), Vector3(0.06, 2.6, 0.16))
+	_store_boards.add_child(b.build())
+
+
+## The dragon's storm has set the store's door alight.
+func _light_store() -> void:
+	_store_lit = true
+	if _store_boards:
+		(_store_boards.get_meta(&"wall") as Node).queue_free()
+		_store_boards.queue_free()
+		_store_boards = null
 	var fire := FireBarrier.new()
 	fire.id = "market_store_fire"
 	fire.position = Vector3(STORE_X - 1.1, UPPER.z, 0.0)
@@ -104,7 +151,7 @@ func _build_burning_store() -> void:
 
 
 static func in_market(x: float) -> bool:
-	return x > SHIFT - 300.0
+	return x > SHIFT - 300.0 and not SumiMarsh.in_marsh(x)
 
 
 ## Height of the ground at a local x (the bridge's deck over the canal).
@@ -157,6 +204,10 @@ func _ready() -> void:
 	shrine.scale = Vector3.ONE * 1.3
 	add_child(shrine)
 	_build_burning_store()
+	# The canal lock and the porters' lift (opened from the far side).
+	var shortcuts := MarketShortcuts.new()
+	shortcuts.market = self
+	add_child(shortcuts)
 	for spot: Vector2 in HUSKS:
 		var husk: Node3D = Village.HUSK_SCENE.instantiate()
 		husk.position = Vector3(spot.x, spot.y, 0.0)
@@ -188,6 +239,8 @@ func set_awake(on: bool) -> void:
 
 
 func _process(_delta: float) -> void:
+	if not _store_lit and SaveGame.dragon_beaten:
+		_light_store()
 	var t := Time.get_ticks_msec() * 0.001
 	for i in _shimmer.size():
 		var s := _shimmer[i]
@@ -707,7 +760,7 @@ func _build_ground() -> void:
 			# pale line across the middle of these stones.)
 			_solid(Vector3((x + x1) * 0.5, g.z - 4.0, -1.5), Vector3(x1 - x, 8.0, 6.0))
 			village._lay_paving(SHIFT + x, SHIFT + x1, g.z, Village.STREET_BACK, NEAR_Z)
-			village._add_rain_splashes(SHIFT + x, SHIFT + x1, g.z)
+			village._add_rain_splashes(SHIFT + x, SHIFT + x1, g.z, NEAR_Z - 0.6)
 			x = x1
 		_front_edge(g.x, g.y, g.z)
 	# Under the steps.

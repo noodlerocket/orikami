@@ -45,6 +45,8 @@ static func deck_at(x: float) -> float:
 
 
 static func ground_at(x: float) -> float:
+	if x > HALL.y:
+		return BackCourt.ground_at(x)
 	if x < BRIDGE.x:
 		return G1.z
 	if x < BRIDGE.y:

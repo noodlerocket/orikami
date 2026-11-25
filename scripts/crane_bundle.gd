@@ -24,6 +24,8 @@ signal collected(count: int)
 @export var count := 5
 ## How close (metres) he must come.
 @export var reach := Vector2(0.9, 1.5)
+## Only taken by him floating (the Wax Coat): cranes out on deep water.
+@export var swim_only := false
 ## How big the cranes are (1 = a hand's width).
 @export var size := 1.8
 
@@ -211,7 +213,7 @@ func _physics_process(_delta: float) -> void:
 		if _ronin == null:
 			return
 	var d := _ronin.global_position + Vector3(0.0, 0.7, 0.0) - global_position
-	if absf(d.x) < reach.x and absf(d.y) < reach.y:
+	if absf(d.x) < reach.x and absf(d.y) < reach.y and (_ronin.swimming or not swim_only):
 		collect()
 
 

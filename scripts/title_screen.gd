@@ -122,6 +122,9 @@ func _on_chosen(item: StringName) -> void:
 			_menu.fade_to_black(func() -> void: get_tree().change_scene_to_file(PROLOGUE_SCENE))
 		&"continue":
 			SaveGame.continuing = true
+			# (Read before the world is built: whatever checks the save while
+			# being built (bosses beaten, gates opened, walls torn) must see it.)
+			SaveGame.read()
 			_menu.fade_to_black(func() -> void: LoadingScreen.go(get_tree(), GAME_SCENE))
 		&"quit":
 			_menu.fade_to_black(func() -> void: get_tree().quit())

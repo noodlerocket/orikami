@@ -170,6 +170,27 @@ used to generate these were not written down.
 | `chochin_cackle.mp3` | a chōchin-obake's tell (swelling, before its lunge) | A dry, papery cackle, 1.2 s. *(rms 0.10, peak 0.81.)* |
 | `windmill_creak.mp3` | the paper windmill turning fast after a gust | A wooden creak, 2 s. *(rms 0.08, peak 0.81.)* |
 | `hosho_lunge.mp3` | Hōshō's thrust (his long slide at you) | Lunge of a heavy armoured samurai general charging forward, lacquered armour plates rattling, silk robes snapping, a deep rush of air, no metal ring. *(Trimmed to 0.6 s, 8 ms fade-in, 0.15 s fade-out; peak 0.75; 0% below 300 Hz: a rattle, not a pop.)* |
+| `frog_croak.mp3` | Sumi Marsh: an ink frog croaking (idle), and its tell | Croak of one big bullfrog, deep, wet, throaty, close up, single croak. *(Levelled to 0.85, 10 ms fade-in; starts quietly.)* |
+| `frog_leap.mp3` | An ink frog leaping | Leaping frog launching off wet ground, a quick soft wet push and a papery flutter, short. *(Peak 0.7, 10 ms fade-in.)* |
+| `frog_splat.mp3` | An ink frog landing | Splat of a soft wet body landing in thick dark liquid, a short heavy wet splash, no echo. *(Was very quiet: levelled to 0.7; 3% below 300 Hz: a splat, not a pop.)* |
+| `eel_hiss.mp3` | An ink eel's tell (the ink bulges) | Eerie hiss of a sea creature rising under dark water, bubbling, a rasping breathy hiss, menacing. *(Started at full loudness: 40 ms fade-in; peak 0.8.)* |
+| `wax_pour.mp3` | The Wax-Maker pouring wax over him (the Wax Coat) | Pouring warm melted wax slowly from a wooden ladle, thick soft liquid trickle and gentle drips, cozy, quiet. *(Was very quiet: levelled to 0.6.)* |
+| `shimeri_groan.mp3` | Shimeri: forgetting, the weeping sky, the charge, the intro | Deep weary groan of an old giant armoured warrior, exhausted, mournful, under a heavy wet helmet, low and slow, with the creak of soaked armour. *(Started at full loudness: 35 ms fade-in; peak 0.85.)* |
+| `marsh_night.ogg` | Sumi Marsh's night, looped at seven places | Swamp at night in light rain, many frogs croaking softly far away, a few insects, slow drips on still water, quiet and eerie. *(Its last 0.5 s blended into its first: a seamless loop.)* |
+| `kamaitachi_whistle.mp3` | the kamaitachi's tell | Whistling of a thin eerie wind through a crack, rising in pitch, a sharp ghostly whistle, like a sickle cutting the air. *(40 ms fade-in; peak 0.75.)* |
+| `kamaitachi_pass.mp3` | the kamaitachi streaking past | Zipping pass of something fast and thin slicing past, a sharp papery swish with a dry snap. *(All above 300 Hz: a swish, not a pop; peak 0.62.)* |
+| `ink_surge.mp3` | the Drowned Muster: warriors rising | Gurgling thick black liquid bubbling up and surging, something heavy rising out of a dark pool. *(Starts quiet; peak 0.71.)* |
+| `seal_stamp.mp3` | a general's seal stamped on the screen (`SealCard`) | Heavy stamp of a large wooden seal pressed onto paper, then the soft ring of a temple bowl. *(Generated at 0.99: levelled to 0.81.)* |
+| `gale_lift.mp3` | Akane rising into the gale dive | Updraft of a sudden gust lifting upward, swirling with fluttering paper. *(Generated at 1.07, clipping: levelled to 0.75.)* |
+| `shuriken_spin.mp3` | the Shuriken Dash | Whirring of a spinning paper pinwheel blade. *(A first "spinning blade" try started at full loudness, 84% in its first 50 ms: rejected.)* |
+| `kite_paper_tear.mp3` | a paper wall torn by the spin | Tearing of a taut sheet of kite paper on a frame, ripped open in one burst. *(Peak 0.77.)* |
+| `carp_flap.mp3` | landing on a drifting carp | Flapping of a large cloth windsock filling with wind. *(25 ms fade-in; peak 0.51; played quietly.)* |
+| `skies_wind.ogg` | Koinobori Skies, placed loops | High mountain wind on a cliff top above the clouds, streamers far off, faint chimes. *(Looped: its last 0.5 s blended into its first; 4.5 s.)* |
+| `gates_evening.ogg` | the Thousand Gates, placed loops | Evening on a forested mountain shrine path, crows, cicadas, a very distant temple bell. *(Looped the same way.)* |
+| `stone_grind.mp3` | a stone fox waking | Grinding of an old stone statue slowly shifting on its base, stone scraping on stone, grit trickling. *(Peak 0.76.)* |
+| `fox_snarl.mp3` | a stone fox leaping and crouching to lunge | Snarling of a fox, a short vicious hissing snarl with a gravelly stony rasp. *(Generated at 1.0: levelled to 0.75.)* |
+| `stone_thud.mp3` | a stone fox landing; its stone cracking when parried | Thudding landing of a heavy stone figure on stone paving. *(An impact, half its energy in 50 ms, but it starts quietly and is mostly above 300 Hz: a knock, not a pop.)* |
+| `music_shimeri_fight.ogg` | Shimeri's fight (loops) | music_v2, 72 s: slow heavy taiko, a sorrowful shakuhachi, biwa, low choir hum, "loop seamlessly". *(It came back with a quiet first 27 s and a fade at its end: the loop is the full groove, 27 s to 68.4 s, its last 1.2 s blended into its first; 40 s; ends meet at 0.25 and 0.27 loudness.)* |
 | `music_hosho_fight.ogg` | the Hōshō fight (loops; `HoshoHall.music_volume`; fades when he falls or the Ronin dies) | music_v2 (ElevenLabs), 82 s seamless loop. *(rms 0.12 overall; peak 0.84.)* |
 
 Measuring tip: decode each channel separately (or `-ac 1` overstates the

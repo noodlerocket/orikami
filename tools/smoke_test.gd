@@ -17,6 +17,15 @@ func _initialize() -> void:
 func _run(main: Node) -> void:
 	var ronin: Ronin = main.get_node("Ronin")
 	await _frames(40)
+	# (ONLY=marsh: just the marsh and the market's shortcuts, quickly.)
+	if OS.get_environment("ONLY") == "marsh":
+		await _marsh(ronin)
+		await _market_shortcuts(ronin)
+		await _skies(ronin)
+		await _gates(ronin)
+		print("SMOKE TEST: ALL PASSED" if _failures == 0 else "SMOKE TEST: %d FAILED" % _failures)
+		quit(1 if _failures > 0 else 0)
+		return
 	_check("lands on the ground", ronin.is_on_floor() and absf(ronin.position.y) < 0.1)
 	_check("stays on the gameplay plane", ronin.position.z == 0.0)
 
@@ -83,21 +92,59 @@ func _run(main: Node) -> void:
 	_check("hits give ink (%d)" % ronin.ink, ronin.ink == 3)
 	_check("ink taken in is kept as marks (%d)" % ronin.ink_absorbed, ronin.ink_absorbed == 3)
 
+	# Changing keys (the Controls page): a key taken from another action is
+	# swapped over to it; the menus' keys cannot be taken; saved keys come
+	# back at start; reset puts every key back. (Its own settings file.)
+	KeyBinds.file_path = "user://test_settings.cfg"
+	KeyBinds.reset()
+	var took := KeyBinds.bind(&"jump", KEY_K)
+	var swapped := KeyBinds.keys_of(&"jump") == [KEY_K] and KeyBinds.keys_of(&"draw") == [KEY_SPACE]
+	var refused := not KeyBinds.bind(&"slash", KEY_ESCAPE) and KeyBinds.keys_of(&"slash") == [KEY_J]
+	InputMap.load_from_project_settings()
+	KeyBinds.apply_saved()
+	var kept := KeyBinds.keys_of(&"jump") == [KEY_K]
+	KeyBinds.bind(&"pause", KEY_TAB)
+	var esc_stays := KeyBinds.label_of(&"pause") == "Esc  /  Tab"
+	# The tutorial's and ability cards' prompts name the keys as they are now.
+	var prompts_follow := KeyBinds.live("hold Space") == "hold K" and KeyBinds.live("Space, then L") == "K, then L" 			and KeyBinds.live("Esc") == "Esc" and KeyBinds.live("A  D") == "A  D"
+	KeyBinds.reset()
+	var back := KeyBinds.keys_of(&"jump") == [KEY_SPACE] and KeyBinds.keys_of(&"draw") == [KEY_K] and KeyBinds.label_of(&"pause") == "Esc  /  P"
+	_check("changing keys: Jump to K (%s) swaps the draw onto Space (%s); Esc can't be taken (%s); saved keys return (%s); Esc always pauses (%s); prompts follow (%s); reset puts them back (%s)" % [took, swapped, refused, kept, esc_stays, prompts_follow, back],
+			took and swapped and refused and kept and esc_stays and prompts_follow and back)
+
+	# The courtyard's far gate stands in the town: it is shown while he is in
+	# the town (it was hidden with the grove, and the gate went invisible).
+	var leaves: Array = (main.get_node("Village") as Village).bamboo.get(&"_gate_leaves")
+	_check("the courtyard's far gate is seen from the town (%s)" % (leaves[0] as Node3D).is_visible_in_tree(), (leaves[0] as Node3D).is_visible_in_tree())
+
 	# Down-slash pogo on the second husk.
 	husk = husks[1]
-	ronin.position = husk.position + Vector3(0.0, 1.7, 0.0)
-	ronin.velocity = Vector3.ZERO
-	Input.action_press("aim_down")
-	await _frames(3)  # Give the game a moment to notice he is airborne.
-	Input.action_press("slash")
-	await _frames(2)
-	Input.action_release("slash")
-	Input.action_release("aim_down")
+	# (Held still: patrolling, it sometimes walked out from under him in the
+	# frames before the cut, and the check failed by chance.)
+	husk.set_physics_process(false)
+	# (Up to three tries: in the full run it now and then failed by chance,
+	# though on its own it bounces every time; a broken pogo fails all three.)
 	var best := -99.0
-	for i in 10:
-		await _frames(1)
-		best = maxf(best, ronin.velocity.y)
-	_check("pogo bounces upward (%.1f m/s)" % best, best > 6.0)
+	var tries := 0
+	while tries < 3 and best <= 6.0:
+		tries += 1
+		ronin.position = husk.position + Vector3(0.0, 1.7, 0.0)
+		ronin.velocity = Vector3.ZERO
+		Input.action_press("aim_down")
+		await _frames(3)  # Give the game a moment to notice he is airborne.
+		Input.action_press("slash")
+		await _frames(2)
+		Input.action_release("slash")
+		Input.action_release("aim_down")
+		for i in 10:
+			await _frames(1)
+			best = maxf(best, ronin.velocity.y)
+		if best <= 6.0:
+			print("  (pogo try %d: %.1f m/s, on floor %s)" % [tries, best, ronin.is_on_floor()])
+			await _frames(40)
+	_check("pogo bounces upward (%.1f m/s, try %d)" % [best, tries], best > 6.0)
+	if is_instance_valid(husk):
+		husk.set_physics_process(true)
 
 	# Touching a husk hurts.
 	ronin.set("_invulnerable", 0.0)
@@ -1724,6 +1771,10 @@ func _ward(ronin: Ronin) -> void:
 	await _fan_gust(ward, ronin)
 	await _rise(ronin)
 	await _hosho(ronin)
+	await _marsh(ronin)
+	await _market_shortcuts(ronin)
+	await _skies(ronin)
+	await _gates(ronin)
 	SaveGame.ward_open = saved[0]
 	SaveGame.dragon_met = saved[1]
 	SaveGame.dragon_beaten = saved[2]
@@ -1830,17 +1881,34 @@ func _rise(ronin: Ronin) -> void:
 	Input.action_release("move_right")
 	_check("the burning gate holds him (x %.1f) until his gust puts it out (then x %.1f)" % [stopped, ronin.global_position.x - shift],
 			stopped < RiseQuarter.START - 0.5 and ronin.global_position.x - shift > RiseQuarter.START + 2.0)
-	# The burning store in the Upper Market: its fire bars the door until
-	# the gust puts it out; then he walks in to its cranes.
+	# The store in the Upper Market: before the dragon is beaten its door is
+	# boarded shut (no fire before the fan: Julian), and a gust does nothing.
+	# Once the dragon is beaten its door is burning; a gust puts it out and
+	# he walks in to its cranes.
 	var store_x := LanternMarket.STORE_X
+	var market_node: LanternMarket = ronin.get_parent().find_children("*", "LanternMarket", true, false)[0]
+	var was_beaten := SaveGame.dragon_beaten
+	var no_fire_before := true
+	for f: FireBarrier in market_node.find_children("*", "FireBarrier", false, false):
+		if f.id == "market_store_fire":
+			no_fire_before = was_beaten
 	ronin.global_position = Vector3(shift + store_x - 4.0, LanternMarket.UPPER.z + 0.2, 0.0)
 	ronin.velocity = Vector3.ZERO
 	ronin.facing = 1.0
 	await _frames(20)
+	if not was_beaten:
+		await _gust_once(ronin)
+		await _frames(30)
 	Input.action_press("move_right")
 	await _frames(60)
 	Input.action_release("move_right")
-	var barred := ronin.global_position.x - shift
+	var boarded := ronin.global_position.x - shift
+	SaveGame.dragon_beaten = true
+	await _frames(5)
+	var lit := false
+	for f: FireBarrier in market_node.find_children("*", "FireBarrier", false, false):
+		if f.id == "market_store_fire" and not f.out:
+			lit = true
 	ronin.global_position = Vector3(shift + store_x - 4.0, LanternMarket.UPPER.z + 0.2, 0.0)
 	await _frames(10)
 	await _gust_once(ronin)
@@ -1848,8 +1916,9 @@ func _rise(ronin: Ronin) -> void:
 	Input.action_press("move_right")
 	await _frames(60)
 	Input.action_release("move_right")
-	_check("the Upper Market's store: its fire bars the door (x %.1f) until a gust puts it out (then x %.1f, inside)" % [barred, ronin.global_position.x - shift],
-			barred < store_x - 0.5 and ronin.global_position.x - shift > store_x + 0.5)
+	_check("the Upper Market's store: boarded before the dragon, no fire (%s, x %.1f); after it the door burns (%s) until a gust puts it out (then x %.1f, inside)" % [no_fire_before, boarded, lit, ronin.global_position.x - shift],
+			no_fire_before and boarded < store_x - 0.5 and lit and ronin.global_position.x - shift > store_x + 0.5)
+	SaveGame.dragon_beaten = was_beaten
 	# A kiln's hot air.
 	ronin.has_glide = true
 	var kiln: float = RiseQuarter.KILNS[0]
@@ -2028,3 +2097,578 @@ func _hosho(ronin: Ronin) -> void:
 	SaveGame.hosho_met = saved[0]
 	SaveGame.hosho_beaten = saved[1]
 	SaveGame.seals = saved[2]
+
+
+## Sumi Marsh: the way in from Hōshō's hall once he is beaten; wading in ink
+## stains and slows him; deep ink carries him off, until the Wax-Maker's
+## coat lets him float (in the town's deep water too); a sinking plank
+## settles under him; a pour of ink presses him down unless waxed; the
+## frog's and the eel's attacks can be parried; a sodden husk rises from the
+## ink; Shimeri's intro, his forgetting, a parried cleave, his ink wave, and
+## beating him.
+func _marsh(ronin: Ronin) -> void:
+	var shift := SumiMarsh.SHIFT
+	var main := ronin.get_parent()
+	var saved := [SaveGame.hosho_beaten, SaveGame.shimeri_met, SaveGame.shimeri_beaten, SaveGame.seals.duplicate(), SaveGame.abilities.duplicate()]
+	ronin.set("_invulnerable", 99.0)
+	ronin.has_wax = false
+	# In through the opened end of Hōshō's hall.
+	SaveGame.hosho_beaten = true
+	ronin.global_position = Vector3(LanternMarket.SHIFT + TerracesQuarter.HALL.y - 3.0, TerracesQuarter.HALL.z + 0.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(10)
+	# (Opened, the hall's east end leads down the covered stair into the back
+	# garden and out through the Rain Gate.)
+	(get_first_node_in_group(&"hosho_hall") as HoshoHall).open_way(false)
+	Input.action_press("move_right")
+	for f in 900:
+		await physics_frame
+		if SumiMarsh.in_marsh(ronin.global_position.x):
+			break
+	Input.action_release("move_right")
+	await _frames(60)
+	_check("once Hōshō is beaten, out of his hall, through the back garden and the Rain Gate is Sumi Marsh (x %.1f)" % (ronin.global_position.x - shift),
+			SumiMarsh.in_marsh(ronin.global_position.x) and absf(ronin.global_position.x - shift - SumiMarsh.ARRIVE_X) < 9.0)
+	# Wading in shallow ink: slower, and it soaks into his paper.
+	ronin.global_position = Vector3(shift + 20.0, SumiMarsh.SHALLOW_BED + 0.3, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(20)
+	var ink_before := ronin.ink_absorbed
+	var x0 := ronin.global_position.x
+	Input.action_press("move_right")
+	await _frames(120)
+	Input.action_release("move_right")
+	var waded := ronin.global_position.x - x0
+	_check("wading in the shallows is slow (%.1f m in 2 s) and stains him (ink %d to %d)" % [waded, ink_before, ronin.ink_absorbed],
+			waded < ronin.run_speed * 2.0 * 0.75 and ronin.ink_absorbed > ink_before)
+	# Deep ink carries him off, unwaxed.
+	ronin.global_position = Vector3(shift + 75.0, 2.0, 0.0)
+	ronin.velocity = Vector3.ZERO
+	var went := false
+	for i in 120:
+		await physics_frame
+		if ronin.is_in_pit():
+			went = true
+			break
+	_check("unwaxed, deep ink carries him off", went)
+	await _frames(150)
+	# A sinking plank settles under him.
+	var plank: SinkingPlank = null
+	for p: SinkingPlank in main.find_children("*", "SinkingPlank", true, false):
+		if not p.lotus and absf(p.global_position.x - (shift + 42.6)) < 0.5:
+			plank = p
+	ronin.global_position = plank.global_position + Vector3(0.0, 0.8, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(20)
+	var top0 := plank.global_position.y
+	await _frames(90)
+	_check("a sodden plank sinks under him (%.2f m)" % (top0 - plank.global_position.y), top0 - plank.global_position.y > 0.25)
+	# The pour over the niche presses him down, unwaxed.
+	ronin.global_position = Vector3(shift + 171.9, 1.7, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(20)
+	var base_y := ronin.global_position.y
+	Input.action_press("jump")
+	var high := -INF
+	for i in 50:
+		await physics_frame
+		high = maxf(high, ronin.global_position.y)
+	Input.action_release("jump")
+	var pressed := high - base_y
+	await _frames(40)
+	# The Wax-Maker coats him.
+	var island := shift + SumiMarsh.WAX_X
+	ronin.global_position = Vector3(island + 3.0, 1.0, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(20)
+	Input.action_press("move_left")
+	await _frames(40)
+	Input.action_release("move_left")
+	await _frames(240)
+	_check("the Wax-Maker coats him in wax (the Wax Coat)", ronin.has_wax and "wax" in SaveGame.abilities)
+	ronin.set_physics_process(true)
+	ronin.global_position = Vector3(shift + 171.9, 1.7, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(20)
+	base_y = ronin.global_position.y
+	Input.action_press("jump")
+	var waxed_high := -INF
+	for i in 50:
+		await physics_frame
+		waxed_high = maxf(waxed_high, ronin.global_position.y)
+	Input.action_release("jump")
+	_check("a pour of ink presses him down (jump %.1f m), until waxed (%.1f m)" % [pressed, waxed_high - base_y], pressed < 1.6 and waxed_high - base_y > 2.0)
+	await _frames(40)
+	# Waxed, deep ink holds him up: he floats and swims.
+	ronin.global_position = Vector3(shift + 220.0, 1.5, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(60)
+	var fy := ronin.global_position.y - SumiMarsh.INK_Y
+	x0 = ronin.global_position.x
+	Input.action_press("move_right")
+	await _frames(60)
+	Input.action_release("move_right")
+	_check("waxed, he floats in deep ink (feet %.2f m under) and swims (%.1f m)" % [-fy, ronin.global_position.x - x0],
+			not ronin.is_in_pit() and ronin.swimming and fy > -1.3 and fy < -0.6 and ronin.global_position.x - x0 > 0.6)
+	Input.action_press("jump")
+	await _frames(20)
+	Input.action_release("jump")
+	_check("and jumps up out of it (%.1f m above the ink)" % (ronin.global_position.y - SumiMarsh.INK_Y), ronin.global_position.y > SumiMarsh.INK_Y + 0.5)
+	await _frames(60)
+	# The town's deep canal water holds him up too.
+	ronin.global_position = Vector3((Canals.DEEP.x + Canals.DEEP.y) * 0.5, Village.CANAL_WATER + 1.0, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(80)
+	_check("waxed, the town's deep water holds him up too (y %.1f, water %.1f)" % [ronin.global_position.y, Village.CANAL_WATER],
+			not ronin.is_in_pit() and ronin.global_position.y > Village.CANAL_WATER - 1.3)
+	# A frog leaps at him; parried, it flips over.
+	var frog: InkFrog = null
+	for f: InkFrog in main.find_children("*", "InkFrog", true, false):
+		if absf(f.global_position.x - (shift + 92.0)) < 2.0:
+			frog = f
+	ronin.global_position = frog.global_position + Vector3(3.0, 0.3, 0.0)
+	ronin.velocity = Vector3.ZERO
+	ronin.facing = -1.0
+	await _frames(10)
+	var flipped := false
+	var tried := false
+	ronin.set("_invulnerable", 0.0)
+	ronin.health = ronin.max_health
+	for i in 600:
+		await physics_frame
+		if frog.mode != &"leap":
+			tried = false
+		if absf(frog.global_position.x - ronin.global_position.x) > 0.3 and frog.mode != &"leap":
+			ronin.facing = signf(frog.global_position.x - ronin.global_position.x)
+		if not tried and frog.mode == &"leap" and absf(frog.global_position.x - ronin.global_position.x) < 1.75:
+			tried = true
+			Input.action_press("parry")
+			await _frames(2)
+			Input.action_release("parry")
+		if frog.mode == &"stagger":
+			flipped = true
+			break
+	_check("an ink frog leaps at him; parried, it flips over (%s)" % frog.mode, flipped)
+	# An eel bursts out of the Mere at him; parried, it falls back staggered.
+	var eel: InkEel = null
+	for e: InkEel in main.find_children("*", "InkEel", true, false):
+		if e.pool.x == 262.0:
+			eel = e
+	ronin.global_position = Vector3(shift + 280.0, 0.6, 0.0)
+	ronin.velocity = Vector3.ZERO
+	ronin.facing = -1.0
+	await _frames(10)
+	var leapt := false
+	var stunned := false
+	tried = false
+	ronin.health = ronin.max_health
+	for i in 400:
+		await physics_frame
+		if absf(eel.global_position.x - ronin.global_position.x) > 0.2:
+			ronin.facing = signf(eel.global_position.x - ronin.global_position.x)
+		if eel.mode == &"leap":
+			leapt = true
+			if not tried and absf(eel.global_position.x - ronin.global_position.x) < 1.4:
+				tried = true
+				Input.action_press("parry")
+				await _frames(2)
+				Input.action_release("parry")
+		if eel.mode == &"stagger":
+			stunned = true
+			break
+	_check("an ink eel bursts out at him (%s); parried, it falls back staggered (%s)" % [leapt, eel.mode], leapt and stunned)
+	# Standing on a stilt house's deck beside the eel's pool, the eel never
+	# leaps through the deck at him (Julian: they went through platforms).
+	var deck_at := Vector3(SumiMarsh.SHIFT + 139.5, 1.75, 0.0)
+	var point := PhysicsPointQueryParameters3D.new()
+	point.collision_mask = 1
+	var space := (main as Node3D).get_world_3d().direct_space_state
+	var through := 0
+	for f in 600:
+		await physics_frame
+		ronin.global_position = deck_at
+		ronin.velocity = Vector3.ZERO
+		for e: InkEel in main.find_children("*", "InkEel", true, false):
+			if e.mode == &"leap" and e.global_position.distance_to(deck_at) < 14.0:
+				point.position = e.global_position
+				if not space.intersect_point(point, 1).is_empty():
+					through += 1
+	_check("an eel beside a deck never leaps through it (%d frames inside)" % through, through == 0)
+	ronin.health = ronin.max_health
+	# A sodden husk rises out of the shallows as he comes near.
+	var riser: InkRiser = null
+	for r: InkRiser in main.find_children("*", "InkRiser", true, false):
+		if absf(r.global_position.x - (shift + 129.5)) < 1.0:
+			riser = r
+	ronin.global_position = Vector3(shift + 125.0, 2.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(100)
+	var risen: bool = riser.husk.is_inside_tree() and riser.husk.global_position.y > SumiMarsh.SHALLOW_BED - 0.2
+	_check("a sodden husk rises out of the ink", risen)
+	# Shimeri: the intro, then the fight.
+	var post: ShimeriPost = get_first_node_in_group(&"shimeri_post")
+	var boss := post.shimeri
+	SaveGame.shimeri_met = false
+	ronin.global_position = Vector3(shift + 352.0, 1.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(10)
+	Input.action_press("move_right")
+	await _frames(70)
+	Input.action_release("move_right")
+	var intro: StringName = post.get(&"_state")
+	var cine: Node = post.get(&"_cine")
+	if cine:
+		cine.call("finish")
+	await _frames(40)
+	_check("walking into his court starts Shimeri's intro (%s), then the fight (%s)" % [intro, post.get(&"_state")],
+			intro == &"intro" and post.get(&"_state") == &"fight" and boss.active)
+	# He forgets in the middle of a tell, then picks a move again.
+	boss.set(&"forget_chance", 1.0)
+	boss.call("_set_mode", &"cleave_tell")
+	var forgot := false
+	var after := &""
+	for i in 300:
+		await physics_frame
+		if boss.mode() == &"forget":
+			forgot = true
+		if forgot and boss.mode() not in [&"forget", &"remember"]:
+			after = boss.mode()
+			break
+	_check("he forgets his move part-way through its tell, then begins another (%s)" % after, forgot and String(after).ends_with("_tell"))
+	boss.set(&"forget_chance", 0.0)
+	boss.set(&"forget_chance_late", 0.0)
+	# The Drowned Muster: the ink bubbles, then his warriors rise.
+	boss.call("_start_muster")
+	await _frames(110)
+	var mustered := 0
+	for r: InkRiser in post.find_children("*", "InkRiser", true, false):
+		if is_instance_valid(r.husk) and r.husk.is_inside_tree():
+			mustered += 1
+	_check("his Drowned Muster: the ink bubbles and his warriors rise (%d)" % mustered, mustered >= 2)
+	for r: InkRiser in post.find_children("*", "InkRiser", true, false):
+		r.queue_free()
+	await _frames(5)
+	# A cleave, parried: posture. Its wave runs along the floor.
+	ronin.set("_invulnerable", 0.0)
+	ronin.health = ronin.max_health
+	ronin.global_position = boss.global_position + Vector3(-2.4, 0.3, 0.0)
+	ronin.velocity = Vector3.ZERO
+	ronin.facing = 1.0
+	boss.facing = -1.0
+	boss.call("_set_mode", &"cleave_tell")
+	var posture0 := boss.posture
+	var waved := false
+	var parried := false
+	for i in 120:
+		await physics_frame
+		if not parried and boss.mode() == &"cleave":
+			parried = true
+			Input.action_press("parry")
+			await _frames(2)
+			Input.action_release("parry")
+		if not (boss.get(&"_waves") as Array).is_empty():
+			waved = true
+	_check("his cleave, parried, costs him posture (%d to %d); its ink wave runs out (%s)" % [posture0, boss.posture, waved], boss.posture > posture0 and waved)
+	# Beaten: he kneels, the seal is his.
+	ronin.set("_invulnerable", 99.0)
+	boss.health = 1
+	boss.take_hit(1, Vector2.RIGHT)
+	await _frames(10)
+	_check("beaten, Shimeri kneels and his seal is his (%s)" % boss.mode(), boss.mode() == &"defeated" and SaveGame.shimeri_beaten and "shimeri" in SaveGame.seals)
+	cine = post.get(&"_cine")
+	if cine:
+		cine.call("finish")
+	await _frames(60)
+	ronin.set_physics_process(true)
+	ronin.set("_invulnerable", 0.0)
+	ronin.has_wax = false
+	SaveGame.hosho_beaten = saved[0]
+	SaveGame.shimeri_met = saved[1]
+	SaveGame.shimeri_beaten = saved[2]
+	SaveGame.seals = saved[3]
+	SaveGame.abilities = saved[4]
+
+
+## The Lantern Market's shortcuts: three cuts on the canal lock's windlass
+## open it, and W at the lock takes him through the culvert to the Lower
+## Market's canal; a cut on the lift's brake rope opens the porters' lift,
+## and W in its cage takes him down to the door in Festival Square.
+func _market_shortcuts(ronin: Ronin) -> void:
+	var shift := LanternMarket.SHIFT
+	var main := ronin.get_parent()
+	var cuts: MarketShortcuts = main.find_children("*", "MarketShortcuts", true, false)[0]
+	var saved := SaveGame.shortcuts.duplicate()
+	SaveGame.shortcuts.erase("canal_lock")
+	SaveGame.shortcuts.erase("porters_lift")
+	ronin.set("_invulnerable", 99.0)
+	var shut_through := false
+	ronin.global_position = Vector3(shift + MarketShortcuts.CULVERT_X, LanternMarket.CANAL_BED + 0.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(20)
+	Input.action_press("aim_up")
+	await _frames(10)
+	Input.action_release("aim_up")
+	await _frames(80)
+	shut_through = absf(ronin.global_position.x - shift - MarketShortcuts.CULVERT_X) > 5.0
+	for t: PropTarget in cuts.find_children("*", "PropTarget", true, false):
+		if absf(t.global_position.x - shift - (MarketShortcuts.LOCK_X - 1.6)) < 0.5:
+			for k in 3:
+				t.take_hit(1, Vector2.RIGHT)
+	await _frames(20)
+	ronin.global_position = Vector3(shift + MarketShortcuts.LOCK_X, MarketShortcuts.LOCK_Y + 0.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(20)
+	Input.action_press("aim_up")
+	await _frames(10)
+	Input.action_release("aim_up")
+	await _frames(100)
+	_check("the culvert is shut from the Lower Market (%s); three cuts on the windlass open the lock, and through it he comes out under the red bridge (x %.1f)" % [not shut_through, ronin.global_position.x - shift],
+			not shut_through and "canal_lock" in SaveGame.shortcuts and absf(ronin.global_position.x - shift - MarketShortcuts.CULVERT_X) < 3.0)
+	for t: PropTarget in cuts.find_children("*", "PropTarget", true, false):
+		if absf(t.global_position.x - shift - (MarketShortcuts.LIFT_X + 1.0)) < 0.5:
+			t.take_hit(1, Vector2.RIGHT)
+	await _frames(20)
+	ronin.global_position = Vector3(shift + MarketShortcuts.LIFT_X, MarketShortcuts.LIFT_Y + 0.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(20)
+	Input.action_press("aim_up")
+	await _frames(10)
+	Input.action_release("aim_up")
+	await _frames(100)
+	_check("cutting the lift's brake rope opens the porters' lift: down it to Festival Square (x %.1f, y %.1f)" % [ronin.global_position.x - shift, ronin.global_position.y],
+			"porters_lift" in SaveGame.shortcuts and absf(ronin.global_position.x - shift - MarketShortcuts.DOOR_X) < 3.0 and absf(ronin.global_position.y - MarketShortcuts.DOOR_Y) < 1.0)
+	ronin.set("_invulnerable", 0.0)
+	SaveGame.shortcuts = saved
+
+
+## Koinobori Skies: once Shimeri is beaten his gate stands open and east
+## through it is the Skies; a drifting carp carries him; falling off into
+## the cloud takes him back to a shrine.
+func _skies(ronin: Ronin) -> void:
+	var main := ronin.get_parent()
+	var saved := [SaveGame.shimeri_beaten]
+	var post: ShimeriPost = get_first_node_in_group(&"shimeri_post")
+	SaveGame.shimeri_beaten = true
+	post.open_gate(false)
+	ronin.set("_invulnerable", 99.0)
+	ronin.global_position = Vector3(SumiMarsh.SHIFT + ShimeriPost.GATE_X - 2.0, SumiMarsh.SHALLOW_BED + 0.3, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(10)
+	Input.action_press("move_right")
+	await _frames(80)
+	Input.action_release("move_right")
+	await _frames(60)
+	_check("through Shimeri's opened gate he climbs out into Koinobori Skies (x %.1f)" % (ronin.global_position.x - KoinoboriSkies.SHIFT),
+			KoinoboriSkies.in_skies(ronin.global_position.x))
+	var carp: SkyCarp = null
+	for c: SkyCarp in main.find_children("*", "SkyCarp", true, false):
+		if c.from_x > 36.0 and c.to_x < 44.0:
+			carp = c
+	ronin.global_position = carp.global_position + Vector3(0.0, 0.5, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(20)
+	var x0 := ronin.global_position.x
+	var c0 := carp.global_position.x
+	await _frames(90)
+	_check("a drifting carp carries him (he moved %.1f m with it, %.1f m)" % [ronin.global_position.x - x0, carp.global_position.x - c0],
+			absf((ronin.global_position.x - x0) - (carp.global_position.x - c0)) < 0.4 and absf(carp.global_position.x - c0) > 0.5 and ronin.is_on_floor())
+	# The Eyrie's altar teaches the Shuriken Dash; its spin tears the paper
+	# wall that a plain dash only bumps into.
+	var skies: KoinoboriSkies = main.find_children("*", "KoinoboriSkies", true, false)[0]
+	var wall: PaperWall = null
+	for w: PaperWall in skies.find_children("*", "PaperWall", true, false):
+		if w.id == "skies_wall_eyrie":
+			wall = w
+	SaveGame.shortcuts.erase("skies_wall_eyrie")
+	ronin.global_position = Vector3(KoinoboriSkies.SHIFT + KoinoboriSkies.ALTAR_X + 2.5, 1.8, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(20)
+	Input.action_press("move_left")
+	await _frames(30)
+	Input.action_release("move_left")
+	await _frames(60)
+	var taught := ronin.has_shuriken and "shuriken" in SaveGame.abilities
+	ronin.global_position = Vector3(KoinoboriSkies.SHIFT + 154.5, 1.8, 0.0)
+	ronin.velocity = Vector3.ZERO
+	ronin.facing = 1.0
+	await _frames(20)
+	Input.action_press("jump")
+	await _frames(8)
+	Input.action_press("dash")
+	await _frames(2)
+	Input.action_release("dash")
+	await _frames(20)
+	Input.action_release("jump")
+	await _frames(30)
+	_check("the Eyrie's altar teaches the Shuriken Dash (%s); its spin tears through the paper wall (torn %s, x %.1f)" % [taught, wall.torn, ronin.global_position.x - KoinoboriSkies.SHIFT],
+			taught and wall.torn and ronin.global_position.x - KoinoboriSkies.SHIFT > 158.5)
+	# A kamaitachi gathers, whistles and streaks past; parried, it tumbles.
+	var weasel: Kamaitachi = null
+	for k: Kamaitachi in skies.find_children("*", "Kamaitachi", true, false):
+		if absf(k.global_position.x - (KoinoboriSkies.SHIFT + 200.0)) < 8.0:
+			weasel = k
+	ronin.set("_invulnerable", 0.0)
+	ronin.health = ronin.max_health
+	ronin.global_position = Vector3(KoinoboriSkies.SHIFT + 199.0, 1.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	var tumbled := false
+	var tried := false
+	for i in 500:
+		await physics_frame
+		if weasel.mode != &"pass":
+			tried = false
+			if absf(weasel.global_position.x - ronin.global_position.x) > 0.3:
+				ronin.facing = signf(weasel.global_position.x - ronin.global_position.x)
+		if not tried and weasel.mode == &"pass" and weasel.global_position.distance_to(ronin.global_position + Vector3(0.0, 1.0, 0.0)) < 2.6:
+			tried = true
+			Input.action_press("parry")
+			await _frames(2)
+			Input.action_release("parry")
+		if weasel.mode == &"stagger":
+			tumbled = true
+			break
+	_check("a kamaitachi whistles, streaks past; parried, it tumbles (%s)" % weasel.mode, tumbled)
+	ronin.has_shuriken = false
+	ronin.set("_invulnerable", 0.0)
+	SaveGame.shimeri_beaten = saved[0]
+
+
+## The Thousand Gates: once Akane has yielded in the Skies, over the rope
+## bridge is the foot of the gates; the stone wall between terraces can be
+## climbed (cling and jump) to the next terrace.
+func _gates(ronin: Ronin) -> void:
+	var saved := [SaveGame.akane_skies_dueled]
+	SaveGame.akane_skies_dueled = true
+	var skies: KoinoboriSkies = ronin.get_parent().find_children("*", "KoinoboriSkies", true, false)[0]
+	skies.duel.set(&"_state", &"done")   # (she has yielded: no meeting in the ring)
+	ronin.set_physics_process(true)
+	ronin.set("_invulnerable", 99.0)
+	ronin.global_position = Vector3(KoinoboriSkies.SHIFT + 376.0, 2.6, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(10)
+	Input.action_press("move_right")
+	await _frames(60)
+	Input.action_release("move_right")
+	await _frames(60)
+	_check("over the rope bridge from Akane's ring he comes to the Thousand Gates (x %.1f)" % (ronin.global_position.x - ThousandGates.SHIFT),
+			ThousandGates.in_gates(ronin.global_position.x))
+	# From the top ledge on the wall, one jump up and over onto the terrace.
+	ronin.global_position = Vector3(ThousandGates.SHIFT + 69.6, 10.3, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(20)
+	Input.action_press("jump")
+	for f in 50:
+		await physics_frame
+		if ronin.velocity.y < 3.0:
+			Input.action_press("move_right")
+		if f == 24:
+			Input.action_release("jump")
+	Input.action_release("jump")
+	Input.action_release("move_right")
+	await _frames(30)
+	_check("the stone wall between terraces is climbed to the next (y %.1f, terrace 12)" % ronin.global_position.y, ronin.global_position.y > 11.5)
+	# A stone fox: asleep it is stone (a cut does nothing); as he comes near
+	# its eyes kindle and it leaps down at him; parried, it cracks, stunned.
+	var gates: ThousandGates = ronin.get_parent().find_children("*", "ThousandGates", true, false)[0]
+	var fox: KitsuneStatue = null
+	for k: KitsuneStatue in gates.find_children("*", "KitsuneStatue", true, false):
+		if absf(k.position.x - 120.0) < 1.0:
+			fox = k
+	fox.take_hit(1, Vector2(1.0, 0.0))
+	var stone := fox.health == fox.max_health and fox.collision_layer == 0
+	ronin.global_position = Vector3(ThousandGates.SHIFT + 115.0, 18.1, 0.0)
+	ronin.velocity = Vector3.ZERO
+	ronin.facing = 1.0
+	ronin.set("_invulnerable", 0.0)
+	ronin.health = ronin.max_health
+	var woke := false
+	var cracked := false
+	var parried_once := false
+	for i in 900:
+		await physics_frame
+		if fox.mode == &"kindle" or fox.mode == &"leap":
+			woke = true
+		if absf(fox.global_position.x - ronin.global_position.x) > 0.3:
+			ronin.facing = signf(fox.global_position.x - ronin.global_position.x)
+		if not parried_once and (fox.mode == &"lunge" or fox.mode == &"leap") and absf(fox.global_position.x - ronin.global_position.x) < 2.0:
+			parried_once = true
+			Input.action_press("parry")
+			await _frames(2)
+			Input.action_release("parry")
+		if fox.mode != &"lunge" and fox.mode != &"leap":
+			parried_once = false
+		if fox.mode == &"stagger":
+			cracked = true
+			break
+	_check("a stone fox is stone asleep (%s), wakes and leaps down at him (%s); parried, it cracks, stunned (%s)" % [stone, woke, fox.mode],
+			stone and woke and cracked)
+	# The summit lookout: gusted, the prayer wheel winds the slab up; he rides
+	# it to the pillar's top and steps off onto the lookout.
+	var wheel: PrayerWheel = gates.find_children("*", "PrayerWheel", true, false)[0]
+	var lift: GustLift = gates.find_children("*", "GustLift", true, false)[0]
+	ronin.set("_invulnerable", 99.0)
+	ronin.global_position = lift.global_position + Vector3(0.0, 0.2, 0.0)
+	ronin.velocity = Vector3.ZERO
+	var rode := 0.0
+	for i in 400:
+		await physics_frame
+		if i % 60 == 0:
+			wheel.gusted(Vector3(1.0, 0.0, 0.0), ronin.global_position)
+		rode = maxf(rode, ronin.global_position.y)
+		if lift.global_position.y >= ThousandGates.LOOKOUT_Y - 0.02:
+			break
+	Input.action_press("move_right")
+	await _frames(50)
+	Input.action_release("move_right")
+	await _frames(20)
+	var up_there := ronin.global_position.y > ThousandGates.LOOKOUT_Y - 0.3 and ronin.global_position.x > ThousandGates.SHIFT + ThousandGates.PILLAR.x
+	# Left alone, the wheel slows (about 9 s) and the slab sinks back.
+	await _frames(1500)
+	_check("the gusted prayer wheel winds the slab up; he rides it to the lookout (y %.1f) and steps off (%s); left alone it sinks back (%.1f)" % [rode, up_there, lift.global_position.y],
+			up_there and lift.global_position.y < ThousandGates.LOOKOUT_Y - 2.0)
+	# The Flat Fold: up on the lookout he learns it at the altar. Down at the
+	# pillar's foot, ducked he cannot get under the store's shut door; folded
+	# he slides under its slit into the chamber, and out again the same way.
+	ronin.has_fold = SaveGame.abilities.has("fold")
+	ronin.global_position = Vector3(ThousandGates.SHIFT + ThousandGates.FOLD_ALTAR_X, ThousandGates.LOOKOUT_Y + 0.1, 0.0)
+	ronin.velocity = Vector3.ZERO
+	await _frames(40)
+	var learned := ronin.has_fold and "fold" in SaveGame.abilities
+	var door_x := ThousandGates.SHIFT + ThousandGates.STORE_DOOR_X
+	ronin.has_fold = false
+	ronin.global_position = Vector3(door_x - 1.0, 34.1, 0.0)
+	ronin.velocity = Vector3.ZERO
+	ronin.facing = 1.0
+	await _frames(20)
+	Input.action_press("aim_down")
+	Input.action_press("move_right")
+	await _frames(90)
+	Input.action_release("move_right")
+	var kept_out := ronin.global_position.x < door_x
+	ronin.has_fold = true
+	await _frames(5)
+	Input.action_press("dash")
+	await _frames(2)
+	Input.action_release("dash")
+	await _frames(60)
+	Input.action_release("aim_down")
+	await _frames(30)
+	var inside := ronin.global_position.x > door_x + 0.3 and ronin.global_position.y < 35.0
+	# Under the chamber's low ceiling he stays crouched; folded again, out.
+	var crouched: bool = ronin.is_crawling() or ronin.get("_ducking")
+	ronin.facing = -1.0
+	Input.action_press("aim_down")
+	Input.action_press("move_left")
+	await _frames(4)
+	Input.action_press("dash")
+	await _frames(2)
+	Input.action_release("dash")
+	Input.action_release("move_left")
+	await _frames(60)
+	Input.action_release("aim_down")
+	await _frames(20)
+	var out_again := ronin.global_position.x < door_x - 0.3
+	_check("the Flat Fold is learned at the lookout's altar (%s); ducked he cannot pass the shut door (%s); folded he slides under into the store (%s), stays crouched there (%s), and out again (%s)" % [learned, kept_out, inside, crouched, out_again],
+			learned and kept_out and inside and crouched and out_again)
+	ronin.set("_invulnerable", 0.0)
+	SaveGame.akane_skies_dueled = saved[0]

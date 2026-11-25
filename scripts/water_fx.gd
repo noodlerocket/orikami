@@ -10,7 +10,8 @@ static var _bead: GradientTexture2D
 
 ## A one-shot splash at `at` (on the water's surface). `strength` 0.3 is a
 ## step in a puddle, 1 a fall from a height.
-static func splash(parent: Node, at: Vector3, strength: float = 1.0) -> void:
+## `ink`: drops of black ink instead of water (Sumi Marsh).
+static func splash(parent: Node, at: Vector3, strength: float = 1.0, ink: bool = false) -> void:
 	var beads := CPUParticles3D.new()
 	beads.emitting = false
 	beads.one_shot = true
@@ -32,7 +33,7 @@ static func splash(parent: Node, at: Vector3, strength: float = 1.0) -> void:
 	beads.scale_amount_curve = shrink
 	var bead := QuadMesh.new()
 	bead.size = Vector2(0.05, 0.05)
-	bead.material = bead_material(Color(0.72, 0.8, 0.95, 0.75))
+	bead.material = bead_material(Color(0.72, 0.8, 0.95, 0.75)) if not ink else PaperMesh.soft_ink(Color(0.03, 0.03, 0.05, 0.95))
 	beads.mesh = bead
 	beads.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(beads)
@@ -59,7 +60,7 @@ static func splash(parent: Node, at: Vector3, strength: float = 1.0) -> void:
 	jet.scale_amount_curve = thin
 	var streak := QuadMesh.new()
 	streak.size = Vector2(0.035, 0.22)
-	var look := bead_material(Color(0.8, 0.86, 1.0, 0.45))
+	var look := bead_material(Color(0.8, 0.86, 1.0, 0.45) if not ink else Color(0.05, 0.05, 0.08, 0.8))
 	look.billboard_mode = BaseMaterial3D.BILLBOARD_FIXED_Y
 	look.billboard_keep_scale = true
 	streak.material = look

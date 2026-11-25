@@ -13,6 +13,7 @@ it. Sheets go to OUT_DIR (default docs/screenshots/sweep, which git
 ignores).
 Takes PARALLEL pictures at a time (separate copies of the game).
 """
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -34,7 +35,9 @@ PARALLEL = 4
 
 def take(x: float) -> Path:
     path = out / f"x_{x:07.1f}.png"
-    subprocess.run(["Godot_v4.7.2-stable_win64_console.exe", "--path", str(ROOT), "--", f"--x={x}", f"--y={height}",
+    # (SWEEP_ARGS: more debug flags, e.g. "--wax" so deep ink holds him up.)
+    extra = os.environ.get("SWEEP_ARGS", "").split()
+    subprocess.run(["Godot_v4.7.2-stable_win64_console.exe", "--path", str(ROOT), "--"] + extra + [f"--x={x}", f"--y={height}",
                     f"--screenshot={path}"], capture_output=True, timeout=240)
     return path
 
